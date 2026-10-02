@@ -1,0 +1,102 @@
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  color: #fff;
+  text-shadow:
+    2px 2px 0 #000,
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000;
+}
+
+.top-right {
+  position: absolute;
+  top: 24px;
+  right: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.clock {
+  font-size: 34px;
+  letter-spacing: 2px;
+}
+
+.bar {
+  width: 150px;
+  height: 12px;
+  border: 2px solid #000;
+}
+
+.health {
+  background: #b4191c;
+}
+
+.money {
+  font-size: 30px;
+  color: #36662a;
+  letter-spacing: 1px;
+}
+
+.help {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  max-width: 360px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.75);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  text-shadow: none;
+}
+
+.help b {
+  color: #e8c547;
+}
+
+.speed {
+  position: absolute;
+  bottom: 32px;
+  right: 32px;
+  font-size: 30px;
+}
+
+.radar {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  border: 3px solid #000;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+  background: #000;
+}
+
+.radar canvas {
+  display: block;
+  image-rendering: auto;
+}
+
+@media (max-width: 600px) {
+  .top-right {
+    top: 12px;
+    right: 16px;
+  }
+  .help {
+    top: 12px;
+    left: 16px;
+    max-width: 55vw;
+    font-size: 13px;
+  }
+  .radar {
+    left: 16px;
+    bottom: 16px;
+    transform: scale(0.75);
+    transform-origin: bottom left;
+  }
+}
