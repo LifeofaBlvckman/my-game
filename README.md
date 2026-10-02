@@ -1,17 +1,51 @@
-# my-game
+# Eko Streets
 
-A San Andreas-style open-world prototype that runs in the browser, built with
-React Three Fiber (Three.js), Rapier physics and Vite.
+A Lagos-set, San Andreas-style open-world game that runs in the browser, built
+with React Three Fiber (Three.js), Rapier physics and Vite.
 
-What's in it so far:
+## What's in it
 
-- A procedural low-poly city: 8x8 blocks, roads with lane markings, sidewalks,
-  parks, palm trees, street lamps, a beach and ocean around the edge
-- An on-foot character who can walk, run and jump, with a third-person mouse camera
-- A drivable car with arcade handling and a handbrake drift
-- Getting in and out of the car with **F**
-- A SA-style HUD with a clock, health bar, money and a rotating radar
-- A retro look: low render resolution, hard pixels, orange haze, short draw distance
+**The city.** A procedural Lagos split into five districts (Ikeja, Yaba,
+Surulere, Lekki and Victoria Island), each announced on screen as you enter it.
+Low-rise mainland blocks have rusty corrugated roofs, burglar bars and rooftop
+water tanks. Victoria Island has glass towers. Billboards sit on the rooftops, and
+Bar Beach wraps around the edge.
+
+**Landmarks.**
+- Oja Oba Market and Yaba Tech Market: rows of stalls with traders and shoppers.
+- Lekki Grand Mall: a glass front, a parking lot and shoppers.
+- Three clubs (Club Eko, Owambe Lounge, Afro Vibes): neon signs, a queue and a bouncer.
+- Mama put umbrellas on the sidewalks.
+
+**Traffic.**
+- Danfos, kekes, sedans and jeeps drive on the right and turn at junctions.
+- They queue behind each other, stop at red lights, and stop for you.
+- Every four-way junction has working traffic lights, zebra crossings and stop lines.
+
+**Police.** Patrol cars drive in traffic. Knocking people down or ramming a
+police car gives you wanted stars. Police then leave their lanes to chase you,
+sirens on. Stop near them and you get **BUSTED** (₦1,000 fine). Lose them for a
+while and your stars drop.
+
+**People.** About 160 pedestrians, each with a drawn face, plus outfits like
+gele, agbada, iro, braids and caps. Walkers circle the blocks, traders tend
+stalls, and shoppers browse the markets and mall. Cars knock them over, and they
+panic when someone nearby gets hit. Talk to anyone with **E**.
+
+**Jobs.** Four missions from named characters, with name tags, a marker over
+whoever you need next, typewriter dialogue in Pidgin, a "NEXT UP" objective and a
+radar blip. Rewards are paid in naira.
+
+**Driving.** Any car can be jacked with **F**. Each vehicle type handles
+differently, and Space is a handbrake drift.
+
+**Day and night.** One game minute passes per real second. At night, windows,
+street lamps and club neon light up.
+
+**Look and sound.**
+- Cel shading with ink outlines.
+- A title screen and an opening fly-in.
+- A synthesized Afrobeats loop, siren, horn and engine. No audio files.
 
 ## Run it
 
@@ -26,41 +60,91 @@ Open the URL it prints, usually http://localhost:5173.
 
 ## Controls
 
-| Key | On foot | In the car |
+| Key | On foot | In a car |
 | --- | --- | --- |
 | Mouse (click the game first) | Look around | Look around (snaps back behind the car) |
 | W A S D / arrow keys | Move | Throttle, brake/reverse, steer |
 | Shift | Run | |
 | Space | Jump | Handbrake |
-| F / Enter | Get in the car (when close) | Get out |
-| H | Show or hide the help box | |
+| E | Talk to whoever is nearby | |
+| F | Get in your car, or jack any other | Get out |
+| Q | | Horn |
+| M / O / T / H | Music on/off, ink outlines on/off, skip an hour, help box | |
 | Esc | Release the mouse | |
 
 ## Project layout
 
 ```
 src/
-  App.jsx                 Canvas, lights, fog, physics world
+  App.jsx                Scene composition
   game/
-    cityData.js           Procedural map layout (shared by the 3D scene and the radar)
-    City.jsx              Draws the city with instanced meshes; static colliders
-    buildingMaterial.js   Shader patch that draws windows from world position
-    Player.jsx            Character controller and walk animation
-    Car.jsx               Arcade vehicle
-    CameraRig.jsx         Third-person camera with wall avoidance
-    GameLogic.jsx         Entering and exiting the car, HUD updates
-    Hud.jsx, Radar.jsx    2D overlay
-    state.js              Zustand store for the HUD, plus a plain object for per-frame data
+    cityData.js          Procedural map: blocks, districts, landmarks, lanes
+    City.jsx             Ground, buildings, trees, lamps, tanks; static colliders
+    Landmarks.jsx        Market stalls, mall, clubs and neon, signs, billboards
+    TrafficLights.jsx    Lights, crossings, stop lines (timing in trafficLights.js)
+    traffic.js           Traffic and police simulation on the lane grid
+    Traffic.jsx          Draws all traffic with 3 instanced meshes; kinematic bodies
+    vehicleTypes.js      Danfo, keke, sedan, jeep, police: parts, handling
+    pedestrians.js       Crowd simulation: walkers, idlers, wanderers, knockdowns
+    Pedestrians.jsx      Draws the whole crowd with 2 instanced meshes
+    people.js            Body parts and outfits shared by the crowd and <Person>
+    faces.js             Canvas-drawn faces, Ankara print, sign textures
+    Person.jsx           One character from meshes: the player and named NPCs
+    NamedNpcs.jsx        Quest characters, name tags, markers, checkpoints
+    quests.js            Characters, missions and dialogue (edit this to add jobs)
+    Player.jsx / Car.jsx The player and their current vehicle
+    CameraRig.jsx        Follow camera, title orbit, intro fly-in
+    GameLogic.jsx        Interactions, carjacking, wanted level, busted, districts
+    DayNight.jsx         Sky, fog and light through the day
+    InkOutlines.jsx      Screen-space outline pass
+    materials.js         Toon materials and the procedural window shader
+    Shadows.jsx          Blob shadows
+    audio.js             Synthesized music and sound effects
+    Hud.jsx, Radar.jsx   2D overlay
+    state.js             Zustand store for the HUD, plus a plain object for per-frame data
 ```
 
-Two rules keep this fast on older hardware:
+Three rules keep this fast on older hardware:
 
-1. **Every repeated object is one `InstancedMesh`.** All buildings are one draw
-   call, all palm trunks are another, and so on. Keep doing this for anything
+1. **Everything repeated is instanced.** All buildings are one draw call, all
+   traffic is three, and the whole crowd is two. Keep it that way for anything
    that appears more than a few times.
 2. **Per-frame data never goes through React state.** Positions, camera angles
-   and speed live in the `world` object in `state.js`. Only things the HUD shows
-   go into the Zustand store, and those update about 10 times a second.
+   and speed live in plain objects (`world` in `state.js`, plus the `vehicles`
+   and `npcs` arrays). Only things the HUD shows go into the Zustand store.
+3. **Fake the expensive things.** Blob shadows instead of shadow maps, glowing
+   materials instead of real lights at night, and outlines from one
+   full-screen pass instead of drawing every mesh twice.
+
+If it's slow on your machine, press **O** to turn off the outlines first, then
+lower `RENDER_SCALE` in `src/App.jsx`.
+
+## Adding a job
+
+Missions live in `src/game/quests.js`. Add a character to `NPCS` (a name, a
+position and a look), then add an entry to `QUESTS`:
+
+- `giver`: the character's key.
+- `start`: the dialogue lines that start the job.
+- `steps`: either `{ npc, objective, talk }` to talk to someone, or
+  `{ goto: { x, z }, vehicle: true, objective, talk }` to drive somewhere.
+- `reward`: the pay, in naira.
+
+Jobs unlock in order.
+
+## Testing hooks
+
+While running `npm run dev`, `window.__game` exposes state and shortcuts for
+automated browser tests: `state()`, `focus()`, `teleport(x, z)`, `setTime(hours)`,
+`setWanted(n)`, `vehicles()`, `npcs()`, `enterOrExit()` and `interact()`. It is
+left out of production builds.
+
+## Credits
+
+The cel-shaded look, named NPCs with markers, typewriter dialogue, "NEXT UP"
+objectives, title screen with an intro, and the debug hook were inspired by
+[Glowin/messager](https://github.com/Glowin/messager), a Three.js study of
+Abeto's *Messenger*. No code or assets were copied.
 
 ## Bringing in Blender models
 
@@ -86,8 +170,14 @@ with your own models:
    }
    ```
 
-6. In `Car.jsx`, replace the box meshes inside the `<RigidBody>` with `<CarModel />`
-   and keep the `CuboidCollider` roughly the same size as the model.
+6. In `Car.jsx`, render `<CarModel />` instead of `<Body>` for that vehicle type,
+   and set the type's `half` in `vehicleTypes.js` to half the model's width,
+   height and length so the collider matches. The model's origin should sit
+   at the center of that box.
+
+Traffic draws vehicles from the box lists in `vehicleTypes.js` so that all of
+them fit in three draw calls. To use your model there too, render it with drei's
+`<Instances>` / `<Merged>`, or start by swapping it in only for the player's car.
 
 For a character with walking animations, rig it in Blender (or use Mixamo),
 export the animations in the same .glb, and play them with drei's `useAnimations`.
@@ -95,21 +185,19 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 ## Tuning
 
 - Render sharpness: `RENDER_SCALE` in `src/App.jsx` (0.6 by default; 1 is native).
-- Car handling: the constants at the top of `src/game/Car.jsx`.
-- City size and density: `GRID`, `BLOCK` and `ROAD` in `src/game/cityData.js`,
-  and the seed passed to `generateCity`.
-- Draw distance: the `fog` and the camera `far` value in `src/App.jsx`.
+- Car handling: `src/game/vehicleTypes.js` (per vehicle) and the constants in `src/game/Car.jsx`.
+- Traffic density: `TRAFFIC` and `POLICE` in `src/game/traffic.js`. Light timing: `src/game/trafficLights.js`.
+- Crowd size: `WALKERS` in `src/game/pedestrians.js`.
+- City layout: `GRID`, `BLOCK`, `ROAD` and the landmark lists in `src/game/cityData.js`.
+- Time of day: `world.time` in `src/game/state.js` (minutes since midnight; the game starts at 17:00).
 
 ## Roadmap
 
-Rough order, each step playable on its own:
-
-1. Your own car and character models from Blender (see above)
-2. More vehicles, with a different handling preset for each
-3. Pedestrians and traffic that follow the road grid (the grid already gives you lanes)
-4. Day and night cycle tied to the HUD clock, with lit windows at night
-5. Health, damage, and a "wasted" screen with a respawn
-6. Missions: trigger markers, objectives, cutscene camera
-7. Weapons and wanted levels
-8. A hand-built map in Blender to replace or extend the procedural one, split
-   into chunks that load as you drive (streaming)
+1. Your own Blender models for Tunde, the danfo and the keke (see above)
+2. Health, damage and a "wasted" screen
+3. Okadas weaving through traffic, and go-slow jams on the main roads
+4. Shops and food you can buy with your naira, plus saving progress
+5. More jobs, with timers and chases
+6. Third Mainland Bridge and the lagoon
+7. A hand-built map in Blender to replace or extend the procedural one, split
+   into chunks that load as you drive

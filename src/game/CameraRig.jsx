@@ -6,17 +6,20 @@ import { useGame, world } from './state'
 
 const desired = new Vector3()
 const lookAt = new Vector3()
+const from = new Vector3()
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a))
+export const INTRO_LENGTH = 7 // seconds of fly-in before the phone call
 
 // Third-person orbit camera. Click the game to capture the mouse, Esc to release.
+// On the title screen it circles the city; during the intro it swoops down to Tunde.
 export default function CameraRig() {
   const { camera, gl } = useThree()
   const { rapier, world: physics } = useRapier()
 
   useEffect(() => {
     const canvas = gl.domElement
-    const lock = () => canvas.requestPointerLock?.()
+    const lock = () => useGame.getState().phase === 'playing' && canvas.requestPointerLock?.()
     const onMove = (e) => {
       if (document.pointerLockElement !== canvas) return
       world.cameraYaw -= e.movementX * 0.0025
@@ -31,28 +34,52 @@ export default function CameraRig() {
     }
   }, [gl])
 
-  useFrame((_, dt) => {
-    const driving = useGame.getState().mode === 'car'
+  useFrame(({ clock }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    const game = useGame.getState()
 
-    // While driving, swing back behind the car once the mouse has been idle.
-    if (driving && performance.now() - world.lastMouseMove > 1200) {
-      const behind = world.heading + Math.PI
-      world.cameraYaw += wrapAngle(behind - world.cameraYaw) * Math.min(1, dt * 2.5)
-      world.cameraPitch += (0.3 - world.cameraPitch) * Math.min(1, dt * 2)
+    if (game.phase === 'title') {
+      const t = clock.elapsedTime * 0.05
+      camera.position.set(Math.sin(t) * 150, 70, Math.cos(t) * 150)
+      camera.lookAt(0, 10, 0)
+      return
     }
 
+    const driving = game.mode === 'car'
     const distance = driving ? 9 : 5
-    const { cameraYaw: yaw, cameraPitch: pitch, focus } = world
+    const { focus } = world
     lookAt.set(focus.x, focus.y + (driving ? 1.2 : 0.8), focus.z)
+
+    // While driving, swing back behind the car once the mouse has been idle.
+    // On foot, do the same more gently after a few seconds.
+    const idle = performance.now() - world.lastMouseMove
+    if ((driving && idle > 1200) || (!driving && idle > 4000 && game.phase === 'playing')) {
+      const behind = world.heading + Math.PI
+      const rate = driving ? 2.5 : 0.6
+      world.cameraYaw += wrapAngle(behind - world.cameraYaw) * Math.min(1, dt * rate)
+      world.cameraPitch += ((driving ? 0.3 : 0.35) - world.cameraPitch) * Math.min(1, dt * 2)
+    }
+
+    const { cameraYaw: yaw, cameraPitch: pitch } = world
     desired.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))
 
     // Pull the camera in if a building is between it and the target.
     const ray = new rapier.Ray(lookAt, desired)
     const exclude = driving ? world.car : world.player
-    const hit = physics.castRay(ray, distance, true, undefined, undefined, undefined, exclude)
+    const hit = physics.castRay(ray, distance, true, undefined, undefined, undefined, exclude, (c) => !world.trafficColliders.has(c.handle))
     const d = hit ? Math.max(1, hit.timeOfImpact - 0.3) : distance
-
     desired.multiplyScalar(d).add(lookAt)
+
+    if (game.phase === 'intro') {
+      // Swoop from high over Victoria Island down to the usual follow position.
+      const k = Math.min(1, (performance.now() / 1000 - world.introStart) / INTRO_LENGTH)
+      const e = 1 - Math.pow(1 - k, 3)
+      from.set(lookAt.x + 90, 85, lookAt.z + 120)
+      camera.position.lerpVectors(from, desired, e)
+      camera.lookAt(lookAt)
+      return
+    }
+
     camera.position.lerp(desired, 1 - Math.exp(-12 * dt))
     camera.lookAt(lookAt)
   })

@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { city, CELL, GRID, ROAD } from './cityData'
-import { world } from './state'
+import { vehicles } from './traffic'
+import { useGame, world } from './state'
 
 const SIZE = 170 // px on screen
 const SCALE = 0.75 // px per meter
 const MAP_PX = 2 // offscreen map resolution, px per meter
 const EXTENT = GRID * CELL + ROAD + 80
 const OCEAN = '#3c6f8c'
+const RIM = SIZE / 2 - 9
 
 // Draw the whole map once, then just rotate and crop it every frame.
 function drawMap() {
@@ -17,15 +19,18 @@ function drawMap() {
   ctx.translate(EXTENT / 2, EXTENT / 2)
   ctx.fillStyle = '#c9b680'
   ctx.fillRect(-EXTENT / 2, -EXTENT / 2, EXTENT, EXTENT)
-  const city2 = GRID * CELL + ROAD
+  const size = GRID * CELL + ROAD
   ctx.fillStyle = '#2e2f33'
-  ctx.fillRect(-city2 / 2, -city2 / 2, city2, city2)
-  ctx.fillStyle = '#7d7f73'
-  city.blocks.forEach((b) => ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d))
+  ctx.fillRect(-size / 2, -size / 2, size, size)
+  city.blocks.forEach((b) => {
+    ctx.fillStyle = b.color === '#a8784c' ? '#9a6d45' : '#7d7f73'
+    ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d)
+  })
   ctx.fillStyle = '#5f8a3c'
   city.parks.forEach((p) => ctx.fillRect(p.x - p.w / 2, p.z - p.d / 2, p.w, p.d))
   ctx.fillStyle = '#a5a79c'
   city.buildings.forEach((b) => ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d))
+  city.solids.filter((s) => s.collider && !s.hidden).forEach((s) => ctx.fillRect(s.x - s.w / 2, s.z - s.d / 2, s.w, s.d))
   return canvas
 }
 
@@ -37,9 +42,36 @@ export default function Radar() {
     const ctx = ref.current.getContext('2d')
     let frame
 
+    // Blip at a world position; clamped to the rim when it's off the radar.
+    const blip = (x, z, rot, color, size, square) => {
+      let dx = (x - world.focus.x) * SCALE
+      let dz = (z - world.focus.z) * SCALE
+      const c = Math.cos(rot)
+      const s = Math.sin(rot)
+      let px = dx * c - dz * s
+      let py = dx * s + dz * c
+      const d = Math.hypot(px, py)
+      if (d > RIM) {
+        px *= RIM / d
+        py *= RIM / d
+      }
+      ctx.fillStyle = color
+      ctx.strokeStyle = '#000'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      if (square) ctx.rect(SIZE / 2 + px - size, SIZE / 2 + py - size, size * 2, size * 2)
+      else ctx.arc(SIZE / 2 + px, SIZE / 2 + py, size, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+
     const draw = () => {
       frame = requestAnimationFrame(draw)
-      const { focus, cameraYaw, heading, car } = world
+      const { focus, cameraYaw, heading, car, objective } = world
+      const game = useGame.getState()
+      // Rotate so "up" on the radar is the direction the camera faces.
+      const rot = -Math.PI / 2 - Math.atan2(-Math.cos(cameraYaw), -Math.sin(cameraYaw))
+
       ctx.save()
       ctx.beginPath()
       ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 3, 0, Math.PI * 2)
@@ -47,22 +79,27 @@ export default function Radar() {
       ctx.fillStyle = OCEAN
       ctx.fillRect(0, 0, SIZE, SIZE)
 
-      // Rotate so "up" on the radar is the direction the camera faces.
-      ctx.translate(SIZE / 2, SIZE / 2)
-      ctx.rotate(-Math.PI / 2 - Math.atan2(-Math.cos(cameraYaw), -Math.sin(cameraYaw)))
       ctx.save()
+      ctx.translate(SIZE / 2, SIZE / 2)
+      ctx.rotate(rot)
       ctx.scale(SCALE, SCALE)
       ctx.translate(-focus.x, -focus.z)
       ctx.drawImage(map, -EXTENT / 2, -EXTENT / 2, EXTENT, EXTENT)
-      if (car && world.player?.isEnabled()) {
-        const c = car.translation()
-        ctx.fillStyle = '#4fa3ff'
-        ctx.fillRect(c.x - 3, c.z - 3, 6, 6)
-      }
       ctx.restore()
 
+      if (car && game.mode === 'foot') {
+        const c = car.translation()
+        blip(c.x, c.z, rot, '#4fa3ff', 3.5, true)
+      }
+      if (game.wanted > 0) {
+        const flash = Math.floor(performance.now() / 250) % 2 === 0
+        vehicles.forEach((v) => v.chasing && blip(v.x, v.z, rot, flash ? '#ff3030' : '#3060ff', 3.5))
+      }
+      if (objective) blip(objective.x, objective.z, rot, '#ffd23a', 5.5)
+
       // Player arrow.
-      ctx.rotate(Math.atan2(Math.cos(heading), Math.sin(heading)))
+      ctx.translate(SIZE / 2, SIZE / 2)
+      ctx.rotate(rot + Math.atan2(Math.cos(heading), Math.sin(heading)))
       ctx.fillStyle = '#fff'
       ctx.strokeStyle = '#000'
       ctx.lineWidth = 1.5

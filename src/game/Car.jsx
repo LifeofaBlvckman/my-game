@@ -1,33 +1,42 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { CoefficientCombineRule, CuboidCollider, RigidBody } from '@react-three/rapier'
 import { Quaternion, Vector3 } from 'three'
 import { city } from './cityData'
 import { useGame, world } from './state'
+import { partColor, VEHICLES } from './vehicleTypes'
+import { setEngine } from './audio'
+import { Blob } from './Shadows'
+import { toonRamp } from './materials'
 
 // Arcade handling: we drive the body's velocity directly instead of simulating
 // tires. Easy to tune and stable, which matters more than realism for a SA feel.
-const ACCEL = 10
-const REVERSE_ACCEL = 8
 const BRAKE = 32
 const ROLLING_DRAG = 4
-const MAX_SPEED = 45 // m/s, about 160 km/h
 const MAX_REVERSE = 12
 const GRIP = 12 // how fast sideways sliding is killed
 const DRIFT_GRIP = 1.5 // handbrake grip
-const STEER_RATE = 2.2
-
-const WHEEL_RADIUS = 0.4
-const WHEELS = [
-  [0.85, -0.1, 1.3, true],
-  [-0.85, -0.1, 1.3, true],
-  [0.85, -0.1, -1.3, false],
-  [-0.85, -0.1, -1.3, false],
-]
 
 const q = new Quaternion()
 const fwd = new Vector3()
+
+function Body({ type, color }) {
+  const def = VEHICLES[type]
+  return def.parts.map((p, i) =>
+    p[7] ? (
+      <mesh key={i} position={[p[0], p[1], p[2]]}>
+        <boxGeometry args={[p[3], p[4], p[5]]} />
+        <meshBasicMaterial color={partColor(p, color)} toneMapped={false} />
+      </mesh>
+    ) : (
+      <mesh key={i} position={[p[0], p[1], p[2]]}>
+        <boxGeometry args={[p[3], p[4], p[5]]} />
+        <meshToonMaterial gradientMap={toonRamp} color={partColor(p, color)} />
+      </mesh>
+    ),
+  )
+}
 
 export default function Car() {
   const body = useRef()
@@ -35,15 +44,21 @@ export default function Car() {
   const wheelSteer = useRef([])
   const steer = useRef(0)
   const [, getKeys] = useKeyboardControls()
+  const type = useGame((s) => s.carType)
+  const color = useGame((s) => s.carColor)
+  const def = VEHICLES[type]
+  const wheels = useMemo(() => def.wheels.at.map((w, i) => ({ w, front: w[2] > 0, i })), [def])
 
   useEffect(() => {
     world.car = body.current
   }, [])
 
-  useFrame((_, dt) => {
+  useFrame((_, rawDt) => {
     const b = body.current
     if (!b) return
-    const driving = useGame.getState().mode === 'car'
+    const dt = Math.min(rawDt, 0.1)
+    const game = useGame.getState()
+    const driving = game.mode === 'car' && game.phase === 'playing' && !game.dialogue
     const keys = driving ? getKeys() : {}
 
     const r = b.rotation()
@@ -60,13 +75,13 @@ export default function Car() {
     const throttle = Number(!!keys.forward) - Number(!!keys.back)
     if (throttle !== 0) {
       const braking = Math.abs(speed) > 0.5 && Math.sign(speed) !== throttle
-      const accel = braking ? BRAKE : throttle > 0 ? ACCEL : REVERSE_ACCEL
+      const accel = braking ? BRAKE : throttle > 0 ? def.accel : def.accel * 0.8
       speed += throttle * accel * dt
     } else {
       speed -= Math.sign(speed) * Math.min(Math.abs(speed), ROLLING_DRAG * dt)
     }
     if (keys.jump) speed -= Math.sign(speed) * Math.min(Math.abs(speed), 18 * dt)
-    speed = Math.max(-MAX_REVERSE, Math.min(MAX_SPEED, speed))
+    speed = Math.max(-MAX_REVERSE, Math.min(def.maxSpeed, speed))
 
     const grip = Math.exp(-(keys.jump ? DRIFT_GRIP : GRIP) * dt)
     latX *= grip
@@ -77,76 +92,41 @@ export default function Car() {
     const steerInput = Number(!!keys.left) - Number(!!keys.right)
     steer.current += (steerInput - steer.current) * Math.min(1, dt * 8)
     const rolling = Math.max(-1, Math.min(1, speed / 6))
-    const yawRate = steer.current * STEER_RATE * rolling * (keys.jump ? 1.4 : 1) / (1 + Math.abs(speed) / 35)
+    const yawRate = (steer.current * def.steer * rolling * (keys.jump ? 1.4 : 1)) / (1 + Math.abs(speed) / 35)
     b.setAngvel({ x: 0, y: yawRate, z: 0 }, true)
 
-    wheelSpin.current.forEach((w) => w && (w.rotation.x += (speed * dt) / WHEEL_RADIUS))
+    wheelSpin.current.forEach((w) => w && (w.rotation.x += (speed * dt) / def.wheels.r))
     wheelSteer.current.forEach((w) => w && (w.rotation.y = steer.current * 0.5))
 
-    if (driving) {
+    world.carHeading = Math.atan2(fwd.x, fwd.z)
+    if (game.mode === 'car') {
       const p = b.translation()
       world.focus.set(p.x, p.y, p.z)
-      world.heading = Math.atan2(fwd.x, fwd.z)
-      world.carSpeed = Math.abs(speed)
+      world.heading = world.carHeading
+      world.carSpeed = speed
     }
+    setEngine(game.mode === 'car', speed)
   })
 
   return (
-    <RigidBody
-      ref={body}
-      colliders={false}
-      position={city.carSpawn}
-      enabledRotations={[false, true, false]}
-      canSleep={false}
-    >
-      <CuboidCollider args={[0.95, 0.5, 2.15]} mass={1200} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
-      {/* Body */}
-      <mesh position-y={0.1}>
-        <boxGeometry args={[1.9, 0.6, 4.3]} />
-        <meshLambertMaterial color="#3d7a3a" />
-      </mesh>
-      {/* Cabin */}
-      <mesh position={[0, 0.7, -0.3]}>
-        <boxGeometry args={[1.7, 0.6, 2.2]} />
-        <meshLambertMaterial color="#2d5a2b" />
-      </mesh>
-      {/* Windshield and rear window */}
-      <mesh position={[0, 0.7, 0.81]}>
-        <boxGeometry args={[1.5, 0.48, 0.02]} />
-        <meshLambertMaterial color="#9fc4d6" />
-      </mesh>
-      <mesh position={[0, 0.7, -1.41]}>
-        <boxGeometry args={[1.5, 0.48, 0.02]} />
-        <meshLambertMaterial color="#9fc4d6" />
-      </mesh>
-      {/* Lights */}
-      {[0.65, -0.65].map((x) => (
-        <group key={x}>
-          <mesh position={[x, 0.15, 2.16]}>
-            <boxGeometry args={[0.35, 0.18, 0.02]} />
-            <meshBasicMaterial color="#fff6d0" />
-          </mesh>
-          <mesh position={[x, 0.15, -2.16]}>
-            <boxGeometry args={[0.35, 0.18, 0.02]} />
-            <meshBasicMaterial color="#c0262a" />
-          </mesh>
-        </group>
-      ))}
-      {/* Wheels */}
-      {WHEELS.map(([x, y, z, front], i) => (
-        <group key={i} position={[x, y, z]} ref={(el) => front && (wheelSteer.current[i] = el)}>
+    <RigidBody ref={body} colliders={false} position={city.carSpawn} rotation={[0, Math.PI, 0]} enabledRotations={[false, true, false]} canSleep={false}>
+      <CuboidCollider key={type} args={def.half} mass={1200} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
+      <Body type={type} color={color} />
+      {wheels.map(({ w, front, i }) => (
+        <group key={`${type}${i}`} position={w} ref={(el) => (wheelSteer.current[i] = front ? el : null)}>
           <mesh ref={(el) => (wheelSpin.current[i] = el)}>
             <mesh rotation-z={Math.PI / 2}>
-              <cylinderGeometry args={[WHEEL_RADIUS, WHEEL_RADIUS, 0.3, 8]} />
-              <meshLambertMaterial color="#1c1c1c" />
+              <cylinderGeometry args={[def.wheels.r, def.wheels.r, 0.28, 10]} />
+              <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
             </mesh>
             <mesh rotation-z={Math.PI / 2}>
-              <boxGeometry args={[0.3, 0.32, 0.12]} />
-              <meshLambertMaterial color="#aaaaaa" />
+              <boxGeometry args={[0.29, def.wheels.r * 0.8, 0.12]} />
+              <meshToonMaterial gradientMap={toonRamp} color="#aaaaaa" />
             </mesh>
           </mesh>
         </group>
       ))}
+      <Blob position-y={-def.half[1] + 0.03} scale={[def.half[0] * 2.6, 1, def.half[2] * 2.4]} />
     </RigidBody>
   )
 }

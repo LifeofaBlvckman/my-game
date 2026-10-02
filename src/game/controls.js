@@ -5,5 +5,7 @@ export const keyMap = [
   { name: 'right', keys: ['KeyD', 'ArrowRight'] },
   { name: 'run', keys: ['ShiftLeft', 'ShiftRight'] },
   { name: 'jump', keys: ['Space'] }, // also the handbrake while driving
-  { name: 'enter', keys: ['KeyF', 'Enter'] },
+  { name: 'enter', keys: ['KeyF'] },
+  { name: 'interact', keys: ['KeyE'] },
+  { name: 'horn', keys: ['KeyQ'] },
 ]
