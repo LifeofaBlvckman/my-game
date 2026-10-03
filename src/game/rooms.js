@@ -199,25 +199,60 @@ export const INTERIORS = {
     wall: '#f4f8f4',
     light: '#f4fbff',
     props: [
-      [0, 0.55, -1, 5, 1.1, 1, '#2f8a6a', S], // front desk
-      [0, 1.12, -1, 5.1, 0.06, 1.1, '#f2f2f2'],
-      [0, 3.1, -7.85, 1.2, 0.4, 0.06, '#e8202a', G], // red cross on the back wall
-      [0, 3.1, -7.85, 0.4, 1.2, 0.06, '#e8202a', G],
-      ...rowOf(4, -8.5, 2.6, (z) => [-9, 0.32, z, 2.0, 0.64, 1.0, '#f7f7f7', S]), // beds along the left wall
-      ...rowOf(4, -8.5, 2.6, (z) => [-9.85, 0.75, z, 0.25, 0.3, 0.9, '#c9e6f2']), // pillows
-      ...rowOf(4, -8.5, 2.6, (z) => [-7.8, 0.95, z + 0.6, 0.04, 1.9, 0.04, '#b0b4b8']), // drip stands
-      ...rowOf(4, -8.5, 2.6, (z) => [-7.8, 1.8, z + 0.6, 0.18, 0.28, 0.06, '#d8f0ff', G]),
-      ...rowOf(3, -7.2, 2.6, (z) => [-8.95, 1.4, z + 1.3, 2.1, 2.2, 0.04, '#9fd0c8']), // curtains between beds
-      ...rowOf(5, 3.5, 1.2, (x) => [x, 0.24, 5.4, 0.9, 0.48, 0.9, '#3d6f8a', S]), // waiting chairs
-      [8.5, 0.9, -5.5, 1.4, 1.8, 0.7, '#e8e8e8', S], // medicine cabinet
-      [8.5, 1.4, -5.13, 1.2, 0.6, 0.02, '#a8d8e8', G],
+      // Reception: desk with a computer, a chair behind it
+      [0, 0.55, -1, 5, 1.1, 1, '#2f8a6a', S],
+      [0, 1.12, -1, 5.2, 0.06, 1.15, '#f2f2f2'],
+      [-1.2, 1.38, -1.2, 0.6, 0.42, 0.05, '#1d1d22'], // monitor
+      [-1.2, 1.38, -1.17, 0.52, 0.34, 0.02, '#7fd0ff', G],
+      [-1.2, 1.16, -1.2, 0.08, 0.1, 0.08, '#1d1d22'],
+      [-1.0, 1.16, -0.85, 0.45, 0.02, 0.16, '#2a2d33'], // keyboard
+      [1.2, 0.3, -2.1, 0.55, 0.06, 0.55, '#3d4a5c'], // desk chair
+      [1.2, 0.6, -2.35, 0.55, 0.55, 0.06, '#3d4a5c'],
+      [0, 3.0, -7.85, 1.2, 0.4, 0.06, '#e8202a', G], // red cross on the back wall
+      [0, 3.0, -7.85, 0.4, 1.2, 0.06, '#e8202a', G],
+      // Ward along the left wall: metal beds, white sheets, a coloured blanket
+      ...rowOf(4, -6.6, 2.7, (z) => [-9.1, 0.5, z, 2.0, 0.16, 0.95, '#f7f7f7', S]), // mattress
+      ...rowOf(4, -6.6, 2.7, (z) => [-8.75, 0.6, z, 1.2, 0.06, 1.0, ['#5fa8c8', '#9fd0a8', '#e8b4c8', '#f4d58a'][Math.abs(Math.round(z)) % 4]]), // blanket
+      ...rowOf(4, -6.6, 2.7, (z) => [-9.85, 0.64, z, 0.36, 0.12, 0.6, '#ffffff']), // pillow
+      ...rowOf(4, -6.6, 2.7, (z) => [-10.15, 0.75, z, 0.06, 0.9, 1.0, '#9aa4ac']), // headboard
+      ...rowOf(4, -6.6, 2.7, (z) => [-9.1, 0.36, z, 2.0, 0.08, 0.95, '#9aa4ac']), // frame
+      ...rowOf(4, -6.6, 2.7, (z) => [-8.15, 0.18, z + 0.4, 0.05, 0.36, 0.05, '#9aa4ac']), // legs
+      ...rowOf(4, -6.6, 2.7, (z) => [-8.15, 0.18, z - 0.4, 0.05, 0.36, 0.05, '#9aa4ac']),
+      ...rowOf(4, -6.6, 2.7, (z) => [-7.75, 0.95, z + 0.55, 0.04, 1.9, 0.04, '#b0b4b8']), // drip stands
+      ...rowOf(4, -6.6, 2.7, (z) => [-7.75, 1.75, z + 0.55, 0.16, 0.26, 0.06, '#d8f0ff', G]),
+      // Ceiling rails with the curtains bunched back between the beds
+      ...rowOf(3, -5.25, 2.7, (z) => [-9.0, 3.6, z, 2.4, 0.04, 0.04, '#9aa4ac']),
+      ...rowOf(3, -5.25, 2.7, (z) => [-10.0, 2.25, z, 0.5, 2.7, 0.08, '#9fd0c8']),
+      // Waiting area: chairs with backs, a water dispenser, a plant
+      ...rowOf(5, 3.4, 1.0, (x) => [x, 0.42, 5.6, 0.8, 0.08, 0.7, '#3d6f8a', S]),
+      ...rowOf(5, 3.4, 1.0, (x) => [x, 0.75, 5.95, 0.8, 0.62, 0.06, '#3d6f8a']),
+      ...rowOf(5, 3.4, 1.0, (x) => [x, 0.2, 5.6, 0.06, 0.4, 0.6, '#5a6066']),
+      [9.9, 0.55, 2.0, 0.45, 1.1, 0.45, '#f2f2f2', S], // water dispenser
+      [9.9, 1.3, 2.0, 0.32, 0.45, 0.32, '#7fd0ff', G],
+      [9.9, 0.3, -1.0, 0.5, 0.6, 0.5, '#b5583c', S], // plant
+      [9.9, 0.95, -1.0, 0.8, 0.9, 0.8, '#3f8a3a', { shape: 'sphere' }],
+      // Wheelchair parked by the desk
+      [3.6, 0.45, -1.2, 0.6, 0.06, 0.6, '#1d1d22'],
+      [3.6, 0.75, -1.5, 0.6, 0.6, 0.05, '#1d1d22'],
+      [3.3, 0.3, -1.2, 0.05, 0.6, 0.6, '#7a8a96', { shape: 'cylinder' }],
+      [3.9, 0.3, -1.2, 0.05, 0.6, 0.6, '#7a8a96', { shape: 'cylinder' }],
+      // Medicine cabinet and posters
+      [8.5, 0.9, -7.4, 1.4, 1.8, 0.6, '#e8e8e8', S],
+      [8.5, 1.4, -7.08, 1.2, 0.6, 0.02, '#a8d8e8', G],
+      [10.88, 2.2, 4.0, 0.04, 0.9, 0.7, '#3d8bfd'], // "wash your hands" poster
+      [10.86, 2.25, 4.0, 0.03, 0.5, 0.5, '#ffffff'],
+      [-3.5, 2.3, -7.88, 1.2, 0.8, 0.04, '#2f8a6a'], // notice board
+      [-3.5, 2.3, -7.86, 1.0, 0.6, 0.02, '#f7f1e3'],
+      // Ceiling light panels
+      ...rowOf(3, -6, 6, (x) => [x, 4.15, -3, 1.6, 0.05, 0.8, '#ffffff', G]),
+      ...rowOf(3, -6, 6, (x) => [x, 4.15, 3, 1.6, 0.05, 0.8, '#ffffff', G]),
     ],
     npcs: [
-      { pos: [-9.1, -8.5], y: 0.66, yaw: 0, anim: 'lie', seed: 801 },
-      { pos: [-9.1, -3.3], y: 0.66, yaw: 0, anim: 'lie', seed: 802 },
-      { pos: [4.5, -4], yaw: -Math.PI / 2, anim: 'idle', seed: 803, look: { top: '#f2f2f2', bottom: '#f2f2f2', robe: true } }, // doctor
-      { pos: [4.7, 5.4], yaw: Math.PI, anim: 'sit', seed: 804 },
-      { pos: [7.1, 5.4], yaw: Math.PI, anim: 'sit', seed: 805 },
+      { pos: [-9.0, -6.6], y: 0.63, yaw: 0, anim: 'lie', seed: 801 },
+      { pos: [-9.0, -1.2], y: 0.63, yaw: 0, anim: 'lie', seed: 802 },
+      { pos: [-7.2, -1.2], yaw: -Math.PI / 2, anim: 'idle', seed: 803, look: { top: '#f2f2f2', bottom: '#f2f2f2', robe: true } }, // doctor at a bedside
+      { pos: [4.4, 5.55], yaw: Math.PI, anim: 'sit', seed: 804 },
+      { pos: [6.4, 5.55], yaw: Math.PI, anim: 'sit', seed: 805 },
     ],
   },
   // Where you're let out after being busted.

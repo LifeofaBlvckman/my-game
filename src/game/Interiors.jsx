@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import { BoxGeometry, Color, CylinderGeometry, SphereGeometry } from 'three'
 import Person from './Person'
+import { FishTank, Painting } from './Ornaments'
 import { Instances } from './Instances'
 import { computePose, lookFromSeed } from './people'
 import { INTERIORS } from './rooms'
@@ -16,6 +17,8 @@ const WALL = 0.3
 
 function Prop({ p }) {
   const [x, y, z, w, h, d, color, opts = {}] = p
+  if (opts.kind === 'tank') return <FishTank p={p} />
+  if (opts.kind === 'painting') return <Painting p={p} />
   const geometry = geometries[opts.shape ?? 'box']
   // Cylinders stand upright, unless much wider than deep (a vault door): then they face forward.
   const flat = opts.shape === 'cylinder' && w > d * 2
