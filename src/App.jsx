@@ -19,6 +19,7 @@ import RemotePlayers from './game/RemotePlayers'
 import ShadowCasters from './game/ShadowCasters'
 import Interiors from './game/Interiors'
 import Hud from './game/Hud'
+import Birds from './game/Birds'
 import { keyMap } from './game/controls'
 import { useGame } from './game/state'
 
@@ -26,7 +27,9 @@ import { useGame } from './game/state'
 // screen's own sharpness (up to 1.5x on Retina screens) and steps down if
 // the frame rate struggles. Real shadows go first, before it drops below one
 // pixel per screen point, so the picture stays sharp on an older laptop.
-const DEVICE_SCALE = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
+// Phones get a lighter start: their screens are dense but their GPUs are small.
+const PHONE = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+const DEVICE_SCALE = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, PHONE ? 1.25 : 1.5)
 const RENDER_STEPS = [...new Set([DEVICE_SCALE, 1.25, 1, 0.85].filter((v) => v <= DEVICE_SCALE))]
 
 export default function App() {
@@ -61,6 +64,7 @@ export default function App() {
         />
         <ShadowCasters />
         <DayNight />
+        <Birds />
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]}>
             <City />

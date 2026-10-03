@@ -3,6 +3,7 @@ import Radar from './Radar'
 import { INTRO_LENGTH } from './CameraRig'
 import { currentTarget, INTRO_CALL } from './quests'
 import { blip, setMusic, startAudio } from './audio'
+import TouchControls, { isTouch } from './TouchControls'
 import { openDialogue, placeInRoom } from './GameLogic'
 import { addChat, connectMultiplayer } from './net'
 import { useGame, world } from './state'
@@ -66,22 +67,33 @@ function Title() {
           <input id="player-name" maxLength={16} defaultValue={savedName()} placeholder="Tunde" autoComplete="off" />
         </label>
         <button className="start" onClick={startGame}>
-          Press Enter to start
+          {isTouch ? 'Tap to start' : 'Press Enter to start'}
         </button>
+        {isTouch ? (
+          <ul className="keys">
+            <li>
+              Left thumb: move (push all the way to sprint) · Right thumb: look around
+            </li>
+            <li>
+              👊 punch · <b>JUMP</b> · <b>CAR</b> get in or out · <b>E</b> talk or go through a door · 😀 emoji
+            </li>
+          </ul>
+        ) : (
         <ul className="keys">
-          <li>
-            <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump / handbrake
-          </li>
-          <li>
-            <b>E</b> talk · <b>F</b> enter, exit or jack a car · <b>Q</b> horn
-          </li>
-          <li>
-            <b>Click</b> or <b>X</b> punch · <b>Y</b> chat when online
-          </li>
-          <li>
-            <b>M</b> music · <b>O</b> outlines · <b>T</b> skip an hour · <b>H</b> help
-          </li>
-        </ul>
+            <li>
+              <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump / handbrake
+            </li>
+            <li>
+              <b>E</b> talk · <b>F</b> enter, exit or jack a car · <b>Q</b> horn
+            </li>
+            <li>
+              <b>Click</b> or <b>X</b> punch · <b>Y</b> chat when online
+            </li>
+            <li>
+              <b>1</b>–<b>8</b> emoji · <b>M</b> music · <b>O</b> outlines · <b>T</b> skip an hour · <b>H</b> help
+            </li>
+          </ul>
+        )}
       </div>
     </div>
   )
@@ -228,7 +240,7 @@ export default function Hud() {
   const playing = game.phase === 'playing'
 
   return (
-    <div className="hud">
+    <div className={`hud ${isTouch ? 'is-touch' : ''}`}>
       {game.phase === 'intro' && !game.dialogue && <IntroCaptions />}
 
       {playing && (
@@ -249,7 +261,7 @@ export default function Hud() {
             </div>
           )}
 
-          {(game.prompt || showHelp) && !game.dialogue && (
+          {(game.prompt || (showHelp && !isTouch)) && !game.dialogue && (
             <div className="help">
               {game.prompt ?? (
                 <>
@@ -282,6 +294,7 @@ export default function Hud() {
             </div>
           )}
           {!game.inside && <Radar />}
+          {isTouch && !game.dialogue && <TouchControls />}
           {game.hold && (
             <div className="hold">
               <span>FILLING THE BAG</span>

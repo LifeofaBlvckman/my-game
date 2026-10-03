@@ -44,24 +44,31 @@ function RoomPerson({ npc, index }) {
       p.bob = Math.abs(Math.sin(beat)) * 0.12
       p.armL = -2.2 - Math.sin(beat) * 0.6
       p.armR = -1.2 + Math.sin(beat) * 0.9
-      p.legL = Math.sin(beat) * 0.25
-      p.legR = -Math.sin(beat) * 0.25
+      p.legL = Math.sin(beat) * 0.25 - 0.1
+      p.legR = -Math.sin(beat) * 0.25 - 0.1
+      p.shinL = p.shinR = 0.2 + Math.abs(Math.sin(beat)) * 0.3
+      p.foreL = -0.6
+      p.foreR = -1.2
       p.twist = Math.sin(beat * 0.5) * 0.4
       p.headNod = Math.sin(beat * 2) * 0.12
     } else if (npc.anim === 'dj') {
       const beat = t * Math.PI * 2 * (104 / 60)
-      p.armL = p.armR = -1.1
+      p.armL = p.armR = -0.9
+      p.foreL = p.foreR = -0.6
       p.lean = 0.25
       p.headNod = Math.sin(beat) * 0.18
       p.bob = Math.abs(Math.sin(beat)) * 0.04
     } else if (npc.anim === 'sit') {
       p.bob = -0.42
       p.legL = p.legR = -1.5
+      p.shinL = p.shinR = 1.5
       p.armL = p.armR = -0.45
+      p.foreL = p.foreR = -0.6
       p.lean = 0
     } else if (npc.anim === 'lift') {
       const k = (Math.sin(t * 1.8) + 1) / 2
       p.armL = p.armR = -0.3 - k * 2.6
+      p.foreL = p.foreR = -0.2
       p.sy = 1 - k * 0.02
     }
     person.current?.animate(p)

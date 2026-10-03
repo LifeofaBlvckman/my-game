@@ -20,8 +20,8 @@ export function faceStyle(index) {
 }
 
 // Illustrated face on a transparent background, so the head's own color
-// shows through: almond eyes under a heavier upper lid, short brows, a hint of
-// a nose and a small mouth.
+// shows through: simple oval eyes, short brows, a little blush, a hint of a
+// nose and a small mouth.
 export function drawFace(ctx, ox, oy, s, { female, beard, mouth = 'smile', brows }) {
   const X = (v) => ox + v * s
   const Y = (v) => oy + v * s
@@ -44,56 +44,63 @@ export function drawFace(ctx, ox, oy, s, { female, beard, mouth = 'smile', brows
     ctx.stroke()
   }
 
-  for (const [cx, dir] of [[0.31, -1], [0.69, 1]]) {
-    // Eye
-    ctx.fillStyle = '#f4efe6'
+  // Eyes in the Messenger manner: simple dark ovals with a small highlight,
+  // set wide and a little low, with short soft brows above.
+  for (const [cx, dir] of [[0.32, -1], [0.68, 1]]) {
+    ctx.fillStyle = '#1b120e'
     ctx.beginPath()
-    ctx.ellipse(X(cx), Y(0.47), 0.085 * s, 0.045 * s, 0, 0, Math.PI * 2)
+    ctx.ellipse(X(cx), Y(0.5), 0.042 * s, 0.062 * s, 0, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = '#2a1810'
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
     ctx.beginPath()
-    ctx.ellipse(X(cx + dir * 0.005), Y(0.47), 0.045 * s, 0.05 * s, 0, 0, Math.PI * 2)
+    ctx.arc(X(cx + 0.012), Y(0.478), 0.013 * s, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = '#ffffff'
-    ctx.beginPath()
-    ctx.arc(X(cx + 0.015), Y(0.455), 0.012 * s, 0, Math.PI * 2)
-    ctx.fill()
-    // Upper lid, heavier toward the outside
+    if (female) {
+      // A flick of lashes at the outer corner.
+      ctx.strokeStyle = ink
+      ctx.lineWidth = s * 0.022
+      ctx.beginPath()
+      ctx.moveTo(X(cx + dir * 0.03), Y(0.445))
+      ctx.lineTo(X(cx + dir * 0.07), Y(0.425))
+      ctx.stroke()
+    }
     ctx.strokeStyle = ink
-    ctx.lineWidth = s * (female ? 0.04 : 0.032)
+    ctx.lineWidth = s * (brows ? 0.034 : 0.024)
     ctx.beginPath()
-    ctx.moveTo(X(cx - dir * 0.09), Y(0.47))
-    ctx.quadraticCurveTo(X(cx), Y(0.405), X(cx + dir * 0.1), Y(female ? 0.43 : 0.45))
-    ctx.stroke()
-    // Brow
-    ctx.lineWidth = s * (brows ? 0.045 : female ? 0.022 : 0.032)
-    ctx.beginPath()
-    ctx.moveTo(X(cx - dir * 0.08), Y(brows ? 0.35 : 0.34))
-    ctx.quadraticCurveTo(X(cx), Y(female ? 0.3 : 0.32), X(cx + dir * 0.09), Y(brows ? 0.33 : 0.35))
+    ctx.moveTo(X(cx - dir * 0.05), Y(0.375))
+    ctx.quadraticCurveTo(X(cx + dir * 0.01), Y(0.35), X(cx + dir * 0.07), Y(0.37))
     ctx.stroke()
   }
 
-  // Nose: just a soft shadow line
-  ctx.strokeStyle = 'rgba(40, 18, 10, 0.4)'
-  ctx.lineWidth = s * 0.03
+  // A touch of blush under each eye.
+  ctx.fillStyle = 'rgba(214, 92, 92, 0.22)'
+  for (const cx of [0.24, 0.76]) {
+    ctx.beginPath()
+    ctx.ellipse(X(cx), Y(0.62), 0.07 * s, 0.035 * s, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Nose: a tiny shadow tick
+  ctx.strokeStyle = 'rgba(40, 18, 10, 0.45)'
+  ctx.lineWidth = s * 0.026
   ctx.beginPath()
-  ctx.moveTo(X(0.47), Y(0.62))
-  ctx.quadraticCurveTo(X(0.5), Y(0.66), X(0.54), Y(0.62))
+  ctx.moveTo(X(0.5), Y(0.6))
+  ctx.lineTo(X(0.485), Y(0.64))
   ctx.stroke()
 
-  // Mouth
-  ctx.strokeStyle = female ? '#7a2a30' : 'rgba(45, 20, 14, 0.85)'
-  ctx.lineWidth = s * (female ? 0.045 : 0.03)
+  // Mouth: small and simple
+  ctx.strokeStyle = 'rgba(45, 20, 14, 0.9)'
+  ctx.lineWidth = s * 0.028
   ctx.beginPath()
   if (mouth === 'grin') {
-    ctx.moveTo(X(0.42), Y(0.76))
-    ctx.quadraticCurveTo(X(0.5), Y(0.82), X(0.58), Y(0.76))
+    ctx.moveTo(X(0.44), Y(0.735))
+    ctx.quadraticCurveTo(X(0.5), Y(0.785), X(0.56), Y(0.735))
   } else if (mouth === 'flat') {
-    ctx.moveTo(X(0.44), Y(0.78))
-    ctx.lineTo(X(0.56), Y(0.78))
+    ctx.moveTo(X(0.46), Y(0.75))
+    ctx.lineTo(X(0.54), Y(0.75))
   } else {
-    ctx.moveTo(X(0.43), Y(0.77))
-    ctx.quadraticCurveTo(X(0.5), Y(0.8), X(0.57), Y(0.77))
+    ctx.moveTo(X(0.45), Y(0.74))
+    ctx.quadraticCurveTo(X(0.5), Y(0.765), X(0.55), Y(0.74))
   }
   ctx.stroke()
 }

@@ -1,3 +1,4 @@
+import { Euler, Matrix4, Quaternion, Vector3 } from 'three'
 import { FACE_COUNT, faceStyle } from './faces'
 import { mulberry32 } from './cityData'
 
@@ -6,22 +7,25 @@ const TOPS = ['#ef8a2a', '#2f5fb8', '#3f9a4a', '#d23f78', '#f4d03f', '#f7f1e3', 
 const BOTTOMS = ['#3a63a8', '#36324a', '#7a5444', '#5a6a7a', '#d8c79a', '#2f5fb8']
 const GELE = ['#d23f78', '#f4d03f', '#2f5fb8', '#ef8a2a', '#8a46c0', '#1aa395', '#e0b84a']
 const CAPS = ['#e04848', '#36324a', '#2f5fb8', '#f7f1e3']
+const SHOES = ['#f2efe8', '#2a2633', '#7a5444', '#e04848', '#2f5fb8']
 export { SKINS } from './faces'
 
 export function randomLook(rand, overrides = {}) {
   const face = Math.floor(rand() * FACE_COUNT)
   const { female } = faceStyle(face)
   const pick = (list) => list[Math.floor(rand() * list.length)]
-  const hair = female ? pick(['gele', 'gele', 'braids', 'braids', 'short']) : pick(['short', 'short', 'bald', 'cap'])
+  const hair = female ? pick(['gele', 'gele', 'braids', 'braids', 'puff', 'short']) : pick(['short', 'short', 'locs', 'afro', 'bald', 'cap'])
   const skinRoll = rand()
   return {
     face,
     female,
     top: pick(TOPS),
     bottom: pick(BOTTOMS),
+    shoes: pick(SHOES),
     hair,
     hairColor: hair === 'gele' ? pick(GELE) : hair === 'cap' ? pick(CAPS) : '#1f1410',
     robe: rand() < (female ? 0.35 : 0.2), // iro wrapper or agbada
+    hood: rand() < 0.25, // hoodie, with the hood down
     height: (female ? 0.95 : 1) * (0.94 + rand() * 0.12),
     ...overrides,
     skin: overrides.skin ?? faceStyle(Math.floor(skinRoll * 4)).skin,
@@ -35,87 +39,203 @@ export function lookFromSeed(seed, overrides) {
   return randomLook(mulberry32(seed), overrides)
 }
 
-// The body as a list of soft shapes, in natural proportions (about 1.8 m
-// tall). `group` says what moves the part: limbs swing around their pivot,
-// head parts turn with the head, everything else moves with the body.
-// Each part: { shape, group, pivot, offset, size, color }.
-export const NECK = [0, 1.58, 0]
-export const FACE = { offset: [0, 0.125, 0.134], size: [0.2, 0.18] }
-export const SLOTS = { sphere: 4, rbox: 7, capsule: 7 }
+// --- The body ---
+// Drawn in the spirit of Abeto's Messenger: natural, slightly stylized
+// proportions (about 6.5 heads tall), soft rounded shapes, knees and elbows
+// that bend, chunky sneakers and clumpy hair. Built in "person space": feet
+// at y = 0, facing +z, about 1.75 m tall.
+//
+// Joints form a small skeleton:
+//   root (hips; legs hang from it) -> chest (bends at the waist) -> head
+//                                             -> armL/armR -> foreL/foreR
+//   root -> legL/legR -> shinL/shinR
+// Every part hangs off one joint. Parts on root and chest are placed in
+// person space; parts on the other joints are placed relative to that joint.
+export const WAIST = [0, 0.97, 0]
+export const HEAD_PIVOT = [0, 1.47, 0]
+const SHOULDER = [0.2, 1.37, 0]
+const HIP = [0.092, 0.9, 0]
+const UPPER_ARM = 0.27
+const THIGH = 0.42
+export const FACE = { offset: [0, 0.125, 0.123], size: [0.19, 0.17] } // on the head joint
+export const JOINTS = ['root', 'chest', 'head', 'armL', 'foreL', 'armR', 'foreR', 'legL', 'shinL', 'legR', 'shinR']
 
-const SHOES = ['#f2efe8', '#2a2633', '#7a5444', '#e04848']
+const P = (shape, joint, offset, size, color, rot) => ({ shape, joint, offset, size, color, rot })
+
+// Hair as a few big clumps, by style. Positions are on the head joint.
+function hairParts(look) {
+  const c = look.hairColor
+  const cap = (y = 0.18, s = 1) => P('sphere', 'head', [0, y, -0.012], [0.25 * s, 0.2 * s, 0.262 * s], c)
+  switch (look.hair) {
+    case 'bald':
+      return []
+    case 'short': // a neat low cut
+      return [cap(0.175)]
+    case 'afro':
+      return [P('sphere', 'head', [0, 0.215, -0.025], [0.33, 0.27, 0.33], c), P('sphere', 'head', [0, 0.27, -0.06], [0.26, 0.17, 0.24], c)]
+    case 'locs': // short locs falling around the head
+      return [
+        cap(0.185),
+        P('capsule', 'head', [0.11, 0.1, -0.06], [0.06, 0.2, 0.06], c, [0.25, 0, 0.3]),
+        P('capsule', 'head', [-0.11, 0.1, -0.06], [0.06, 0.2, 0.06], c, [0.25, 0, -0.3]),
+        P('capsule', 'head', [0, 0.08, -0.13], [0.07, 0.22, 0.06], c, [0.35, 0, 0]),
+        P('cone', 'head', [0, 0.27, 0.06], [0.1, 0.1, 0.07], c, [0.9, 0, 0]),
+      ]
+    case 'cap':
+      return [P('sphere', 'head', [0, 0.205, 0], [0.265, 0.15, 0.275], c), P('rbox', 'head', [0, 0.2, 0.15], [0.2, 0.03, 0.13], c)]
+    case 'gele': // head wrap, tied high
+      return [
+        P('rbox', 'head', [0, 0.26, -0.02], [0.36, 0.17, 0.31], c),
+        P('rbox', 'head', [0, 0.36, -0.04], [0.26, 0.12, 0.22], c, [0.25, 0, 0]),
+        P('cone', 'head', [0.12, 0.38, -0.02], [0.12, 0.16, 0.06], c, [0, 0, -0.7]),
+      ]
+    case 'braids': // box braids gathered at the back
+      return [
+        cap(0.18),
+        P('capsule', 'head', [0, 0.02, -0.12], [0.22, 0.34, 0.07], c, [0.12, 0, 0]),
+        P('capsule', 'head', [0.1, 0.06, -0.05], [0.06, 0.26, 0.06], c, [0.1, 0, 0.12]),
+        P('capsule', 'head', [-0.1, 0.06, -0.05], [0.06, 0.26, 0.06], c, [0.1, 0, -0.12]),
+      ]
+    case 'puff': // afro puff on top
+      return [cap(0.17, 0.98), P('sphere', 'head', [0, 0.31, -0.06], [0.2, 0.17, 0.2], c), P('cone', 'head', [0, 0.21, 0.1], [0.12, 0.08, 0.05], c, [2.4, 0, 0])]
+    default:
+      return [cap()]
+  }
+}
 
 export function personParts(look) {
-  const legColor = look.robe && look.female ? look.skin : look.bottom
+  const wrapper = look.robe && look.female
+  const agbada = look.robe && !look.female
+  const leg = wrapper ? look.skin : look.bottom
   const sleeve = look.top
-  const forearm = look.robe && !look.female ? look.top : look.skin
+  const forearm = agbada ? look.top : look.skin
   const shoe = look.shoes ?? SHOES[(look.face + (look.female ? 1 : 0)) % SHOES.length]
-  const P = (shape, group, pivot, offset, size, color) => ({ shape, group, pivot, offset, size, color })
+  const sole = '#f4f1ea'
   const parts = []
-  for (const [side, x] of [['L', 1], ['R', -1]]) {
-    parts.push(P('capsule', `leg${side}`, [0.1 * x, 0.9, 0], [0, -0.42, 0], [0.15, 0.86, 0.16], legColor))
-    parts.push(P('rbox', `leg${side}`, [0.1 * x, 0.9, 0], [0, -0.85, 0.05], [0.15, 0.1, 0.28], shoe))
-    parts.push(P('capsule', `arm${side}`, [0.27 * x, 1.45, 0], [0, -0.12, 0], [0.13, 0.28, 0.13], sleeve))
-    parts.push(P('capsule', `arm${side}`, [0.27 * x, 1.45, 0], [0, -0.38, 0], [0.1, 0.36, 0.1], forearm))
-    parts.push(P('sphere', `arm${side}`, [0.27 * x, 1.45, 0], [0, -0.6, 0.01], [0.1, 0.12, 0.1], look.skin))
+  for (const s of ['L', 'R']) {
+    parts.push(
+      P('capsule', `leg${s}`, [0, -0.2, 0], [0.15, 0.44, 0.155], leg),
+      P('capsule', `shin${s}`, [0, -0.19, 0], [0.12, 0.42, 0.12], leg),
+      P('rbox', `shin${s}`, [0, -0.36, 0.045], [0.13, 0.1, 0.26], shoe),
+      P('rbox', `shin${s}`, [0, -0.402, 0.05], [0.142, 0.04, 0.276], sole),
+      P('capsule', `arm${s}`, [0, -0.135, 0], [0.105, 0.29, 0.105], sleeve),
+      P('capsule', `fore${s}`, [0, -0.12, 0], [0.088, 0.26, 0.088], forearm),
+      P('sphere', `fore${s}`, [0, -0.27, 0.005], [0.085, 0.1, 0.075], look.skin),
+    )
   }
   parts.push(
-    P('rbox', 'body', [0, 0.96, 0], [0, 0, 0], [0.36, 0.22, 0.24], look.bottom),
-    P('rbox', 'body', [0, 1.24, 0], [0, 0, 0], [0.44, 0.54, 0.27], look.top),
-    P('capsule', 'body', [0, 1.54, 0], [0, 0, 0], [0.1, 0.14, 0.1], look.skin),
-    P('sphere', 'head', NECK, [0, 0.13, 0], [0.25, 0.29, 0.27], look.skin),
+    P('rbox', 'root', [0, 0.9, 0], [0.32, 0.16, 0.21], look.bottom), // hips
+    P('rbox', 'chest', [0, 1.2, 0], [0.37, 0.4, 0.22], look.top), // torso
+    P('rbox', 'chest', [0, 0.99, 0], [0.34, 0.1, 0.215], look.top), // hem
+    P('capsule', 'chest', [0, 1.44, 0], [0.085, 0.1, 0.085], look.skin), // neck
+    P('sphere', 'head', [0, 0.13, 0.005], [0.235, 0.27, 0.25], look.skin),
+    ...hairParts(look),
   )
-  const hc = look.hairColor
-  const hair = {
-    short: [P('sphere', 'head', NECK, [0, 0.2, -0.016], [0.27, 0.19, 0.285], hc)],
-    bald: [],
-    cap: [P('sphere', 'head', NECK, [0, 0.235, 0], [0.275, 0.15, 0.285], hc), P('rbox', 'head', NECK, [0, 0.2, 0.15], [0.2, 0.03, 0.12], hc)],
-    gele: [P('rbox', 'head', NECK, [0, 0.3, -0.02], [0.4, 0.18, 0.33], hc), P('rbox', 'head', NECK, [0, 0.4, -0.04], [0.27, 0.13, 0.23], hc)],
-    braids: [P('sphere', 'head', NECK, [0, 0.2, -0.02], [0.28, 0.2, 0.29], hc), P('rbox', 'head', NECK, [0, 0.03, -0.13], [0.24, 0.32, 0.06], hc)],
-  }[look.hair]
-  parts.push(...hair)
-  if (look.robe) {
-    parts.push(
-      look.female
-        ? P('rbox', 'body', [0, 0.68, 0], [0, 0, 0], [0.42, 0.56, 0.3], look.bottom)
-        : P('rbox', 'body', [0, 1.08, 0], [0, 0, 0], [0.72, 0.78, 0.34], look.top),
-    )
+  if (look.hood && !look.robe) parts.push(P('sphere', 'chest', [0, 1.4, -0.105], [0.26, 0.13, 0.12], look.top))
+  if (wrapper) parts.push(P('rbox', 'root', [0, 0.7, 0], [0.4, 0.5, 0.28], look.bottom)) // iro wrapper
+  if (agbada) parts.push(P('rbox', 'chest', [0, 1.06, 0], [0.62, 0.72, 0.3], look.top)) // flowing agbada
+  for (const p of parts) {
+    p.local = new Matrix4().compose(new Vector3(...p.offset), new Quaternion().setFromEuler(new Euler(...(p.rot ?? [0, 0, 0]))), new Vector3(...p.size))
   }
   return parts
 }
 
-// Shared animation: a natural walk and run, idle breathing, punches and
-// getting hit. Writes into `p` so it can run every frame without allocating.
-//   s.phase  walk cycle, s.t  time, s.moving, s.run
+// The most parts of each shape any look can have (instance slots per person).
+export const SLOTS = (() => {
+  const max = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+  for (const hair of ['bald', 'short', 'afro', 'locs', 'cap', 'gele', 'braids', 'puff']) {
+    for (const robe of [false, true]) {
+      for (const female of [false, true]) {
+        const count = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+        personParts({ hair, robe, female, hood: !robe, skin: '#000', top: '#000', bottom: '#000', hairColor: '#000', face: 0 }).forEach((p) => count[p.shape]++)
+        for (const k in max) max[k] = Math.max(max[k], count[k])
+      }
+    }
+  }
+  return max
+})()
+
+// --- Poses ---
+// Joint angles for walking, jogging, sprinting, idling, punching and
+// flinching. Rotations about x: negative swings a limb forward, a positive
+// shin angle folds the knee back, a negative fore angle bends the elbow.
+// Writes into `p` so it can run every frame without allocating.
+//   s.phase  stride cycle, s.t  time, s.moving, s.run (jog), s.sprint
 //   s.punch  0..1 progress of a punch (or -1), s.punchSide  1 right / -1 left
 //   s.flinch 0..1 after being hit
 export function computePose(p, s) {
-  const amp = s.moving ? (s.run ? 1 : 0.62) : 0
-  const sw = Math.sin(s.phase) * amp
-  const step = Math.cos(s.phase * 2)
+  const gait = s.moving ? (s.run ? (s.sprint ? 1.15 : 1) : 0.6) : 0
+  const running = s.moving && s.run
+  const sn = Math.sin(s.phase)
+  const cs = Math.cos(s.phase)
   const breathe = Math.sin(s.t * 2)
-  p.legL = sw * 0.75
-  p.legR = -sw * 0.75
-  p.armL = -sw * 0.6
-  p.armR = sw * 0.6
-  p.bob = s.moving ? Math.abs(Math.sin(s.phase)) * (s.run ? 0.07 : 0.035) : 0
-  p.sy = 1 + (s.moving ? step * 0.01 : breathe * 0.008)
+  const fold = running ? 1.45 : 0.55 // how far the knee folds as the leg swings through
+  p.legL = -0.8 * sn * gait
+  p.legR = 0.8 * sn * gait
+  p.shinL = s.moving ? 0.12 + fold * Math.max(0, cs) * gait : 0.04
+  p.shinR = s.moving ? 0.12 + fold * Math.max(0, -cs) * gait : 0.04
+  p.armL = 0.7 * sn * gait + (s.moving ? 0 : 0.04)
+  p.armR = -0.7 * sn * gait + (s.moving ? 0 : 0.04)
+  const elbow = running ? -1.45 : s.moving ? -0.35 : -0.14
+  p.foreL = elbow - (s.moving ? 0.15 * Math.max(0, -sn) : 0)
+  p.foreR = elbow - (s.moving ? 0.15 * Math.max(0, sn) : 0)
+  p.splayL = running ? 0.14 : 0.09
+  p.splayR = -p.splayL
+  // Running bounces at each push-off; walking rises over the planted foot.
+  p.bob = running ? Math.abs(sn) * 0.05 * gait : s.moving ? (1 - Math.abs(sn)) * 0.03 : 0
+  p.sy = 1 + (s.moving ? 0 : breathe * 0.006)
   p.sxz = 1
-  p.lean = s.moving ? (s.run ? 0.18 : 0.05) : 0
-  p.headTilt = s.moving ? Math.sin(s.phase) * 0.03 : Math.sin(s.t * 0.7) * 0.04
-  p.headNod = s.moving ? step * 0.02 : Math.sin(s.t * 0.5) * 0.02
-  p.twist = s.moving ? Math.sin(s.phase) * 0.06 : 0
+  p.lean = running ? (s.sprint ? 0.26 : 0.18) : s.moving ? 0.05 : 0
+  p.twist = s.moving ? 0.1 * sn * gait : 0
+  p.headNod = s.moving ? -p.lean * 0.5 + cs * 0.02 : Math.sin(s.t * 0.5) * 0.03
+  p.headTilt = s.moving ? sn * 0.03 : Math.sin(s.t * 0.7) * 0.04
   if (s.punch >= 0 && s.punch <= 1) {
+    // Jab with one hand, the other up on guard.
     const k = Math.sin(s.punch * Math.PI)
-    if (s.punchSide > 0) p.armR = -1.55 * k
-    else p.armL = -1.55 * k
-    p.twist = 0.4 * k * s.punchSide
+    const [hit, guard] = s.punchSide > 0 ? ['R', 'L'] : ['L', 'R']
+    p[`arm${hit}`] = -0.5 - 1.05 * k
+    p[`fore${hit}`] = -1.5 + 1.35 * k
+    p[`arm${guard}`] = -0.7
+    p[`fore${guard}`] = -1.9
+    p.twist = 0.45 * k * s.punchSide
     p.lean = 0.12 * k
   }
   if (s.flinch > 0) {
     p.lean = -0.3 * s.flinch
     p.armL = p.armR = -0.5 * s.flinch
+    p.foreL = p.foreR = -1.2 * s.flinch
     p.headNod = -0.3 * s.flinch
   }
   return p
+}
+
+// Fill `J` (an object of Matrix4s keyed by joint name) for pose `p`, in
+// person space.
+const _q = new Quaternion()
+const _e = new Euler()
+const _v = new Vector3()
+const _s = new Vector3()
+const _m = new Matrix4()
+const T = (m, x, y, z) => m.multiply(_m.makeTranslation(x, y, z))
+const R = (m, x, y, z, order = 'XYZ') => m.multiply(_m.makeRotationFromEuler(_e.set(x, y, z, order)))
+
+export function makeJoints() {
+  return Object.fromEntries(JOINTS.map((j) => [j, new Matrix4()]))
+}
+
+export function jointMatrices(p, J) {
+  J.root.compose(_v.set(0, p.bob, 0), _q.identity(), _s.set(p.sxz, p.sy, p.sxz))
+  T(J.chest.copy(J.root), ...WAIST)
+  R(J.chest, p.lean, p.twist, 0, 'YXZ')
+  T(J.chest, -WAIST[0], -WAIST[1], -WAIST[2])
+  R(T(J.head.copy(J.chest), ...HEAD_PIVOT), p.headNod, 0, p.headTilt)
+  for (const [side, x] of [['L', 1], ['R', -1]]) {
+    const arm = J[`arm${side}`]
+    R(T(arm.copy(J.chest), SHOULDER[0] * x, SHOULDER[1], SHOULDER[2]), p[`arm${side}`], 0, p[`splay${side}`] ?? 0, 'ZYX')
+    R(T(J[`fore${side}`].copy(arm), 0, -UPPER_ARM, 0), p[`fore${side}`], 0, 0)
+    const leg = J[`leg${side}`]
+    R(T(leg.copy(J.root), HIP[0] * x, HIP[1], HIP[2]), p[`leg${side}`], 0, 0)
+    R(T(J[`shin${side}`].copy(leg), 0, -THIGH, 0), p[`shin${side}`], 0, 0)
+  }
+  return J
 }

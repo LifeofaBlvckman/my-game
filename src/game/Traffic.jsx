@@ -11,7 +11,7 @@ import { ENGINE_VOICES, trafficHorn, updateTrafficAudio } from './audio'
 import { toon, toonRamp, unlit } from './materials'
 import { useGame, world } from './state'
 import { blobGeometry, blobMaterial } from './Shadows'
-import { driverFace, driverParts, seatMatrix, steeringWheel } from './drivers'
+import { DRIVER_SLOTS, driverFace, driverParts, seatMatrix, steeringWheel } from './drivers'
 import { alightRiders, callBoarders, waitingCounts } from './crowd'
 import { city as cityMap } from './cityData'
 import { COP_LOOK, randomLook } from './people'
@@ -24,7 +24,6 @@ const KINDS = ['lit', 'trim', 'glow', 'glass']
 const SEATS = 1 + MAX_PASSENGERS // driver plus passengers
 const wheelRing = new TorusGeometry(0.18, 0.025, 5, 14)
 const plainBox = new BoxGeometry(1, 1, 1)
-const DRIVER_SLOTS = { sphere: 2, rbox: 2, capsule: 2 }
 
 // Local matrices for every part of every vehicle type, split by kind
 // (solid, glowing lights, see-through glass), computed once.
@@ -92,7 +91,7 @@ function createFaceMaterial() {
 
 export default function Traffic() {
   const meshes = { lit: useRef(), trim: useRef(), glow: useRef(), glass: useRef() }
-  const people = { sphere: useRef(), rbox: useRef(), capsule: useRef() }
+  const people = { sphere: useRef(), rbox: useRef(), capsule: useRef(), cone: useRef() }
   const faces = useRef()
   const wheels = useRef()
   const steering = useRef()
@@ -269,7 +268,7 @@ export default function Traffic() {
       }
       for (let seat = 0; seat < SEATS; seat++) {
         const occ = occupants[seat]
-        const used = { sphere: 0, rbox: 0, capsule: 0 }
+        const used = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
         const slotBase = i * SEATS + seat
         if (occ && rig.seats[seat]) {
           seatBase.multiplyMatrices(base, rig.seats[seat])

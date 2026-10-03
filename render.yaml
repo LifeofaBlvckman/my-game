@@ -1,0 +1,13 @@
+# One-click hosting on Render (render.com): New > Blueprint, pick this repo.
+# It builds the game and runs the multiplayer server on one free web service.
+services:
+  - type: web
+    name: eko-streets
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20

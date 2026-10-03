@@ -8,10 +8,12 @@ import { makeAnkaraTexture } from './faces'
 import Person from './Person'
 import { computePose } from './people'
 import { Blob } from './Shadows'
+import EmoteBubble from './EmoteBubble'
 import { useGame, world } from './state'
 
-const WALK = 4.5
-const RUN = 9
+// Like in Messenger, the everyday pace is a jog; Shift is a flat-out sprint.
+const JOG = 6.5
+const SPRINT = 9.5
 const JUMP = 6
 const FOOT_OFFSET = 0.9 // capsule center to the soles of the feet
 
@@ -62,7 +64,7 @@ export default function Player() {
     const moving = move.lengthSq() > 0
     if (moving) move.normalize()
 
-    const speed = run ? RUN : WALK
+    const speed = run ? SPRINT : JOG
     const v = b.linvel()
     // While knocked down, let physics carry the body instead of the controls.
     if (!down) b.setLinvel({ x: move.x * speed, y: v.y, z: move.z * speed }, true)
@@ -86,7 +88,7 @@ export default function Player() {
     visual.current.rotation.y = a.facing
 
     a.time = (a.time ?? 0) + dt
-    a.phase += dt * (moving ? speed * 1.8 : 0)
+    a.phase += dt * (moving ? speed * 1.75 : 0)
     const punch = world.punch
     if (punch) {
       punch.t += dt / PUNCH_TIME
@@ -95,7 +97,8 @@ export default function Player() {
     poseIn.phase = a.phase
     poseIn.t = a.time
     poseIn.moving = moving && grounded
-    poseIn.run = !!run
+    poseIn.run = true // he jogs everywhere
+    poseIn.sprint = !!run
     poseIn.punch = punch ? punch.t : -1
     poseIn.punchSide = punch?.side ?? 1
     poseIn.flinch = world.flinch / 0.4
@@ -103,13 +106,21 @@ export default function Player() {
     if (world.workout > 0) {
       // Working out at the gym: arms pumping overhead.
       world.workout -= dt
-      pose.armL = pose.armR = -0.3 - ((Math.sin(a.time * 4) + 1) / 2) * 2.6
+      // Dumbbell curls at the gym.
+      const k = (Math.sin(a.time * 4) + 1) / 2
+      pose.armL = pose.armR = -0.25
+      pose.foreL = pose.foreR = -0.2 - k * 2.1
     }
     if (!grounded && !down) {
-      pose.legL = 0.5
-      pose.legR = -0.3
-      pose.armL = pose.armR = -2.4
-      pose.sy = 1.08
+      // In the air: one knee tucked up, arms thrown up and out.
+      pose.legL = -0.9
+      pose.shinL = 1.3
+      pose.legR = 0.25
+      pose.shinR = 0.7
+      pose.armL = pose.armR = -2.3
+      pose.foreL = pose.foreR = -0.4
+      pose.splayL = 0.5
+      pose.splayR = -0.5
     }
     person.current?.animate(pose)
     // Lying flat while knocked down.
@@ -127,6 +138,7 @@ export default function Player() {
         <Person ref={person} look={PLAYER_LOOK} shirtMap={shirt} faceOverride={PLAYER_FACE} />
         <Blob position-y={0.03} scale={[0.9, 1, 0.9]} />
       </group>
+      {mode === 'foot' && <EmoteBubble get={() => world.emote} y={1.4} />}
     </RigidBody>
   )
 }

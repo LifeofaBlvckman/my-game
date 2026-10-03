@@ -6,6 +6,7 @@ import { CanvasTexture, Quaternion, SRGBColorSpace, Vector3 } from 'three'
 import Person from './Person'
 import { Body } from './Car'
 import { Blob } from './Shadows'
+import EmoteBubble from './EmoteBubble'
 import { computePose, lookFromSeed } from './people'
 import { FLAGS } from './net'
 import { fx } from './particles'
@@ -64,8 +65,9 @@ function RemotePlayer({ id }) {
     if (s.m === 'f' && visual.current) {
       const moving = (s.a & FLAGS.moving) !== 0
       a.t += dt
-      a.phase += dt * (moving ? ((s.a & FLAGS.run) !== 0 ? 16 : 8) : 0)
-      Object.assign(a.input, { phase: a.phase, t: a.t, moving, run: (s.a & FLAGS.run) !== 0, punch: s.u ?? -1, punchSide: 1, flinch: 0 })
+      const sprint = (s.a & FLAGS.run) !== 0
+      a.phase += dt * (moving ? (sprint ? 16.6 : 11.4) : 0)
+      Object.assign(a.input, { phase: a.phase, t: a.t, moving, run: true, sprint, punch: s.u ?? -1, punchSide: 1, flinch: 0 })
       person.current?.animate(computePose(a.pose, a.input))
       visual.current.rotation.set((s.a & FLAGS.down) !== 0 ? -Math.PI / 2 : 0, remote.yaw, 0, 'YXZ')
     }
@@ -113,6 +115,7 @@ function RemotePlayer({ id }) {
           <Blob position-y={-0.88} scale={[0.9, 1, 0.9]} />
         </>
       )}
+      <EmoteBubble get={() => world.net?.remotes.get(id)?.emote} y={shape.m === 'c' ? def.half[1] + 2.2 : 2.2} />
       <Billboard position-y={shape.m === 'c' ? def.half[1] + 1.4 : 1.45}>
         <mesh>
           <planeGeometry args={[1.6, 0.4]} />
@@ -137,7 +140,7 @@ export default function RemotePlayers() {
     const footSpeed = v ? Math.hypot(v.x, v.z) : 0
     let a = 0
     if (inCar ? Math.abs(world.carSpeed) > 0.5 : footSpeed > 0.5) a |= FLAGS.moving
-    if (footSpeed > 6) a |= FLAGS.run
+    if (footSpeed > 8) a |= FLAGS.run // sprinting
     if (world.playerDown > 0) a |= FLAGS.down
     net.sendState({
       p: [p.x, p.y, p.z],

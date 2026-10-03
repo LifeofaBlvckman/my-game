@@ -2,9 +2,13 @@ import { WebSocketServer } from 'ws'
 
 // Multiplayer relay. Each client simulates its own city (traffic, crowds);
 // the server only shares players with each other: where they are, what they
-// drive, punches between them, chat, and the time of day.
+// drive, punches between them, chat, emoji, and the time of day.
+// Like Messenger, players are split into rooms: everyone joins the first room
+// with space, and a new room opens when they're all full. No database is
+// needed: everything lives in memory while people are connected.
 
-const MAX_PLAYERS = 24
+const ROOM_SIZE = 16 // players who see each other
+const MAX_PLAYERS = 256 // per server
 const MAX_MESSAGE = 2048
 const MAX_RATE = 40 // messages per second per client
 const VEHICLE_TYPES = new Set(['sedan', 'police', 'jeep', 'danfo', 'keke'])
@@ -20,15 +24,25 @@ const num = (v, limit) => (Number.isFinite(v) ? Math.max(-limit, Math.min(limit,
 
 export function attachMultiplayer(httpServer) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE })
-  const players = new Map()
+  const players = new Map() // everyone connected, by id
+  const rooms = new Map() // room number -> Map of players
   const started = Date.now()
   let nextId = 1
 
   const minutes = () => (START_MINUTES + (Date.now() - started) / 1000) % 1440
   const send = (ws, msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg))
-  const broadcast = (msg, except) => {
+  // Send to everyone in a player's room (except one, usually the sender).
+  const broadcast = (room, msg, except) => {
     const data = JSON.stringify(msg)
-    for (const p of players.values()) if (p.id !== except && p.ws.readyState === 1) p.ws.send(data)
+    for (const p of room.values()) if (p.id !== except && p.ws.readyState === 1) p.ws.send(data)
+  }
+  const joinRoom = (player) => {
+    let number = 1
+    while (rooms.get(number)?.size >= ROOM_SIZE) number++
+    if (!rooms.has(number)) rooms.set(number, new Map())
+    player.roomNumber = number
+    player.room = rooms.get(number)
+    player.room.set(player.id, player)
   }
 
   httpServer.on('upgrade', (req, socket, head) => {
@@ -63,13 +77,15 @@ export function attachMultiplayer(httpServer) {
       if (msg.t === 'hello' && !player.name) {
         player.name = clean(msg.name, 16) || `Player ${player.id}`
         players.set(player.id, player)
+        joinRoom(player)
         send(ws, {
           t: 'welcome',
           id: player.id,
+          room: player.roomNumber,
           time: minutes(),
-          players: [...players.values()].filter((p) => p.id !== player.id).map((p) => ({ id: p.id, name: p.name, s: p.state })),
+          players: [...player.room.values()].filter((p) => p.id !== player.id).map((p) => ({ id: p.id, name: p.name, s: p.state })),
         })
-        broadcast({ t: 'join', id: player.id, name: player.name }, player.id)
+        broadcast(player.room, { t: 'join', id: player.id, name: player.name }, player.id)
         return
       }
       if (!player.name) return
@@ -85,22 +101,31 @@ export function attachMultiplayer(httpServer) {
           a: num(msg.a, 255) | 0, // animation flags
           u: num(msg.u, 1), // punch progress
         }
-        broadcast({ t: 's', id: player.id, ...player.state }, player.id)
+        broadcast(player.room, { t: 's', id: player.id, ...player.state }, player.id)
       } else if (msg.t === 'hit') {
         // Only allow hits on players who are actually close to the attacker.
-        const target = players.get(msg.to)
+        const target = player.room.get(msg.to)
         const a = player.state?.p
         const b = target?.state?.p
         if (!target || !a || !b || Math.hypot(a[0] - b[0], a[2] - b[2]) > 8) return
         send(target.ws, { t: 'hit', from: player.id, dmg: Math.max(0, Math.min(40, num(msg.dmg, 40))), x: a[0], z: a[2] })
       } else if (msg.t === 'chat') {
         const text = clean(msg.text, 120)
-        if (text) broadcast({ t: 'chat', id: player.id, name: player.name, text })
+        if (text) broadcast(player.room, { t: 'chat', id: player.id, name: player.name, text })
+      } else if (msg.t === 'emote') {
+        // Emoji reactions: an index into the client's list, at most a couple a second.
+        const e = num(msg.e, 7) | 0
+        if (e < 0 || now - (player.lastEmote ?? 0) < 400) return
+        player.lastEmote = now
+        broadcast(player.room, { t: 'emote', id: player.id, e }, player.id)
       }
     })
 
     ws.on('close', () => {
-      if (players.delete(player.id)) broadcast({ t: 'leave', id: player.id, name: player.name })
+      if (!players.delete(player.id)) return
+      player.room.delete(player.id)
+      broadcast(player.room, { t: 'leave', id: player.id, name: player.name })
+      if (!player.room.size) rooms.delete(player.roomNumber)
     })
   })
 

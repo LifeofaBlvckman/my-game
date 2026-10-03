@@ -1,37 +1,51 @@
 import { Matrix4 } from 'three'
-import { FACE, NECK } from './people'
+import { computePose, FACE, jointMatrices, makeJoints, personParts } from './people'
 
-// A seated driver: torso, head, hair, arms reaching for the wheel, and a
-// face. Matrices are in the same "person space" as people.js (torso center
-// at y = 1.24), so seatMatrix() can drop them into any vehicle.
+// A seated driver or passenger: the upper half of the same body as everyone
+// else (people.js), posed sitting, with arms on the wheel or in the lap.
+// Matrices are in "person space" (torso center at y = 1.2), so seatMatrix()
+// can drop them into any vehicle.
 
-const TORSO_Y = 1.24
+const TORSO_Y = 1.2
 const m = (...ops) => ops.reduce((acc, op) => acc.multiply(op), new Matrix4())
 const T = (x, y, z) => new Matrix4().makeTranslation(x, y, z)
 const S = (x, y, z) => new Matrix4().makeScale(x, y, z)
 const RX = (a) => new Matrix4().makeRotationX(a)
 
+const UPPER = new Set(['chest', 'head', 'armL', 'armR', 'foreL', 'foreR'])
+const seated = (driving) => {
+  const p = computePose({}, { phase: 0, t: 0, moving: false, punch: -1, flinch: 0 })
+  p.armL = p.armR = driving ? -1.2 : -0.45
+  p.foreL = p.foreR = driving ? -0.3 : -1.0
+  p.splayL = 0.05
+  p.splayR = -0.05
+  p.headNod = p.headTilt = 0
+  return jointMatrices(p, makeJoints())
+}
+const POSES = { true: seated(true), false: seated(false) }
+
 // `driving`: arms reach for the wheel; otherwise they rest in the lap.
 export function driverParts(look, driving = true) {
-  const arm = driving ? -1.15 : -0.55
-  const parts = [
-    { shape: 'rbox', m: m(T(0, TORSO_Y, 0), S(0.44, 0.54, 0.27)), color: look.top },
-    { shape: 'sphere', m: m(T(NECK[0], NECK[1] + 0.13, 0), S(0.25, 0.29, 0.27)), color: look.skin },
-    { shape: 'capsule', m: m(T(0.24, 1.42, 0.02), RX(arm), T(0, -0.26, 0), S(0.11, 0.52, 0.11)), color: look.top },
-    { shape: 'capsule', m: m(T(-0.24, 1.42, 0.02), RX(arm), T(0, -0.26, 0), S(0.11, 0.52, 0.11)), color: look.top },
-  ]
-  if (look.hair !== 'bald') {
-    const gele = look.hair === 'gele'
-    parts.push({
-      shape: gele ? 'rbox' : 'sphere',
-      m: gele ? m(T(0, NECK[1] + 0.3, -0.02), S(0.4, 0.18, 0.33)) : m(T(0, NECK[1] + 0.2, -0.016), S(0.27, 0.19, 0.285)),
-      color: look.hairColor,
-    })
-  }
-  return parts
+  const J = POSES[driving]
+  return personParts(look)
+    .filter((p) => UPPER.has(p.joint) && p.offset[1] !== 0.99) // no hem: it's hidden by the seat
+    .map((p) => ({ shape: p.shape, m: new Matrix4().multiplyMatrices(J[p.joint], p.local), color: p.color }))
 }
 
-export const driverFace = m(T(FACE.offset[0], NECK[1] + FACE.offset[1], FACE.offset[2]), S(FACE.size[0], FACE.size[1], 1))
+// Instance slots per seated person, by shape.
+export const DRIVER_SLOTS = (() => {
+  const max = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+  for (const hair of ['bald', 'short', 'afro', 'locs', 'cap', 'gele', 'braids', 'puff']) {
+    for (const [hood, robe, female] of [[false, false, false], [true, false, false], [false, true, false], [false, true, true]]) {
+      const count = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+      driverParts({ hair, hood, robe, female, skin: '#000', top: '#000', bottom: '#000', hairColor: '#000', face: 0 }).forEach((p) => count[p.shape]++)
+      for (const k in max) max[k] = Math.max(max[k], count[k])
+    }
+  }
+  return max
+})()
+
+export const driverFace = m(POSES.true.head.clone(), T(...FACE.offset), S(FACE.size[0], FACE.size[1], 1))
 
 // Person space -> vehicle space for a vehicle type's seat.
 export function seatMatrix(seat) {
@@ -41,4 +55,4 @@ export function seatMatrix(seat) {
 
 // Steering wheel in front of the driver, tilted toward them. The ring
 // geometry (a torus) faces +z.
-export const steeringWheel = m(T(0, 1.24, 0.5), RX(-0.45))
+export const steeringWheel = m(T(0, 1.2, 0.5), RX(-0.45))

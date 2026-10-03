@@ -51,6 +51,9 @@ export function connectMultiplayer(name) {
     chat(text) {
       net.send({ t: 'chat', text })
     },
+    emote(e) {
+      net.send({ t: 'emote', e })
+    },
     // A punch landing at (px, pz): did it hit another player on foot?
     punchPlayers(px, pz) {
       for (const r of net.remotes.values()) {
@@ -99,7 +102,8 @@ export function connectMultiplayer(name) {
       msg.players.forEach((p) => addRemote(net, p.id, p.name, p.s))
       useGame.setState({ online: true })
       syncRoster(net)
-      addChat(null, msg.players.length ? `Online. ${msg.players.length} other player${msg.players.length > 1 ? 's' : ''} here.` : 'Online. Share this address with friends so they can join.', true)
+      const where = msg.room > 1 ? ` (room ${msg.room})` : ''
+      addChat(null, msg.players.length ? `Online${where}. ${msg.players.length} other player${msg.players.length > 1 ? 's' : ''} here.` : `Online${where}. Share this address with friends so they can join.`, true)
     } else if (msg.t === 'join') {
       addRemote(net, msg.id, msg.name)
       syncRoster(net)
@@ -119,6 +123,9 @@ export function connectMultiplayer(name) {
       if (from && msg.dmg >= 15) fx.shake(0.4)
     } else if (msg.t === 'chat') {
       addChat(msg.name, msg.text)
+    } else if (msg.t === 'emote') {
+      const r = net.remotes.get(msg.id)
+      if (r) r.emote = { e: msg.e, at: performance.now() }
     } else if (msg.t === 'full') {
       addChat(null, 'The server is full, so you are playing offline.', true)
     }

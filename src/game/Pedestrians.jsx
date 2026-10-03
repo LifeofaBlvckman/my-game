@@ -2,7 +2,8 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Color, InstancedBufferAttribute, Matrix4, PlaneGeometry, Quaternion, Vector3 } from 'three'
 import { npcs, updatePedestrians } from './crowd'
-import { computePose, FACE, NECK, personParts, SLOTS } from './people'
+import { computePose, FACE, jointMatrices, makeJoints, personParts, SLOTS } from './people'
+import { inkOutline } from './outline'
 import { FACE_COLS, getFaceAtlas } from './faces'
 import { toon, toonRamp } from './materials'
 import { SHAPES } from './shapes'
@@ -10,9 +11,9 @@ import { useGame, world } from './state'
 import { VEHICLES } from './vehicleTypes'
 import { blobGeometry, blobMaterial } from './Shadows'
 
-const DRAW_DISTANCE = 150
-const SHAPE_NAMES = ['sphere', 'rbox', 'capsule']
-const SPLAY = { armL: 0.06, armR: -0.06 }
+const DRAW_DISTANCE = 120 // people further away are only a few pixels tall
+const SHAPE_NAMES = ['sphere', 'rbox', 'capsule', 'cone']
+const OUTLINE_DISTANCE = 35 // people closer than this get the bold ink outline
 const LOD_DISTANCE = 60 // beyond this, people update every third frame
 
 function createFaceMaterial() {
@@ -29,40 +30,22 @@ function createFaceMaterial() {
   return material
 }
 
-const M = () => new Matrix4()
-const base = M()
-const head = M()
-const tmp = M()
-const rot = M()
+const base = new Matrix4()
+const rot = new Matrix4()
 const q = new Quaternion()
 const v = new Vector3()
 const s = new Vector3()
 const up = new Vector3(0, 1, 0)
 const lying = new Matrix4().makeRotationX(-Math.PI / 2).premultiply(new Matrix4().makeTranslation(0, 0.14, 0))
-const neck = new Matrix4().makeTranslation(...NECK)
 const faceLocal = new Matrix4().makeTranslation(...FACE.offset).multiply(new Matrix4().makeScale(FACE.size[0], FACE.size[1], 1))
+const joints = makeJoints()
 const pose = {}
 const poseIn = {}
 const color = new Color()
 
-// Each NPC's parts with their local matrices prebuilt.
-function buildRig(n) {
-  return personParts(n.look).map((p) => {
-    const scale = new Matrix4().makeScale(...p.size)
-    if (p.group.startsWith('leg') || p.group.startsWith('arm')) {
-      return {
-        ...p,
-        pivotM: new Matrix4().makeTranslation(...p.pivot).multiply(new Matrix4().makeRotationZ(SPLAY[p.group] ?? 0)),
-        localM: new Matrix4().makeTranslation(...p.offset).multiply(scale),
-      }
-    }
-    const origin = p.group === 'head' ? p.offset : p.pivot.map((c, k) => c + p.offset[k])
-    return { ...p, localM: new Matrix4().makeTranslation(...origin).multiply(scale) }
-  })
-}
-
 export default function Pedestrians() {
-  const meshes = { sphere: useRef(), rbox: useRef(), capsule: useRef() }
+  const meshes = { sphere: useRef(), rbox: useRef(), capsule: useRef(), cone: useRef() }
+  const lines = { sphere: useRef(), rbox: useRef(), capsule: useRef(), cone: useRef() }
   const faces = useRef()
   const shadows = useRef()
   const faceMaterial = useMemo(createFaceMaterial, [])
@@ -72,7 +55,7 @@ export default function Pedestrians() {
     return g
   }, [])
   const rigs = useMemo(
-    () => npcs.map((n) => ({ parts: buildRig(n).map((p) => ({ ...p, world: new Matrix4() })), face: new Matrix4(), shadow: new Matrix4() })),
+    () => npcs.map((n) => ({ parts: personParts(n.look).map((p) => ({ ...p, world: new Matrix4() })), face: new Matrix4(), shadow: new Matrix4() })),
     [],
   )
   const frame = useRef(0)
@@ -85,6 +68,7 @@ export default function Pedestrians() {
       sphere: new Int32Array(npcs.length * SLOTS.sphere).fill(-1),
       rbox: new Int32Array(npcs.length * SLOTS.rbox).fill(-1),
       capsule: new Int32Array(npcs.length * SLOTS.capsule).fill(-1),
+      cone: new Int32Array(npcs.length * SLOTS.cone).fill(-1),
       face: new Int32Array(npcs.length).fill(-1),
     }),
     [],
@@ -106,7 +90,8 @@ export default function Pedestrians() {
     const fx = world.focus.x
     const fz = world.focus.z
     const time = clock.elapsedTime
-    const cursor = { sphere: 0, rbox: 0, capsule: 0 }
+    const cursor = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+    const lineCursor = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
     let faceCursor = 0
     let recolored = false
     const faceAttr = faceGeometry.getAttribute('aFace')
@@ -135,32 +120,36 @@ export default function Pedestrians() {
         poseIn.punchSide = n.punchSide ?? 1
         poseIn.flinch = n.flinch > 0 ? n.flinch / 0.4 : 0
         computePose(pose, poseIn)
-        if (n.grab) pose.armL = pose.armR = -1.35 // an officer taking hold of you
+        if (n.grab) {
+          // An officer taking hold of you.
+          pose.armL = pose.armR = -1.35
+          pose.foreL = pose.foreR = -0.25
+        }
         if (n.down > 0) {
           pose.bob = pose.lean = pose.twist = pose.headTilt = pose.headNod = 0
           pose.sy = pose.sxz = 1
           pose.legL = pose.legR = 0.2
+          pose.shinL = pose.shinR = 0.35
           pose.armL = pose.armR = -2.6
+          pose.foreL = pose.foreR = -0.3
         }
+        jointMatrices(pose, joints)
         const h = n.look.height
-        q.setFromAxisAngle(up, n.yaw + pose.twist)
-        base.compose(v.set(n.x + n.ox, n.y + pose.bob, n.z + n.oz), q, s.set(h * pose.sxz, h * pose.sy, h * pose.sxz))
+        q.setFromAxisAngle(up, n.yaw)
+        base.compose(v.set(n.x + n.ox, n.y, n.z + n.oz), q, s.set(h, h, h))
         if (n.down > 0) base.multiply(lying)
-        else base.multiply(rot.makeRotationX(pose.lean))
-        head.multiplyMatrices(base, neck).multiply(rot.makeRotationX(pose.headNod)).multiply(rot.makeRotationZ(pose.headTilt))
-        for (const p of rig.parts) {
-          if (p.pivotM) p.world.multiplyMatrices(base, p.pivotM).multiply(rot.makeRotationX(pose[p.group])).multiply(p.localM)
-          else p.world.multiplyMatrices(p.group === 'head' ? head : base, p.localM)
-        }
-        rig.face.multiplyMatrices(head, faceLocal)
+        for (const p of rig.parts) p.world.multiplyMatrices(base, rot.multiplyMatrices(joints[p.joint], p.local))
+        rig.face.multiplyMatrices(base, rot.multiplyMatrices(joints.head, faceLocal))
         rig.shadow.makeScale(n.down > 0 ? 1.2 : 0.9, 1, n.down > 0 ? 2 : 0.9).setPosition(n.x + n.ox, n.y + 0.02, n.z + n.oz)
       }
 
+      const outlined = d2 < OUTLINE_DISTANCE * OUTLINE_DISTANCE
       for (let k = 0; k < rig.parts.length; k++) {
         const p = rig.parts[k]
         const slot = cursor[p.shape]++
         const mesh = meshes[p.shape].current
         mesh.setMatrixAt(slot, p.world)
+        if (outlined) lines[p.shape].current.setMatrixAt(lineCursor[p.shape]++, p.world)
         const id = i * 32 + k
         if (owners[p.shape][slot] !== id) {
           owners[p.shape][slot] = id
@@ -182,6 +171,9 @@ export default function Pedestrians() {
       const mesh = meshes[name].current
       mesh.count = cursor[name]
       mesh.instanceMatrix.needsUpdate = true
+      const line = lines[name].current
+      line.count = lineCursor[name]
+      line.instanceMatrix.needsUpdate = true
       if (recolored && mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     })
     faces.current.count = shadows.current.count = faceCursor
@@ -195,6 +187,9 @@ export default function Pedestrians() {
         <instancedMesh key={name} ref={meshes[name]} args={[SHAPES[name], undefined, npcs.length * SLOTS[name]]} frustumCulled={false}>
           <meshToonMaterial gradientMap={toonRamp} />
         </instancedMesh>
+      ))}
+      {SHAPE_NAMES.map((name) => (
+        <instancedMesh key={`${name}-line`} ref={lines[name]} args={[SHAPES[name], inkOutline, npcs.length * SLOTS[name]]} frustumCulled={false} userData={{ noShadow: true }} />
       ))}
       <instancedMesh ref={faces} args={[faceGeometry, faceMaterial, npcs.length]} frustumCulled={false} />
       <instancedMesh ref={shadows} args={[blobGeometry, blobMaterial, npcs.length]} frustumCulled={false} renderOrder={-1} />

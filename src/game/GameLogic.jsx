@@ -8,10 +8,11 @@ import { alightRiders, callBoarders, copsGrabbing, deployCop, ejectDriver, npcNe
 import { INTERIORS, roomExit, roomPoint, roomSpawn } from './rooms'
 import { CHATTER, currentTarget, NPCS, QUESTS, STRANGER_LINES } from './quests'
 import { VEHICLES } from './vehicleTypes'
-import { alarm, bust, clang, jingle, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn } from './audio'
+import { alarm, bust, clang, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn } from './audio'
 import { CAR_HP, damagePlayerCar, damageVehicle, hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
+import { emote } from './emotes'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -84,6 +85,8 @@ function nearestNamedNpc(from) {
 // --- Buildings ---
 
 function placePlayer(x, y, z, facing) {
+  // Still loading: try again in a moment.
+  if (!world.player) return void setTimeout(() => placePlayer(x, y, z, facing), 100)
   world.player.setTranslation({ x, y, z }, true)
   world.player.setLinvel({ x: 0, y: 0, z: 0 }, true)
   world.focus.set(x, y, z)
@@ -97,7 +100,8 @@ function placePlayer(x, y, z, facing) {
 export function placeInRoom(id) {
   const room = INTERIORS[id]
   const [x, y, z] = roomSpawn(room)
-  placePlayer(x, y, z, Math.PI)
+  // A little scatter, so friends coming through the same door don't overlap.
+  placePlayer(x + (Math.random() - 0.5) * 2, y, z, Math.PI)
   world.simFocus = { x: room.door.x, z: room.door.z }
   useGame.setState({ inside: id })
 }
@@ -429,9 +433,13 @@ export default function GameLogic() {
         return
       }
       if (e.code === 'KeyX') punch()
+      if (/^Digit[1-8]$/.test(e.code) && game.phase === 'playing') emote(Number(e.code.slice(5)) - 1)
       if (e.code === 'KeyM') {
-        setMusic(!game.music)
-        useGame.setState({ music: !game.music })
+        // Cycle: calm theme -> Afrobeats -> off.
+        const music = MUSIC_STYLES[(MUSIC_STYLES.indexOf(game.music) + 1) % MUSIC_STYLES.length]
+        setMusic(music)
+        useGame.setState({ music })
+        banner(music === 'calm' ? 'MUSIC: CALM' : music === 'afro' ? 'MUSIC: AFROBEATS' : 'MUSIC OFF')
       }
       if (e.code === 'KeyO') useGame.setState({ outlines: !game.outlines })
       if (e.code === 'KeyT' && game.phase === 'playing') world.time = (world.time + 60) % 1440
@@ -655,13 +663,27 @@ export default function GameLogic() {
         return { shadowMap: three.gl.shadowMap.enabled, type: three.gl.shadowMap.type, casters, lights, calls: three.gl.info.render.calls, triangles: three.gl.info.render.triangles }
       },
       state: () => useGame.getState(),
+      // Draw calls and triangles for one whole frame (all passes).
+      frameStats: () =>
+        new Promise((done) => {
+          const info = three.gl.info
+          requestAnimationFrame(() => {
+            info.autoReset = false
+            info.reset()
+            requestAnimationFrame(() => {
+              const stats = { calls: info.render.calls, triangles: info.render.triangles, frames: info.render.frame }
+              info.autoReset = true
+              done(stats)
+            })
+          })
+        }),
       carSpeed: () => world.carSpeed,
       // A crowd member, by index, or the nearest one to the player.
       crowdNpc: (i) => {
         const n = i === undefined ? npcNear(world.focus.x, world.focus.z, 8) : npcs[i]
         return n && { i: npcs.indexOf(n), tough: !!n.tough, kind: n.kind, role: n.role, x: n.x, z: n.z, y: n.y, down: n.down, hp: n.hp, active: n.active, panic: n.panic, fight: n.fight }
       },
-      remotes: () => [...(world.net?.remotes.values() ?? [])].map((r) => ({ x: r.x, z: r.z, m: r.s?.m })),
+      remotes: () => [...(world.net?.remotes.values() ?? [])].map((r) => ({ x: r.x, z: r.z, m: r.s?.m, emote: r.emote?.e })),
       heading: () => world.heading,
       focus: () => ({ x: world.focus.x, y: world.focus.y, z: world.focus.z }),
       teleport: (x, z) => {
@@ -672,6 +694,8 @@ export default function GameLogic() {
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
       setShadows: (on) => useGame.setState({ shadows: on }),
+      // Point the camera (yaw 0 looks from +z) and hold it there for a while.
+      setCamera: (yaw, pitch = 0.3, distance) => Object.assign(world, { cameraYaw: yaw, cameraPitch: pitch, debugCamDistance: distance, lastMouseMove: performance.now() + 60000 }),
       vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut, yaw: v.yaw, blockedBy: v.blockedBy, riders: v.riders?.length ?? 0, dwell: v.dwell })),
       waiting: () => waitingCounts(),
       // Put an NPC danfo on the road just before a bus stop.

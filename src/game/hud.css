@@ -477,3 +477,173 @@
   width: 260px;
   margin-top: 8px;
 }
+
+/* --- Touch controls (phones and tablets) --- */
+.touch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.look-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 60%;
+  pointer-events: auto;
+  touch-action: none;
+}
+.stick-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 40%;
+  height: 60%;
+  pointer-events: auto;
+  touch-action: none;
+}
+.stick {
+  position: fixed;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 3px solid rgba(29, 26, 36, 0.55);
+}
+.stick.idle {
+  position: absolute;
+  left: 100px;
+  top: auto;
+  bottom: 40px;
+  margin: 0 0 0 -60px;
+  opacity: 0.6;
+}
+.knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 3px solid #1d1a24;
+}
+.touch-buttons {
+  position: absolute;
+  right: 16px;
+  bottom: 24px;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 12px;
+  align-items: end;
+  pointer-events: auto;
+}
+.touch-top {
+  position: absolute;
+  right: 16px;
+  top: 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+  pointer-events: auto;
+}
+.touch-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #1d1a24;
+  background: rgba(255, 255, 255, 0.86);
+  color: #1d1a24;
+  font: bold 14px Arial, Helvetica, sans-serif;
+  letter-spacing: 1px;
+  text-shadow: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.touch-btn:active {
+  background: #ffd23a;
+}
+.touch-btn.big {
+  width: 84px;
+  height: 84px;
+  font-size: 34px;
+}
+.touch-btn.small {
+  width: 46px;
+  height: 46px;
+  font-size: 20px;
+}
+.touch-btn.glow {
+  background: #ffd23a;
+  box-shadow: 0 0 0 4px rgba(255, 210, 58, 0.4);
+}
+.emoji-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.emoji-list {
+  display: flex;
+  flex-wrap: wrap;
+  width: 176px;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 3px solid #1d1a24;
+  background: rgba(255, 255, 255, 0.92);
+}
+.emoji-list button {
+  width: 38px;
+  height: 38px;
+  font-size: 24px;
+  border: 0;
+  background: none;
+  touch-action: none;
+}
+/* With touch controls the radar moves up out of the joystick's way, and the
+   chat sits above it. */
+.hud.is-touch .radar {
+  top: 12px;
+  bottom: auto;
+  left: 12px;
+  transform: scale(0.6);
+  transform-origin: top left;
+}
+.hud.is-touch .help {
+  top: 128px;
+  left: 12px;
+  max-width: 46vw;
+}
+.hud.is-touch .chat {
+  bottom: 190px;
+}
+.hud.is-touch .online {
+  top: 116px;
+  bottom: auto;
+  left: 12px;
+}
+.hud.is-touch .objective {
+  top: 12px;
+  bottom: auto;
+  max-width: 44vw;
+}
+.hud.is-touch .speed {
+  bottom: auto;
+  top: 230px;
+  right: 16px;
+  font-size: 20px;
+}
+.hud.is-touch .banner {
+  bottom: 200px;
+}
+.name-field input,
+.chat input {
+  user-select: text;
+  -webkit-user-select: text;
+}

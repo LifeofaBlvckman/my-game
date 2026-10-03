@@ -27,8 +27,9 @@ export const useGame = create((set) => ({
   wasted: false,
   busted: false,
   outlines: true,
-  shadows: true, // real cast shadows; turned off automatically on slow machines
-  music: true,
+  // Real shadows; off from the start on phones.
+  shadows: !(typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches), // real cast shadows; turned off automatically on slow machines
+  music: 'calm', // 'calm' | 'afro' | 'off' (M cycles)
   // Multiplayer
   playerName: '',
   online: false,

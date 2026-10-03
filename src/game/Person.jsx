@@ -1,70 +1,62 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
-import { makeFaceTexture, faceStyle } from './faces'
-import { FACE, NECK, personParts } from './people'
+import { Matrix4 } from 'three'
+import { faceStyle, makeFaceTexture } from './faces'
+import { FACE, jointMatrices, makeJoints, personParts } from './people'
 import { SHAPES } from './shapes'
 import { toonRamp } from './materials'
+import { inkOutline } from './outline'
 
-const SPLAY = { armL: 0.06, armR: -0.06 }
-const isLimb = (g) => g.startsWith('leg') || g.startsWith('arm')
+const faceLocal = new Matrix4().makeTranslation(...FACE.offset).multiply(new Matrix4().makeScale(FACE.size[0], FACE.size[1], 1))
 
-function Part({ p, origin, map }) {
-  return (
-    <mesh geometry={SHAPES[p.shape]} position={[p.offset[0] + origin[0], p.offset[1] + origin[1], p.offset[2] + origin[2]]} scale={p.size}>
-      <meshToonMaterial gradientMap={toonRamp} color={map ? '#ffffff' : p.color} map={map ?? null} />
-    </mesh>
-  )
-}
-
-// A single character built from meshes: the player and named NPCs.
-// The ref exposes `animate(pose)`; poses come from computePose in people.js.
-const Person = forwardRef(function Person({ look, shirtMap, faceOverride, ...props }, ref) {
+// A single character built from meshes: the player, named NPCs and other
+// players. Same body and poses as the crowd (people.js), plus a bold ink
+// outline. The ref exposes `animate(pose)`; poses come from computePose.
+const Person = forwardRef(function Person({ look, shirtMap, faceOverride, outline = true, ...props }, ref) {
   const parts = useMemo(() => personParts(look), [look])
   const face = useMemo(() => makeFaceTexture(faceOverride ?? faceStyle(look.face)), [look, faceOverride])
-  const limbs = useMemo(() => {
-    const groups = {}
-    parts.forEach((p, i) => isLimb(p.group) && (groups[p.group] ??= { pivot: p.pivot, parts: [] }).parts.push({ p, i }))
-    return groups
-  }, [parts])
-  const torso = parts.findIndex((p) => p.group === 'body' && p.pivot[1] > 1.1 && p.pivot[1] < 1.3)
-  const root = useRef()
-  const head = useRef()
-  const limbRefs = useRef({})
+  const torso = parts.findIndex((p) => p.joint === 'chest' && p.offset[1] === 1.2)
+  const joints = useMemo(makeJoints, [])
+  const meshes = useRef([])
+  const faceMesh = useRef()
 
   useImperativeHandle(ref, () => ({
-    animate(p) {
-      const r = root.current
-      if (!r) return
-      r.position.y = p.bob
-      r.rotation.set(p.lean, p.twist, 0)
-      r.scale.set(p.sxz, p.sy, p.sxz)
-      head.current.rotation.set(p.headNod, 0, p.headTilt)
-      for (const name of ['legL', 'legR', 'armL', 'armR']) {
-        if (limbRefs.current[name]) limbRefs.current[name].rotation.x = p[name]
+    animate(pose) {
+      jointMatrices(pose, joints)
+      parts.forEach((p, i) => {
+        const m = meshes.current[i]
+        if (!m) return
+        m.main.matrix.multiplyMatrices(joints[p.joint], p.local)
+        m.main.matrixWorldNeedsUpdate = true
+        if (m.line) {
+          m.line.matrix.copy(m.main.matrix)
+          m.line.matrixWorldNeedsUpdate = true
+        }
+      })
+      if (faceMesh.current) {
+        faceMesh.current.matrix.multiplyMatrices(joints.head, faceLocal)
+        faceMesh.current.matrixWorldNeedsUpdate = true
       }
     },
   }))
 
+  const keep = (i, key) => (el) => {
+    meshes.current[i] ??= {}
+    meshes.current[i][key] = el
+  }
   return (
     <group scale={look.height} {...props}>
-      <group ref={root}>
-        {Object.entries(limbs).map(([name, g]) => (
-          <group key={name} position={g.pivot} rotation-z={SPLAY[name] ?? 0}>
-            <group ref={(el) => (limbRefs.current[name] = el)}>
-              {g.parts.map(({ p, i }) => (
-                <Part key={i} p={p} origin={[0, 0, 0]} />
-              ))}
-            </group>
-          </group>
-        ))}
-        {parts.map((p, i) => (p.group === 'body' ? <Part key={i} p={p} origin={p.pivot} map={i === torso ? shirtMap : null} /> : null))}
-        <group ref={head} position={NECK}>
-          {parts.map((p, i) => (p.group === 'head' ? <Part key={i} p={p} origin={[0, 0, 0]} /> : null))}
-          <mesh position={FACE.offset}>
-            <planeGeometry args={FACE.size} />
-            <meshToonMaterial gradientMap={toonRamp} map={face} transparent alphaTest={0.05} depthWrite={false} />
+      {parts.map((p, i) => (
+        <group key={i}>
+          <mesh ref={keep(i, 'main')} geometry={SHAPES[p.shape]} matrixAutoUpdate={false} matrix={p.local}>
+            <meshToonMaterial gradientMap={toonRamp} color={i === torso && shirtMap ? '#ffffff' : p.color} map={i === torso ? (shirtMap ?? null) : null} />
           </mesh>
+          {outline && <mesh ref={keep(i, 'line')} geometry={SHAPES[p.shape]} material={inkOutline} matrixAutoUpdate={false} matrix={p.local} userData={{ noShadow: true }} />}
         </group>
-      </group>
+      ))}
+      <mesh ref={faceMesh} matrixAutoUpdate={false}>
+        <planeGeometry args={[1, 1]} />
+        <meshToonMaterial gradientMap={toonRamp} map={face} transparent alphaTest={0.05} depthWrite={false} />
+      </mesh>
     </group>
   )
 })

@@ -47,7 +47,7 @@ export default function CameraRig() {
     }
 
     const driving = game.mode === 'car'
-    const distance = driving ? 9 : 5
+    const distance = world.debugCamDistance ?? (driving ? 9 : 5)
     const { focus } = world
     lookAt.set(focus.x, focus.y + (driving ? 1.2 : 0.8), focus.z)
 

@@ -99,9 +99,16 @@ street lamps and club neon light up.
   you're **WASTED**.
 
 **Multiplayer.** Friends can join your city: you see each other walking and
-driving, can punch or run each other over, and chat. Everyone shares the same
-time of day. Traffic and crowds are simulated on each player's own machine,
-so they won't match between players.
+driving, can punch or run each other over, chat, and pop emoji bubbles over
+your heads (keys **1**–**8**). Like Messenger, players are put in rooms of 16:
+when a room fills up, the next player starts a new one. Everyone shares the
+same time of day. Traffic and crowds are simulated on each player's own
+machine, so they won't match between players.
+
+**On phones.** Touch controls appear automatically: a joystick on the left
+(push it all the way to sprint), drag on the right to look around, and
+buttons to punch, jump, use cars, talk and send emoji. Phones start with
+lighter graphics.
 
 **Look and sound.** An illustrated style inspired by Abeto's *Messenger*:
 - Two-tone shading: each surface is either lit (warm) or in shadow (one cool
@@ -110,12 +117,20 @@ so they won't match between players.
 - Hand-drawn-style ink lines that wobble and vary in weight, with a light
   paper grain.
 - A flat teal sky with painted clouds.
-- Characters in natural proportions with illustrated faces, and Lagos
-  clothes: Ankara, agbada, iro, gele.
+- Characters drawn in Messenger's manner, built from scratch: about 6.5
+  heads tall, soft rounded shapes, bending knees and elbows, chunky sneakers,
+  clumpy hair (low cuts, locs, afros, braids, puffs, gele), simple oval-eyed
+  faces with a little blush, and a bold dark ink outline. Lagos clothes:
+  Ankara, agbada, iro, hoodies. Everyone jogs rather than walks, like in
+  Messenger; Shift is a sprint.
+- Small flocks of birds drifting across the sky.
 - Pastel houses with pitched roofs, framed windows and doors, puffy trees.
 - A title screen and an opening fly-in.
-- A synthesized Afrobeats loop, siren, horns, engines, a bank alarm, punches
-  and explosions. No audio files.
+- Music: a calm theme by default (plucked zither notes on a pentatonic
+  scale over a soft drone, with bends and tremolo, in a big airy room), or an
+  Afrobeats groove. **M** switches between them and off.
+- Sirens, horns, engines, a bank alarm, punches and explosions. Everything is
+  synthesized in code: no audio files.
 
 ## Run it
 
@@ -136,21 +151,35 @@ Open the URL it prints, usually http://localhost:5173.
 2. It prints a `Network:` address, such as `http://192.168.1.20:5173`.
 3. Friends open that address on their own computers.
 
-**Over the internet:**
+**Over the internet (players anywhere in the world):**
 
-1. Run `npm run build`, then `npm start`. This serves the game and the
-   multiplayer server on port 3000, or on `PORT` if it's set.
-2. Host it on any service that runs Node.js and supports WebSockets, such as
-   Render, Railway or Fly.io. Use `npm run build` as the build command and
-   `npm start` as the start command.
-3. Share the address the host gives you.
+The quickest way is [Render](https://render.com), which has a free plan:
+
+1. Sign in to Render with your GitHub account.
+2. Choose **New > Blueprint** and pick this repository. It reads
+   `render.yaml`, builds the game and starts the server.
+3. Share the `onrender.com` address it gives you. It works on phones too.
+
+Free Render servers fall asleep when nobody has played for a while, so the
+first visit after that takes about a minute to load.
+
+Any other host that runs Node.js and supports WebSockets works too (Railway,
+Fly.io, a VPS): use `npm run build` as the build command and `npm start` as the
+start command. `npm start` serves the game and the multiplayer server on port
+3000, or on `PORT` if it's set.
 
 For a quick test, a tunnel like `cloudflared tunnel --url http://localhost:3000`
 also works.
 
-The server allows up to 24 players. It checks every message: names and chat
-are trimmed, numbers are bounded, punches only count at close range, and each
-connection is rate-limited.
+**Do I need a database?** No. Live multiplayer doesn't use one: the server
+keeps who's online and where they are in memory, and passes it between
+players many times a second (Messenger works the same way). A database only
+becomes useful later, for things that must outlast a session: accounts, saved
+progress across devices, or leaderboards.
+
+One server holds up to 256 players, in rooms of 16. It checks every message:
+names and chat are trimmed, numbers are bounded, punches only count at close
+range, and each connection is rate-limited.
 
 ## Controls
 
@@ -158,14 +187,15 @@ connection is rate-limited.
 | --- | --- | --- |
 | Mouse (click the game first) | Look around | Look around (snaps back behind the car) |
 | W A S D / arrow keys | Move | Throttle, brake/reverse, steer |
-| Shift | Run | |
+| Shift | Sprint (you jog by default) | |
 | Space | Jump | Handbrake |
 | Click / X | Punch (click needs the mouse captured) | |
 | Y | Chat (when online) | Chat |
 | E | Talk, go through a door, sleep in your bed, use a gym bench | |
 | F | Get in your car, or jack any other | Get out |
 | Q | | Horn |
-| M / O / T / H | Music on/off, ink outlines on/off, skip an hour, help box | |
+| 1 – 8 | Emoji bubble over your head | Emoji |
+| M / O / T / H | Music (calm, Afrobeats, off), ink outlines on/off, skip an hour, help box | |
 | Esc | Release the mouse | |
 
 ## Project layout
@@ -183,9 +213,13 @@ src/
     vehicleTypes.js      Danfo, keke, sedan, jeep, police: parts, handling
     crowd.js             Crowd simulation: walkers, idlers, wanderers, bus riders, cops on foot
     Pedestrians.jsx      Draws the whole crowd with 2 instanced meshes
-    people.js            Body parts and outfits shared by the crowd and <Person>
+    people.js            The body: joints, parts, outfits and hair, plus the poses (walk, jog, punch...)
     faces.js             Canvas-drawn faces, Ankara print, sign textures
-    Person.jsx           One character from meshes: the player and named NPCs
+    Person.jsx           One character from meshes, with its ink outline: the player, named NPCs, other players
+    outline.js           The bold ink outline material for characters
+    Birds.jsx            Flocks of birds in the sky
+    emotes.js            Emoji reactions; EmoteBubble.jsx draws the bubble
+    TouchControls.jsx    Joystick, look area and buttons on phones
     NamedNpcs.jsx        Quest characters, name tags, markers, checkpoints
     quests.js            Characters, missions and dialogue (edit this to add jobs)
     rooms.js             Building interiors: layout, furniture, people (edit this to add rooms)
@@ -231,9 +265,10 @@ If it's slow on your machine, it lowers resolution and turns off real shadows
 by itself after a few seconds. You can also press **O** to turn off the ink
 outlines, or change `RENDER_STEPS` in `src/App.jsx`.
 
-About 290,000 triangles are drawn per frame (twice that with shadows on):
-people are low-poly, only those within 150 m are drawn, and anyone beyond
-60 m is re-posed every third frame.
+At a busy market about 650,000 triangles are drawn per frame (1.2 million
+with real shadows on). People are low-poly (about 1,800 triangles each), only
+those within 120 m are drawn, only those within 35 m get the ink outline, and
+anyone beyond 60 m is re-posed every third frame.
 
 ## Adding a job
 

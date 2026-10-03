@@ -68,7 +68,8 @@ void main() {
 
   float fade = 1.0 - smoothstep(fadeEnd * 0.35, fadeEnd, d);
   float ink = max(silhouette, crease * 0.75) * fade;
-  vec3 c = mix(color.rgb, vec3(0.1, 0.12, 0.16), ink * 0.85);
+  // Dark ink, a touch cool, like Messenger's line work.
+  vec3 c = mix(color.rgb, vec3(0.018, 0.018, 0.028), ink * 0.85);
 
   // Light grade toward an illustrated palette: slightly muted, with a
   // little paper grain.

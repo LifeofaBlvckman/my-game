@@ -82,13 +82,148 @@ function scheduleBar(start, bar) {
   }
 }
 
+// --- Music: a calm theme, the default ---
+// Plucked zither (guzheng-like) notes on a pentatonic scale over a soft
+// drone, in a big airy room. The plucks are Karplus-Strong strings,
+// synthesized once at startup into buffers.
+const CALM_BPM = 68
+const EIGHTH = 60 / CALM_BPM / 2
+const MIDI = (n) => 440 * Math.pow(2, (n - 69) / 12)
+// D major pentatonic (D E F# A B) across two octaves, plus low roots.
+const MELODY = [62, 64, 66, 69, 71, 74, 76, 78, 81].map(MIDI)
+const ROOTS = [50, 47, 43, 45].map(MIDI) // D, B, G, A: one per bar
+const DRONE = [[50, 57], [47, 54], [43, 50], [45, 52]].map((c) => c.map(MIDI))
+let plucks = null
+let reverb = null
+let calmGain = null
+let calmMelody = { note: 4, rest: 0 }
+
+function pluckBuffer(freq, seconds = 2.6, damping = 0.996) {
+  const rate = ctx.sampleRate
+  const out = ctx.createBuffer(1, Math.floor(rate * seconds), rate)
+  const data = out.getChannelData(0)
+  const period = rate / freq
+  const n = Math.floor(period)
+  const frac = period - n
+  const line = new Float32Array(n + 2)
+  // A soft pick: filtered noise, so it sounds plucked, not scratched.
+  let last = 0
+  for (let i = 0; i < line.length; i++) {
+    last = last * 0.5 + (Math.random() * 2 - 1) * 0.5
+    line[i] = last
+  }
+  let idx = 0
+  for (let i = 0; i < data.length; i++) {
+    const a = line[idx]
+    const b = line[(idx + 1) % line.length]
+    const v = a + (b - a) * frac
+    data[i] = v
+    line[idx] = damping * 0.5 * (a + b)
+    idx = (idx + 1) % line.length
+  }
+  return out
+}
+
+function impulse(seconds = 2.4) {
+  const rate = ctx.sampleRate
+  const out = ctx.createBuffer(2, Math.floor(rate * seconds), rate)
+  for (let c = 0; c < 2; c++) {
+    const d = out.getChannelData(c)
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3)
+  }
+  return out
+}
+
+function setupCalm() {
+  calmGain = ctx.createGain()
+  calmGain.gain.value = 0
+  calmGain.connect(master)
+  reverb = ctx.createConvolver()
+  reverb.buffer = impulse()
+  const wet = ctx.createGain()
+  wet.gain.value = 0.55
+  reverb.connect(wet).connect(calmGain)
+  plucks = { melody: MELODY.map((f) => pluckBuffer(f)), roots: ROOTS.map((f) => pluckBuffer(f, 3.5, 0.998)) }
+}
+
+function pluck(buffer, t, gain, bend = 0) {
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  // Guzheng players press the string to bend a note up after plucking it.
+  if (bend) {
+    src.playbackRate.setValueAtTime(1, t)
+    src.playbackRate.setValueAtTime(1, t + 0.18)
+    src.playbackRate.linearRampToValueAtTime(Math.pow(2, bend / 12), t + 0.42)
+  }
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(gain, t)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + buffer.duration)
+  src.connect(g)
+  g.connect(calmGain)
+  g.connect(reverb)
+  src.start(t)
+  src.stop(t + buffer.duration)
+}
+
+function pad(freqs, t, length) {
+  for (const f of freqs) {
+    const o = ctx.createOscillator()
+    o.type = 'sine'
+    o.frequency.value = f
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.linearRampToValueAtTime(0.035, t + length * 0.4)
+    g.gain.linearRampToValueAtTime(0.0001, t + length)
+    o.connect(g)
+    g.connect(calmGain)
+    g.connect(reverb)
+    o.start(t)
+    o.stop(t + length + 0.05)
+  }
+}
+
+function scheduleCalmBar(start, bar) {
+  const chord = bar % 4
+  pluck(plucks.roots[chord], start, 0.5)
+  pad(DRONE[chord], start, 8 * EIGHTH + 0.6)
+  // A wandering melody: small steps along the scale, with rests, a long
+  // note at the end of each phrase, and now and then a bend or a tremolo.
+  const phraseEnd = bar % 4 === 3
+  for (let e = 0; e < 8; e++) {
+    const t = start + e * EIGHTH + (Math.random() - 0.5) * 0.02
+    if (calmMelody.rest > 0) {
+      calmMelody.rest--
+      continue
+    }
+    if (phraseEnd && e >= 4) break
+    if (Math.random() < 0.38) continue
+    const step = [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]
+    calmMelody.note = Math.max(0, Math.min(MELODY.length - 1, calmMelody.note + step))
+    const buf = plucks.melody[calmMelody.note]
+    const roll = Math.random()
+    if (roll < 0.08 && e < 6) {
+      // Tremolo: the same string picked quickly, fading.
+      for (let k = 0; k < 6; k++) pluck(buf, t + k * 0.07, 0.22 * (1 - k * 0.12))
+      calmMelody.rest = 2
+    } else {
+      pluck(buf, t, 0.3 + Math.random() * 0.1, roll > 0.88 ? 2 : 0)
+      if (Math.random() < 0.3) calmMelody.rest = 1 // let it ring
+    }
+  }
+  if (phraseEnd) pluck(plucks.melody[[0, 3, 5][Math.floor(Math.random() * 3)]], start + 4 * EIGHTH, 0.34)
+}
+
+let musicStyle = 'calm'
+
 function setupLoops() {
+  setupCalm()
   let next = ctx.currentTime + 0.1
   let bar = 0
   musicTimer = setInterval(() => {
     while (next < ctx.currentTime + 0.4) {
-      if (musicGain.gain.value > 0.001) scheduleBar(next, bar)
-      next += 16 * STEP
+      if (musicStyle === 'afro' && musicGain.gain.value > 0.001) scheduleBar(next, bar)
+      if (musicStyle === 'calm') scheduleCalmBar(next, bar)
+      next += musicStyle === 'calm' ? 8 * EIGHTH : 16 * STEP
       bar++
     }
   }, 100)
@@ -142,8 +277,12 @@ function setupLoops() {
 
 const smooth = (param, value) => ctx && param.setTargetAtTime(value, ctx.currentTime, 0.08)
 
-export function setMusic(on) {
-  if (musicGain) smooth(musicGain.gain, on ? 0.32 : 0)
+// style: 'calm' (default), 'afro' (Afrobeats groove) or 'off'.
+export const MUSIC_STYLES = ['calm', 'afro', 'off']
+export function setMusic(style) {
+  musicStyle = style
+  if (musicGain) smooth(musicGain.gain, style === 'afro' ? 0.32 : 0)
+  if (calmGain) smooth(calmGain.gain, style === 'calm' ? 0.9 : 0)
 }
 export function setSiren(volume) {
   if (siren) smooth(siren.gain, volume * 0.12)
