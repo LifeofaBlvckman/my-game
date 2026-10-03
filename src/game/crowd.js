@@ -115,15 +115,7 @@ function panicAround(n, radius = 20) {
   }
 }
 
-function freezeLoop(n) {
-  if (n.kind !== 'walk') return
-  const p = loopPoint(n)
-  n.x = p.x
-  n.z = p.z
-}
-
 export function knockDown(n, dx, dz, force) {
-  freezeLoop(n)
   const d = Math.hypot(dx, dz) || 1
   n.vx = (dx / d) * Math.min(10, force)
   n.vz = (dz / d) * Math.min(10, force)
@@ -145,7 +137,6 @@ export function punchNpc(n, fromX, fromZ) {
     knockDown(n, dx, dz, 5)
     return 'down'
   }
-  freezeLoop(n)
   n.flinch = 0.4
   const d = Math.hypot(dx, dz) || 1
   n.ox += (dx / d) * 0.5

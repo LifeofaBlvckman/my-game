@@ -1,4 +1,4 @@
-import { BLOCK, blockX, blockZ, city, SIDEWALK_Y, zoneAt } from './cityData'
+import { BLOCK, blockX, blockZ, city, ISLAND_FIRST, SIDEWALK_Y, zoneAt } from './cityData'
 import { INTERIORS, roomPoint } from './rooms'
 
 // Named characters with something to say. Outdoor ones stand by the
@@ -44,14 +44,14 @@ export const NPCS = {
   },
   chidi: {
     name: 'Chidi',
-    pos: [blockX(11) + 9, blockZ(7) + 1.6],
+    pos: [blockX(ISLAND_FIRST + 3) + 9, blockZ(7) + 1.6],
     yaw: 0,
     look: { female: false, face: 2, hair: 'short', top: '#00897b', bottom: '#455a64', robe: false, height: 0.98 },
     stall: true,
   },
   funke: {
     name: 'Aunty Funke',
-    pos: [blockX(9) - 5, front(7) - 1.8],
+    pos: [blockX(ISLAND_FIRST + 1) - 5, front(7) - 1.8],
     yaw: 0,
     look: { female: true, face: 11, hair: 'gele', hairColor: '#d4af37', top: '#d4af37', bottom: '#6a1b9a', robe: true, height: 0.97 },
   },
@@ -70,7 +70,7 @@ export const NPCS = {
   },
   skido: {
     name: 'Skido',
-    pos: [blockX(9) - 5, front(4) - 1.8],
+    pos: [blockX(ISLAND_FIRST + 1) - 5, front(4) - 1.8],
     yaw: 0,
     look: { female: false, face: 3, hair: 'cap', hairColor: '#e04848', top: '#111111', bottom: '#2a2633', robe: false, height: 1.04 },
   },

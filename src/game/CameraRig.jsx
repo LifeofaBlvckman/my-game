@@ -68,8 +68,11 @@ export default function CameraRig() {
     const ray = new rapier.Ray(lookAt, desired)
     const exclude = driving ? world.car : world.player
     const hit = physics.castRay(ray, distance, true, undefined, undefined, undefined, exclude, (c) => !world.trafficColliders.has(c.handle))
-    const d = hit ? Math.max(1.6, hit.timeOfImpact - 0.3) : distance
+    // Never push through the wall: in a tight spot the camera comes in close
+    // and rises to look over the shoulder instead.
+    const d = hit ? Math.max(0.5, hit.timeOfImpact - 0.3) : distance
     desired.multiplyScalar(d).add(lookAt)
+    if (d < 1.8) desired.y += (1.8 - d) * 0.6
 
     if (game.phase === 'intro' && !game.inside) {
       // Swoop from high over Victoria Island down to the usual follow position.

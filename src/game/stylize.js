@@ -1,4 +1,4 @@
-import { ShaderLib } from 'three'
+import { ShaderChunk, ShaderLib } from 'three'
 
 // Illustrated look for every MeshToonMaterial in the game, patched into the
 // shader once at startup:
@@ -7,6 +7,15 @@ import { ShaderLib } from 'three'
 //    surfaces instead of swimming across the screen.
 //  - The lit/shadow split itself comes from the 2-step toon ramp and a flat,
 //    cool fill light (see DayNight.jsx), which gives the two-tone look.
+//  - Cast shadows get a hard edge instead of a soft blur (below).
+
+// Crisp shadows: the filtered shadow sample is pushed toward fully lit or
+// fully shaded, which keeps a clean, slightly smoothed edge rather than a
+// blurry smudge (most visible on long night shadows).
+ShaderChunk.shadowmap_pars_fragment = ShaderChunk.shadowmap_pars_fragment.replaceAll(
+  'return mix( 1.0, shadow, shadowIntensity );',
+  'return mix( 1.0, smoothstep( 0.4, 0.6, shadow ), shadowIntensity );',
+)
 
 const toon = ShaderLib.toon
 
@@ -52,3 +61,4 @@ toon.fragmentShader = toon.fragmentShader
   )
 
 if (!toon.fragmentShader.includes('sunShare')) console.warn('stylize: toon shader patch did not apply')
+if (!ShaderChunk.shadowmap_pars_fragment.includes('smoothstep( 0.4,')) console.warn('stylize: shadow patch did not apply')

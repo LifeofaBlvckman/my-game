@@ -1,10 +1,11 @@
 // Procedural Lagos-style city. Pure data, no Three.js, so the 3D scene, the
 // traffic system, the pedestrians and the radar all read the same map.
 
-// The map is a grid of blocks with roads between them. Columns 0-4 are the
-// Mainland, 5-7 are the Lagos Lagoon, and 8-12 are the Island. Two bridges
-// carry roads across the water.
-export const GX = 13 // block columns (x)
+// The map is a grid of blocks with roads between them: five columns of
+// Mainland, then the Lagos Lagoon, then five columns of Island. Two long
+// bridges carry roads across the water.
+export const LAGOON = 6 // columns of water between Mainland and Island
+export const GX = 10 + LAGOON // block columns (x)
 export const GZ = 8 // block rows (z)
 export const BLOCK = 36 // width of a city block (buildings + sidewalk)
 export const ROAD = 12 // width of a road
@@ -14,7 +15,8 @@ export const HALF_X = (GX * CELL) / 2
 export const HALF_Z = (GZ * CELL) / 2
 export const SIDEWALK_Y = 0.12
 export const MAINLAND_LAST = 4 // last mainland column
-export const ISLAND_FIRST = 8 // first island column
+export const ISLAND_FIRST = MAINLAND_LAST + 1 + LAGOON // first island column
+const isl = (k) => ISLAND_FIRST + k // the k-th island column
 export const BRIDGES = [
   { row: 2, name: 'THIRD MAINLAND BRIDGE' },
   { row: 6, name: 'CARTER BRIDGE' },
@@ -45,18 +47,18 @@ const MARKETS = [
   { i: 1, j: 5, name: 'OJA OBA MARKET' },
   { i: 4, j: 1, name: 'YABA TECH MARKET' },
 ]
-const MALLS = [{ i: 11, j: 7, name: 'LEKKI GRAND MALL' }]
+const MALLS = [{ i: isl(3), j: 7, name: 'LEKKI GRAND MALL' }]
 const CLUBS = [
   { i: 1, j: 1, name: 'CLUB EKO', color: '#ff2fb4', door: 'club' },
-  { i: 9, j: 4, name: 'KWILOX', color: '#ffd23a', door: 'kwilox' },
-  { i: 9, j: 7, name: 'OWAMBE LOUNGE', color: '#39e6ff' },
+  { i: isl(1), j: 4, name: 'KWILOX', color: '#ffd23a', door: 'kwilox' },
+  { i: isl(1), j: 7, name: 'OWAMBE LOUNGE', color: '#39e6ff' },
 ]
 // Buildings you can walk into (besides the clubs), on the south side of their block.
 const ENTERABLE = [
   { i: 3, j: 2, id: 'gym', name: 'IRON GBENGA GYM', w: 20, d: 14, h: 8, color: '#c9cdd2', sign: '#e04848' },
   { i: 2, j: 6, id: 'home', name: 'NO. 12', w: 14, d: 12, h: 7, color: '#f2d6a2', roof: '#c4553d', sign: '#3f6f3a', small: true },
   { i: 0, j: 3, id: 'church', name: 'MOUNTAIN OF GRACE CHAPEL', w: 18, d: 20, h: 10, color: '#f4f1e8', sign: '#2f4f8a', steeple: true },
-  { i: 8, j: 1, id: 'bank', name: 'NO WAHALA BANK', w: 24, d: 16, h: 18, color: '#7a9ab0', sign: '#0d2a4a' },
+  { i: isl(0), j: 1, id: 'bank', name: 'NO WAHALA BANK', w: 24, d: 16, h: 18, color: '#7a9ab0', sign: '#0d2a4a' },
 ]
 // Where danfos and kekes pick people up. Each stop sits on the curb of one
 // traffic lane: (axis, line, dir) like a lane, at position p along it.
@@ -65,10 +67,10 @@ const BUS_STOPS = [
   ['YABA', 'x', 3, -1, 4],
   ['OJUELEGBA', 'x', 5, 1, 1],
   ['SURULERE', 'z', 2, -1, 5],
-  ['OBALENDE', 'x', 2, -1, 9],
-  ['CMS', 'x', 1, 1, 10],
-  ['AHMADU BELLO WAY', 'z', 10, 1, 4],
-  ['LEKKI PHASE 1', 'x', 7, 1, 10],
+  ['OBALENDE', 'x', 2, -1, isl(1)],
+  ['CMS', 'x', 1, 1, isl(2)],
+  ['AHMADU BELLO WAY', 'z', isl(2), 1, 4],
+  ['LEKKI PHASE 1', 'x', 7, 1, isl(2)],
 ]
 
 export const roadX = (i) => -HALF_X + i * CELL
@@ -138,8 +140,8 @@ export function zoneAt(x, z) {
     if (j < 4) return i <= 2 ? ZONES.ikeja : ZONES.yaba
     return i <= 2 ? ZONES.surulere : ZONES.ebute
   }
-  if (j < 3) return i >= 11 ? ZONES.ikoyi : ZONES.island
-  if (j < 6) return i >= 11 ? ZONES.ikoyi : ZONES.vi
+  if (j < 3) return i >= isl(3) ? ZONES.ikoyi : ZONES.island
+  if (j < 6) return i >= isl(3) ? ZONES.ikoyi : ZONES.vi
   return ZONES.lekki
 }
 
@@ -216,7 +218,8 @@ export function generateCity(seed = 2026) {
     }
   }
 
-  const addDoor = (id, name, x, front) => city.doors.push({ id, name, x, z: front - 1.2 })
+  // facadeZ: the building's front wall. The door spot is on the sidewalk just outside it.
+  const addDoor = (id, name, x, facadeZ) => city.doors.push({ id, name, x, z: facadeZ + 1.3 })
 
   for (let i = 0; i < GX; i++) {
     if (!isLandColumn(i)) continue
@@ -224,7 +227,7 @@ export function generateCity(seed = 2026) {
       const x = blockX(i)
       const z = blockZ(j)
       const island = i >= ISLAND_FIRST
-      const style = island ? (i <= 10 && j < 6 ? 'tower' : 'mid') : 'low'
+      const style = island ? (i <= isl(2) && j < 6 ? 'tower' : 'mid') : 'low'
       const isVI = style === 'tower'
       const market = at(MARKETS, i, j)
       const mall = at(MALLS, i, j)
@@ -307,7 +310,7 @@ export function generateCity(seed = 2026) {
           fg: '#ffffff',
           glow: e.small ? undefined : '#ffffff',
         })
-        addDoor(e.id, e.id === 'home' ? "TUNDE'S HOUSE" : e.name, x, front - 2.6)
+        addDoor(e.id, e.id === 'home' ? "TUNDE'S HOUSE" : e.name, x, front - 3)
         continue
       }
 
@@ -323,7 +326,7 @@ export function generateCity(seed = 2026) {
         for (let q = 0; q < 6; q++) {
           city.idlers.push({ x: x + 2 + q * 1.1, z: cz + 6.2, y: SIDEWALK_Y, yaw: Math.PI / 2, role: 'queue' })
         }
-        if (club.door) addDoor(club.door, club.name, x, cz + 5 + 1.4)
+        if (club.door) addDoor(club.door, club.name, x, cz + 5)
         continue
       }
 

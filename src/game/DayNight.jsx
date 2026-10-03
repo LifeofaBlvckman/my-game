@@ -119,7 +119,8 @@ export default function DayNight() {
     cam.far = 400
     cam.updateProjectionMatrix()
     light.shadow.mapSize.set(SHADOW_SIZE, SHADOW_SIZE)
-    light.shadow.bias = -0.0006
+    light.shadow.bias = -0.00025
+    light.shadow.radius = 0.6 // tight filtering: crisp edges (see stylize.js)
     light.shadow.normalBias = 0.04
   }, [target])
 

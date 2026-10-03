@@ -104,7 +104,7 @@ export function placeInRoom(id) {
 
 function placeOutside(id) {
   const door = INTERIORS[id].door
-  placePlayer(door.x, 1.2, door.z + 0.5, 0)
+  placePlayer(door.x, 1.2, door.z + 0.6, 0)
   world.simFocus = null
   useGame.setState({ inside: null })
 }
@@ -656,6 +656,11 @@ export default function GameLogic() {
       },
       state: () => useGame.getState(),
       carSpeed: () => world.carSpeed,
+      // A crowd member, by index, or the nearest one to the player.
+      crowdNpc: (i) => {
+        const n = i === undefined ? npcNear(world.focus.x, world.focus.z, 8) : npcs[i]
+        return n && { i: npcs.indexOf(n), tough: !!n.tough, kind: n.kind, role: n.role, x: n.x, z: n.z, y: n.y, down: n.down, hp: n.hp, active: n.active, panic: n.panic, fight: n.fight }
+      },
       remotes: () => [...(world.net?.remotes.values() ?? [])].map((r) => ({ x: r.x, z: r.z, m: r.s?.m })),
       heading: () => world.heading,
       focus: () => ({ x: world.focus.x, y: world.focus.y, z: world.focus.z }),
@@ -666,6 +671,7 @@ export default function GameLogic() {
       },
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
+      setShadows: (on) => useGame.setState({ shadows: on }),
       vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut, yaw: v.yaw, blockedBy: v.blockedBy, riders: v.riders?.length ?? 0, dwell: v.dwell })),
       waiting: () => waitingCounts(),
       // Put an NPC danfo on the road just before a bus stop.

@@ -23,6 +23,12 @@ varying vec2 vUv;
 float viewZ(vec2 uv) {
   return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far);
 }
+// How much farther away (relative) two opposite neighbors at depths a and b
+// are than a flat surface through this pixel (1/depth = ic) would put them.
+// Zero on any plane, however steeply it's seen; large at an object's edge.
+float farther(float ic, float a, float b) {
+  return (2.0 * ic - 1.0 / a - 1.0 / b) / ic;
+}
 float hash(vec2 p) {
   return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
@@ -43,13 +49,16 @@ void main() {
   float u = viewZ(uv + ty);
   float b = viewZ(uv - ty);
 
-  // Silhouettes: a neighbor is much farther away than this pixel. Line
-  // weight varies along the stroke.
+  // Silhouettes: neighbors much farther away than the surface here would put
+  // them. 1/depth changes linearly across any flat surface, so this ignores
+  // distant ground seen at a shallow angle (comparing raw depths would ink
+  // it as blocky noise near the horizon). Line weight varies along the stroke.
   float weight = 1.0 + step(0.55, hash(cell * 0.37));
-  float gap = max(max(l, r), max(u, b));
-  gap = max(gap, max(max(viewZ(uv - weight * tx), viewZ(uv + weight * tx)), max(viewZ(uv + weight * ty), viewZ(uv - weight * ty))));
-  gap -= d;
-  float silhouette = smoothstep(0.03, 0.08, gap / d);
+  float id0 = 1.0 / d;
+  float sil = max(farther(id0, l, r), farther(id0, u, b));
+  sil = max(sil, farther(id0, viewZ(uv - weight * tx), viewZ(uv + weight * tx)));
+  sil = max(sil, farther(id0, viewZ(uv + weight * ty), viewZ(uv - weight * ty)));
+  float silhouette = smoothstep(0.03, 0.08, sil);
 
   // Creases: 1/depth is linear across a flat surface, so its second
   // derivative is zero except where two faces meet at an angle.

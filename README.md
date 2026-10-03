@@ -11,8 +11,8 @@ with React Three Fiber (Three.js), Rapier physics and Vite.
   rusty corrugated roofs, burglar bars and rooftop water tanks.
 - **Island:** Lagos Island, Ikoyi, Victoria Island and Lekki. Glass towers and
   mid-rise offices, with Bar Beach along the edge.
-- **Third Mainland Bridge** and **Carter Bridge** cross the Lagos Lagoon. They
-  have barriers, lamps and pillars down into the water. Fall in and you wash
+- **Third Mainland Bridge** and **Carter Bridge** cross the Lagos Lagoon, each
+  about 280 m of water. They have barriers, lamps and pillars down into the water. Fall in and you wash
   up back home.
 
 Each district is announced on screen as you enter it. The air is clear, so
@@ -229,7 +229,7 @@ Three rules keep this fast on older hardware:
 
 If it's slow on your machine, it lowers resolution and turns off real shadows
 by itself after a few seconds. You can also press **O** to turn off the ink
-outlines, or lower the values in `RENDER_SCALE` in `src/App.jsx`.
+outlines, or change `RENDER_STEPS` in `src/App.jsx`.
 
 About 290,000 triangles are drawn per frame (twice that with shadows on):
 people are low-poly, only those within 150 m are drawn, and anyone beyond
@@ -282,7 +282,10 @@ your laptop, these run well on older Macs:
 
 - **[Blockbench](https://www.blockbench.net)**: free and light, made for
   low-poly models like these. It runs as an app or in the browser
-  (web.blockbench.net). Export with **File > Export > Export glTF Model**.
+  (web.blockbench.net). Start a **Generic Model** (not one of the Minecraft
+  types), and export with **File > Export > Export glTF Model**. If it shows
+  up the wrong size in the game, give it a `scale` (for example
+  `<primitive object={scene} scale={0.5} />`).
 - **[VRoid Studio](https://vroid.com/en/studio)**: free, for characters with
   sliders for face, hair and clothes. Export as VRM and convert to GLB.
 - **[Mixamo](https://www.mixamo.com)**: free, in the browser. Upload a
@@ -324,15 +327,16 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 
 ## Tuning
 
-- Render sharpness: `RENDER_SCALE` in `src/App.jsx`. It starts at 1 and drops to
-  0.65 automatically when the frame rate struggles; real shadows switch off at
-  the same time (blob shadows stay).
+- Render sharpness: `RENDER_STEPS` in `src/App.jsx`. It starts at your screen's
+  sharpness (up to 1.5x on Retina screens) and steps down to 1x when the frame
+  rate struggles. Real shadows switch off next (blob shadows stay), and only
+  then does it go below 1x.
 - Shadow quality: `SHADOW_SIZE` and `SHADOW_RANGE` in `src/game/DayNight.jsx`.
 - Hatching density and strength: the numbers in `src/game/stylize.js`.
 - Car handling: `src/game/vehicleTypes.js` (per vehicle) and the constants in `src/game/Car.jsx`.
 - Traffic density: `TRAFFIC` and `POLICE` in `src/game/trafficSim.js`. Light timing: `src/game/signals.js`.
 - Crowd size: `WALKERS` in `src/game/crowd.js`.
-- City layout: `GX`, `GZ`, `BLOCK`, `ROAD`, `MAINLAND_LAST`, `ISLAND_FIRST`,
+- City layout: `LAGOON` (how many blocks wide the water is, which sets the bridge length), `GZ`, `BLOCK`, `ROAD`, `MAINLAND_LAST`, `ISLAND_FIRST`,
   `BRIDGES`, `BUS_STOPS`, `ENTERABLE` and the landmark lists in `src/game/cityData.js`.
 - Rooms: `src/game/rooms.js` (size, colors, furniture, people).
 - Fog distance: `fog` in `src/game/DayNight.jsx`.

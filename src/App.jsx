@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react'
+import { Suspense, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, PerformanceMonitor } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
@@ -22,13 +22,19 @@ import Hud from './game/Hud'
 import { keyMap } from './game/controls'
 import { useGame } from './game/state'
 
-// Rendering resolution. Starts sharp and drops automatically if the frame
-// rate struggles, which keeps an older laptop GPU comfortable.
-const RENDER_SCALE = { high: 1, low: 0.65 }
+// Rendering resolution, as steps from sharpest to cheapest. It starts at the
+// screen's own sharpness (up to 1.5x on Retina screens) and steps down if
+// the frame rate struggles. Real shadows go first, before it drops below one
+// pixel per screen point, so the picture stays sharp on an older laptop.
+const DEVICE_SCALE = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
+const RENDER_STEPS = [...new Set([DEVICE_SCALE, 1.25, 1, 0.85].filter((v) => v <= DEVICE_SCALE))]
 
 export default function App() {
   const outlines = useGame((s) => s.outlines)
-  const [dpr, setDpr] = useState(RENDER_SCALE.high)
+  const [step, setStep] = useState(0)
+  const stepRef = useRef(0)
+  stepRef.current = step
+  const dpr = RENDER_STEPS[step]
   return (
     <KeyboardControls map={keyMap}>
       <Canvas
@@ -36,15 +42,22 @@ export default function App() {
         shadows="percentage"
         dpr={dpr}
         gl={{ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
-        camera={{ fov: 65, near: 0.1, far: 620, position: [150, 70, 150] }}
+        camera={{ fov: 65, near: 0.25, far: 620, position: [150, 70, 150] }}
       >
         <PerformanceMonitor
+          flipflops={4}
           onDecline={() => {
-            // Struggling: drop resolution and real shadows (blob shadows stay).
-            setDpr(RENDER_SCALE.low)
-            useGame.setState({ shadows: false })
+            // Struggling: drop real shadows (blob shadows stay) once at 1x,
+            // then the last step of resolution.
+            const next = Math.min(stepRef.current + 1, RENDER_STEPS.length - 1)
+            if (RENDER_STEPS[next] < 1 && useGame.getState().shadows) useGame.setState({ shadows: false })
+            else setStep(next)
           }}
-          onIncline={() => setDpr(RENDER_SCALE.high)}
+          onIncline={() => setStep((k) => Math.max(0, k - 1))}
+          onFallback={() => {
+            useGame.setState({ shadows: false })
+            setStep(RENDER_STEPS.indexOf(1))
+          }}
         />
         <ShadowCasters />
         <DayNight />
