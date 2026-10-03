@@ -1,4 +1,4 @@
-import { GRID, hasLight, roadLine, ROAD } from './cityData'
+import { GX, GZ, hasLight, ROAD, roadX, roadZ } from './cityData'
 
 // All junctions share one cycle: roads along x get green, then roads along z.
 const GREEN = 9
@@ -17,8 +17,8 @@ export function lightFor(axis, t = signals.t) {
 
 // Every approach into every junction that has lights.
 export const approaches = []
-for (let i = 1; i < GRID; i++) {
-  for (let j = 1; j < GRID; j++) {
+for (let i = 1; i < GX; i++) {
+  for (let j = 1; j < GZ; j++) {
     if (!hasLight(i, j)) continue
     for (const [axis, dir] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]]) {
       const ux = axis === 'x' ? dir : 0
@@ -29,12 +29,12 @@ for (let i = 1; i < GRID; i++) {
       const k = ROAD / 2 + 0.8
       approaches.push({
         axis,
-        nx: roadLine(i),
-        nz: roadLine(j),
+        nx: roadX(i),
+        nz: roadZ(j),
         ux,
         uz,
-        x: roadLine(i) - ux * k + rx * k,
-        z: roadLine(j) - uz * k + rz * k,
+        x: roadX(i) - ux * k + rx * k,
+        z: roadZ(j) - uz * k + rz * k,
       })
     }
   }

@@ -1,15 +1,26 @@
 // Procedural Lagos-style city. Pure data, no Three.js, so the 3D scene, the
 // traffic system, the pedestrians and the radar all read the same map.
 
-export const GRID = 8 // blocks per side
+// The map is a grid of blocks with roads between them. Columns 0-4 are the
+// Mainland, 5-7 are the Lagos Lagoon, and 8-12 are the Island. Two bridges
+// carry roads across the water.
+export const GX = 13 // block columns (x)
+export const GZ = 8 // block rows (z)
 export const BLOCK = 36 // width of a city block (buildings + sidewalk)
 export const ROAD = 12 // width of a road
 export const LANE = 3 // lane center offset from the road center (we drive on the right)
 export const CELL = BLOCK + ROAD
-export const HALF = (GRID * CELL) / 2
+export const HALF_X = (GX * CELL) / 2
+export const HALF_Z = (GZ * CELL) / 2
 export const SIDEWALK_Y = 0.12
+export const MAINLAND_LAST = 4 // last mainland column
+export const ISLAND_FIRST = 8 // first island column
+export const BRIDGES = [
+  { row: 2, name: 'THIRD MAINLAND BRIDGE' },
+  { row: 6, name: 'CARTER BRIDGE' },
+]
 
-// Faded stucco and paint for mainland low-rise; glass and concrete for VI towers.
+// Faded stucco and paint for mainland low-rise; glass and concrete for Island towers.
 const LOWRISE_COLORS = ['#f6d79b', '#f4b6a6', '#a8d8c8', '#b9cfe8', '#f7e7c4', '#e9a875', '#c8e09a', '#f3c0d4', '#9fc9e0']
 const TOWER_COLORS = ['#8fb3c9', '#a9c4d4', '#b8c9d9', '#d8dde2', '#9bb8c4']
 const ROOF_COLORS = ['#c4553d', '#3f8f9a', '#9a5a3c', '#5d6e8e', '#d0773a', '#7a4f8a']
@@ -25,35 +36,111 @@ const BILLBOARDS = [
   'FRESH FISH\nMAKOKO',
   'OWAMBE\nEVERY SATURDAY',
   'GEN-SET REPAIRS\nCALL 0803...',
+  'KWILOX\nSATURDAY NIGHT',
+  'IRON GBENGA GYM\nNO PAIN NO GAIN',
 ]
 
-// Fixed landmark blocks, by grid index (i = x, j = z).
+// Fixed landmark blocks, by grid index (i = column, j = row).
 const MARKETS = [
   { i: 1, j: 5, name: 'OJA OBA MARKET' },
-  { i: 5, j: 2, name: 'YABA TECH MARKET' },
+  { i: 4, j: 1, name: 'YABA TECH MARKET' },
 ]
-const MALLS = [{ i: 6, j: 6, name: 'LEKKI GRAND MALL' }]
+const MALLS = [{ i: 11, j: 7, name: 'LEKKI GRAND MALL' }]
 const CLUBS = [
-  { i: 2, j: 3, name: 'CLUB EKO', color: '#ff2fb4' },
-  { i: 4, j: 5, name: 'OWAMBE LOUNGE', color: '#39e6ff' },
-  { i: 5, j: 1, name: 'AFRO VIBES', color: '#ffd23a' },
+  { i: 1, j: 1, name: 'CLUB EKO', color: '#ff2fb4', door: 'club' },
+  { i: 9, j: 4, name: 'KWILOX', color: '#ffd23a', door: 'kwilox' },
+  { i: 9, j: 7, name: 'OWAMBE LOUNGE', color: '#39e6ff' },
+]
+// Buildings you can walk into (besides the clubs), on the south side of their block.
+const ENTERABLE = [
+  { i: 3, j: 2, id: 'gym', name: 'IRON GBENGA GYM', w: 20, d: 14, h: 8, color: '#c9cdd2', sign: '#e04848' },
+  { i: 2, j: 6, id: 'home', name: 'NO. 12', w: 14, d: 12, h: 7, color: '#f2d6a2', roof: '#c4553d', sign: '#3f6f3a', small: true },
+  { i: 0, j: 3, id: 'church', name: 'MOUNTAIN OF GRACE CHAPEL', w: 18, d: 20, h: 10, color: '#f4f1e8', sign: '#2f4f8a', steeple: true },
+  { i: 8, j: 1, id: 'bank', name: 'NO WAHALA BANK', w: 24, d: 16, h: 18, color: '#7a9ab0', sign: '#0d2a4a' },
+]
+// Where danfos and kekes pick people up. Each stop sits on the curb of one
+// traffic lane: (axis, line, dir) like a lane, at position p along it.
+const BUS_STOPS = [
+  ['OSHODI', 'x', 1, 1, 2],
+  ['YABA', 'x', 3, -1, 4],
+  ['OJUELEGBA', 'x', 5, 1, 1],
+  ['SURULERE', 'z', 2, -1, 5],
+  ['OBALENDE', 'x', 2, -1, 9],
+  ['CMS', 'x', 1, 1, 10],
+  ['AHMADU BELLO WAY', 'z', 10, 1, 4],
+  ['LEKKI PHASE 1', 'x', 7, 1, 10],
 ]
 
+export const roadX = (i) => -HALF_X + i * CELL
+export const roadZ = (j) => -HALF_Z + j * CELL
+export const blockX = (i) => roadX(i) + CELL / 2
+export const blockZ = (j) => roadZ(j) + CELL / 2
+
+export const isLandColumn = (i) => (i >= 0 && i <= MAINLAND_LAST) || (i >= ISLAND_FIRST && i < GX)
+export const bridgeAt = (row) => BRIDGES.find((b) => b.row === row)
+
+// Lagoon shores and the outer edge of each landmass (road edges included).
+export const MAINLAND = { minX: roadX(0) - ROAD / 2, maxX: roadX(MAINLAND_LAST + 1) + ROAD / 2, minZ: roadZ(0) - ROAD / 2, maxZ: roadZ(GZ) + ROAD / 2 }
+export const ISLAND = { minX: roadX(ISLAND_FIRST) - ROAD / 2, maxX: roadX(GX) + ROAD / 2, minZ: MAINLAND.minZ, maxZ: MAINLAND.maxZ }
+export const BEACH = 40 // sand around the outer coast
+
+// --- Road network ---
+// Roads run along x ("x" roads, one per row line j, at z = roadZ(j)) and
+// along z ("z" roads, one per column line i, at x = roadX(i)). Junctions are
+// numbered by the cross road's index. These helpers let traffic treat both
+// the same way.
+export const lineCoord = (axis, line) => (axis === 'x' ? roadZ(line) : roadX(line))
+export const nodeCoord = (axis, k) => (axis === 'x' ? roadX(k) : roadZ(k))
+export const nodeCount = (axis) => (axis === 'x' ? GX : GZ) // highest junction index
+export const lineCount = (axis) => (axis === 'x' ? GZ : GX) // highest road line index
+export const halfFor = (axis) => (axis === 'x' ? HALF_X : HALF_Z)
+
+// Does road `line` have tarmac between junctions a and a + 1? Over the lagoon
+// only the bridges do.
+export function segmentValid(axis, line, a) {
+  if (a < 0 || a >= nodeCount(axis) || line < 0 || line > lineCount(axis)) return false
+  if (axis === 'x') return isLandColumn(a) || !!bridgeAt(line)
+  return isLandColumn(line - 1) || isLandColumn(line)
+}
+
+// Traffic lights only at full four-way junctions.
+export const hasLight = (i, j) =>
+  i > 0 && i < GX && j > 0 && j < GZ && segmentValid('x', j, i - 1) && segmentValid('x', j, i) && segmentValid('z', i, j - 1) && segmentValid('z', i, j)
+
+// Point on a lane. "x" roads run along x at z = roadZ(line).
+export function lanePoint(axis, line, dir, p) {
+  return axis === 'x' ? { x: p, z: roadZ(line) + dir * LANE } : { x: roadX(line) - dir * LANE, z: p }
+}
+
 export const ZONES = {
+  ikeja: 'IKEJA',
+  yaba: 'YABA',
+  surulere: 'SURULERE',
+  ebute: 'EBUTE METTA',
+  lagoon: 'LAGOS LAGOON',
+  island: 'LAGOS ISLAND',
+  ikoyi: 'IKOYI',
   vi: 'VICTORIA ISLAND',
-  nw: 'IKEJA',
-  ne: 'YABA',
-  sw: 'SURULERE',
-  se: 'LEKKI',
+  lekki: 'LEKKI',
+  beach: 'BAR BEACH',
 }
 
 export function zoneAt(x, z) {
-  if (Math.abs(x) > HALF + ROAD / 2 || Math.abs(z) > HALF + ROAD / 2) return 'BAR BEACH'
-  const i = Math.floor((x + HALF) / CELL)
-  const j = Math.floor((z + HALF) / CELL)
-  if (i >= 3 && i <= 4 && j >= 3 && j <= 4) return ZONES.vi
-  if (j < 4) return i < 4 ? ZONES.nw : ZONES.ne
-  return i < 4 ? ZONES.sw : ZONES.se
+  if (z > MAINLAND.maxZ + 2 || z < MAINLAND.minZ - 2 || x < MAINLAND.minX - 2 || x > ISLAND.maxX + 2) return ZONES.beach
+  if (x > MAINLAND.maxX && x < ISLAND.minX) {
+    const row = Math.round((z + HALF_Z) / CELL)
+    const bridge = bridgeAt(row)
+    return bridge && Math.abs(z - roadZ(row)) < ROAD ? bridge.name : ZONES.lagoon
+  }
+  const i = Math.floor((x + HALF_X) / CELL)
+  const j = Math.floor((z + HALF_Z) / CELL)
+  if (i <= MAINLAND_LAST) {
+    if (j < 4) return i <= 2 ? ZONES.ikeja : ZONES.yaba
+    return i <= 2 ? ZONES.surulere : ZONES.ebute
+  }
+  if (j < 3) return i >= 11 ? ZONES.ikoyi : ZONES.island
+  if (j < 6) return i >= 11 ? ZONES.ikoyi : ZONES.vi
+  return ZONES.lekki
 }
 
 // Small deterministic RNG so the city is the same on every load.
@@ -66,13 +153,6 @@ export function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }
-
-// Center line of road i (0..GRID) along either axis.
-export const roadLine = (i) => -HALF + i * CELL
-export const blockCenter = (i) => roadLine(i) + CELL / 2
-
-// Traffic lights only at junctions where four roads meet.
-export const hasLight = (i, j) => i > 0 && i < GRID && j > 0 && j < GRID
 
 const pick = (rand, list) => list[Math.floor(rand() * list.length)]
 const at = (list, i, j) => list.find((b) => b.i === i && b.j === j)
@@ -95,6 +175,8 @@ export function generateCity(seed = 2026) {
     parkedCars: [],
     idlers: [], // NPCs that stand in one spot: traders, queues, bouncers
     wanderAreas: [], // rectangles where shoppers mill about
+    doors: [], // enterable buildings: { id, name, x, z } is the spot outside the door
+    busStops: [],
   }
 
   const addBuilding = (b) => {
@@ -111,36 +193,44 @@ export function generateCity(seed = 2026) {
     }
   }
 
-  // Regular block filled with 2x2 or 3x3 lots. `rows` limits which rows get buildings.
-  const fillLots = (x, z, isVI, rows = null) => {
-    const lots = isVI ? 2 : rand() < 0.5 ? 2 : 3
+  // Regular block filled with 2x2 or 3x3 lots. `rows` limits which rows get
+  // buildings. style: 'tower' (Marina, VI), 'mid' (Ikoyi, Lekki) or 'low'.
+  const fillLots = (x, z, style, rows = null) => {
+    const isTower = style === 'tower'
+    const lots = isTower ? 2 : rand() < 0.5 ? 2 : 3
     const lotSize = (BLOCK - 6) / lots
     for (let a = 0; a < lots; a++) {
       for (let b = 0; b < lots; b++) {
         if (rows && !rows(b, lots)) continue
         if (rand() < 0.1) continue // empty lot
-        const h = isVI ? 26 + rand() * 40 : 5 + rand() * (rand() < 0.2 ? 18 : 9)
+        const h = isTower ? 26 + rand() * 40 : style === 'mid' ? 10 + rand() * 16 : 5 + rand() * (rand() < 0.2 ? 18 : 9)
         addBuilding({
           x: x - (BLOCK - 6) / 2 + lotSize * (a + 0.5),
           z: z - (BLOCK - 6) / 2 + lotSize * (b + 0.5),
           w: lotSize - 1.5 - rand() * 2,
           d: lotSize - 1.5 - rand() * 2,
           h,
-          color: pick(rand, isVI ? TOWER_COLORS : LOWRISE_COLORS),
+          color: pick(rand, isTower ? TOWER_COLORS : LOWRISE_COLORS),
         })
       }
     }
   }
 
-  for (let i = 0; i < GRID; i++) {
-    for (let j = 0; j < GRID; j++) {
-      const x = blockCenter(i)
-      const z = blockCenter(j)
-      const isVI = i >= 3 && i <= 4 && j >= 3 && j <= 4
+  const addDoor = (id, name, x, front) => city.doors.push({ id, name, x, z: front - 1.2 })
+
+  for (let i = 0; i < GX; i++) {
+    if (!isLandColumn(i)) continue
+    for (let j = 0; j < GZ; j++) {
+      const x = blockX(i)
+      const z = blockZ(j)
+      const island = i >= ISLAND_FIRST
+      const style = island ? (i <= 10 && j < 6 ? 'tower' : 'mid') : 'low'
+      const isVI = style === 'tower'
       const market = at(MARKETS, i, j)
       const mall = at(MALLS, i, j)
       const club = at(CLUBS, i, j)
-      const front = z + BLOCK / 2 // south edge, faces the road at roadLine(j + 1)
+      const enterable = at(ENTERABLE, i, j)
+      const front = z + BLOCK / 2 // south edge, faces the road at roadZ(j + 1)
 
       if (market) {
         city.blocks.push({ x, z, w: BLOCK, d: BLOCK, color: '#a8784c' })
@@ -192,9 +282,38 @@ export function generateCity(seed = 2026) {
 
       city.blocks.push({ x, z, w: BLOCK, d: BLOCK, color: '#b9ae9b' })
 
+      if (enterable) {
+        // The building on the south half, ordinary lots on the north half.
+        fillLots(x, z, style, (b, lots) => b < lots / 2)
+        const e = enterable
+        const bz = front - 3 - e.d / 2
+        city.buildings.push({ x, z: bz, w: e.w, d: e.d, h: e.h, color: e.color, landmark: true, roof: e.roof ? { h: Math.min(e.w, e.d) * 0.38, color: e.roof } : undefined })
+        if (e.steeple) {
+          city.solids.push({ x: x - e.w / 2 + 2.5, z: bz + e.d / 2 - 2.5, w: 4, d: 4, h: e.h + 9, color: e.color, collider: true })
+          city.solids.push({ x: x - e.w / 2 + 2.5, z: bz + e.d / 2 - 2.5, w: 0.4, d: 0.4, h: 3, color: '#d4af37', y: e.h + 9 })
+          city.solids.push({ x: x - e.w / 2 + 2.5, z: bz + e.d / 2 - 2.5, w: 1.8, d: 0.4, h: 0.4, color: '#d4af37', y: e.h + 10.6 })
+        }
+        if (e.id === 'bank') city.glass.push({ x, y: 1, z: front - 3 + 0.05, w: e.w - 4, h: e.h - 4 })
+        city.solids.push({ x, z: front - 3 + 0.05, w: 2.2, d: 0.12, h: 2.6, color: '#ffd9a0', emissive: true }) // door
+        city.signs.push({
+          text: e.name,
+          x,
+          y: e.small ? 3.2 : Math.min(e.h - 1.5, 6.5),
+          z: front - 3 + 0.12,
+          rot: 0,
+          w: e.small ? 2 : Math.min(e.w - 4, 14),
+          h: e.small ? 0.8 : 1.8,
+          bg: e.sign,
+          fg: '#ffffff',
+          glow: e.small ? undefined : '#ffffff',
+        })
+        addDoor(e.id, e.id === 'home' ? "TUNDE'S HOUSE" : e.name, x, front - 2.6)
+        continue
+      }
+
       if (club) {
         // Club on the south half, regular buildings on the north half.
-        fillLots(x, z, false, (b, lots) => b < lots / 2)
+        fillLots(x, z, style, (b, lots) => b < lots / 2)
         const cz = front - 3 - 5
         city.solids.push({ x, z: cz, w: 16, d: 10, h: 7, color: '#1d1b22', collider: true })
         city.solids.push({ x, z: cz + 5.02, w: 2.4, d: 0.1, h: 2.6, color: '#ff4d4d', emissive: true })
@@ -204,6 +323,7 @@ export function generateCity(seed = 2026) {
         for (let q = 0; q < 6; q++) {
           city.idlers.push({ x: x + 2 + q * 1.1, z: cz + 6.2, y: SIDEWALK_Y, yaw: Math.PI / 2, role: 'queue' })
         }
+        if (club.door) addDoor(club.door, club.name, x, cz + 5 + 1.4)
         continue
       }
 
@@ -215,7 +335,7 @@ export function generateCity(seed = 2026) {
         }
         city.wanderAreas.push({ x, z, w: BLOCK - 10, d: BLOCK - 10, count: 4, y: 0.16 })
       } else {
-        fillLots(x, z, isVI)
+        fillLots(x, z, style)
       }
 
       // Palm trees along the sidewalk edges, kept away from the corners.
@@ -245,7 +365,7 @@ export function generateCity(seed = 2026) {
   }
 
   // Billboards on mid-height rooftops, facing south.
-  const candidates = city.buildings.filter((b) => b.h > 8 && b.h < 24 && b.w > 7 && !b.roof)
+  const candidates = city.buildings.filter((b) => b.h > 8 && b.h < 24 && b.w > 7 && !b.roof && !b.landmark)
   for (let k = 0; k < BILLBOARDS.length && candidates.length; k++) {
     const b = candidates.splice(Math.floor(rand() * candidates.length), 1)[0]
     city.signs.push({
@@ -267,16 +387,39 @@ export function generateCity(seed = 2026) {
     if (['#123c69', '#b3201f', '#1f6f3a'].includes(s.bg) && s.legs) s.fg = '#fff'
   })
 
-  // Spawn on the sidewalk by the center junction, with a car at the curb.
-  city.spawn = [roadLine(GRID / 2) + ROAD / 2 + 1.5, 1.5, roadLine(GRID / 2) + 14]
-  city.carSpawn = [roadLine(GRID / 2) + 5, 0.6, roadLine(GRID / 2) + 16]
+  // Bus stops: a shelter on the curb of the stop's lane, with a name board.
+  BUS_STOPS.forEach(([name, axis, line, dir, block], id) => {
+    const p = axis === 'x' ? blockX(block) : blockZ(block)
+    const lane = lanePoint(axis, line, dir, p)
+    // The curb is on the driver's right: +z for eastbound, -x for southbound...
+    const rx = axis === 'x' ? 0 : -dir
+    const rz = axis === 'x' ? dir : 0
+    const curb = ROAD / 2 - LANE + 1.6
+    const stop = { id, name, axis, line, dir, p, x: lane.x + rx * curb, z: lane.z + rz * curb, yaw: Math.atan2(-rx, -rz) }
+    city.busStops.push(stop)
+    city.solids.push({ x: stop.x + rx * 0.9, z: stop.z + rz * 0.9, w: axis === 'x' ? 4 : 0.15, d: axis === 'x' ? 0.15 : 4, h: 2.4, color: '#2f5f8a', y: SIDEWALK_Y })
+    city.solids.push({ x: stop.x + rx * 0.4, z: stop.z + rz * 0.4, w: axis === 'x' ? 4.4 : 1.4, d: axis === 'x' ? 1.4 : 4.4, h: 0.12, color: '#f2b705', y: 2.5 })
+    city.signs.push({ text: `${name}\nBUS STOP`, x: stop.x - rz * 2.6 - rx * 0.2, y: 2, z: stop.z + rx * 2.6 - rz * 0.2, rot: stop.yaw, w: 1.6, h: 0.9, bg: '#f2b705', fg: '#111', posts: true })
+  })
+
+  city.bridges = BRIDGES.map((b) => ({ ...b, z: roadZ(b.row), x0: MAINLAND.maxX, x1: ISLAND.minX }))
+  city.bridges.forEach((b) => {
+    // Name boards over each end, facing the traffic coming onto the bridge.
+    city.signs.push({ text: b.name, x: b.x0 + 4, y: 5.5, z: b.z, rot: -Math.PI / 2, w: 11, h: 1.6, bg: '#1f6f3a', fg: '#ffffff', posts: true })
+    city.signs.push({ text: b.name, x: b.x1 - 4, y: 5.5, z: b.z, rot: Math.PI / 2, w: 11, h: 1.6, bg: '#1f6f3a', fg: '#ffffff', posts: true })
+    for (let x = b.x0 + 15; x < b.x1 - 10; x += 30) {
+      city.lamps.push({ x, z: b.z - ROAD / 2 - 1.2 })
+      city.lamps.push({ x: x + 15, z: b.z + ROAD / 2 + 1.2 })
+    }
+  })
+
+  // Tunde lives in Surulere; his car is parked at the curb outside.
+  const home = city.doors.find((d) => d.id === 'home')
+  city.spawn = [home.x, 1.5, home.z + 1]
+  city.carSpawn = [home.x + 9, 0.6, roadZ(7) - 5]
+  city.carSpawnYaw = -Math.PI / 2
 
   return city
 }
 
 export const city = generateCity()
-
-// Point on a lane. axis 'x' roads run along x at z = roadLine(line).
-export function lanePoint(axis, line, dir, p) {
-  return axis === 'x' ? { x: p, z: roadLine(line) + dir * LANE } : { x: roadLine(line) - dir * LANE, z: p }
-}

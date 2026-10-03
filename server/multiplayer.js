@@ -76,7 +76,8 @@ export function attachMultiplayer(httpServer) {
 
       if (msg.t === 's') {
         player.state = {
-          p: [num(msg.p?.[0], 1000), num(msg.p?.[1], 200), num(msg.p?.[2], 1000)],
+          // x reaches 2500 because building interiors sit off to the east of the city.
+          p: [num(msg.p?.[0], 2500), num(msg.p?.[1], 200), num(msg.p?.[2], 1000)],
           y: num(msg.y, 10),
           m: msg.m === 'c' ? 'c' : 'f',
           c: VEHICLE_TYPES.has(msg.c) ? msg.c : 'sedan',

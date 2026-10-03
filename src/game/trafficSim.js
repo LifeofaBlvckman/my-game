@@ -1,4 +1,4 @@
-import { city, GRID, hasLight, lanePoint, roadLine, ROAD, HALF, CELL, mulberry32 } from './cityData'
+import { CELL, city, halfFor, hasLight, lanePoint, lineCount, mulberry32, nodeCount, nodeCoord, ROAD, roadX, roadZ, segmentValid } from './cityData'
 import { lightFor } from './signals'
 import { VEHICLES } from './vehicleTypes'
 
@@ -12,6 +12,12 @@ const POLICE = 6
 const RECYCLE = 190
 const STOP_BACK = 6 // how far before the junction box cars stop
 export const TRAFFIC_HP = 60
+
+const DWELL = 4 // seconds a danfo waits at a stop
+
+// Bus stops, by the lane they sit on.
+const stopsByLane = {}
+city.busStops.forEach((s) => (stopsByLane[`${s.axis}:${s.line}:${s.dir}`] ??= []).push(s))
 
 const rand = mulberry32(4242)
 const pick = (list) => list[Math.floor(rand() * list.length)]
@@ -36,6 +42,8 @@ function makeVehicle(type, extra = {}) {
     police: type === 'police',
     chasing: false,
     hp: TRAFFIC_HP,
+    riders: [], // passengers on board (crowd NPCs, hidden while riding)
+    dwell: 0, // seconds left stopped at a bus stop
     stall: 0, // seconds stopped after a knock
     burning: 0,
     wrecked: false,
@@ -43,18 +51,19 @@ function makeVehicle(type, extra = {}) {
   }
 }
 
-function setLane(v, axis, line, dir, p) {
+export function setLane(v, axis, line, dir, p) {
   v.state = 'lane'
   v.axis = axis
   v.line = line
   v.dir = dir
   v.p = p
-  // Next junction ahead along this road.
-  const f = (p + HALF) / CELL
+  // Next junction ahead along this road; turn around if the road ends.
+  const f = (p + halfFor(axis)) / CELL
   v.node = dir > 0 ? Math.floor(f) + 1 : Math.ceil(f) - 1
-  if (v.node < 0 || v.node > GRID) {
+  const ahead = dir > 0 ? v.node - 1 : v.node
+  if (v.node < 0 || v.node > nodeCount(axis) || !segmentValid(axis, line, ahead)) {
     v.dir = -dir
-    v.node = dir > 0 ? GRID - 1 : 1
+    v.node = dir > 0 ? Math.floor(f) : Math.ceil(f)
   }
   const pt = lanePoint(axis, line, v.dir, p)
   v.x = pt.x
@@ -64,13 +73,14 @@ function setLane(v, axis, line, dir, p) {
 
 // A random spot on a lane, at least `min` and at most `max` from `near`.
 function randomLanePosition(near, min, max) {
-  for (let tries = 0; tries < 30; tries++) {
+  for (let tries = 0; tries < 40; tries++) {
     const axis = rand() < 0.5 ? 'x' : 'z'
-    const line = Math.floor(rand() * (GRID + 1))
+    const line = Math.floor(rand() * (lineCount(axis) + 1))
     const dir = rand() < 0.5 ? 1 : -1
+    const seg = Math.floor(rand() * nodeCount(axis))
+    if (!segmentValid(axis, line, seg)) continue
     // Stay out of junction boxes.
-    const seg = Math.floor(rand() * GRID)
-    const p = roadLine(seg) + ROAD / 2 + 3 + rand() * (CELL - ROAD - 6)
+    const p = nodeCoord(axis, seg) + ROAD / 2 + 3 + rand() * (CELL - ROAD - 6)
     const pt = lanePoint(axis, line, dir, p)
     const d = near ? Math.hypot(pt.x - near.x, pt.z - near.z) : 100
     if (d < min || d > max) continue
@@ -101,16 +111,18 @@ function junctionOptions(v) {
   const I = v.axis === 'x' ? v.node : v.line
   const J = v.axis === 'x' ? v.line : v.node
   const options = []
-  const inRange = (k) => k >= 0 && k <= GRID
+  // Only roads that exist: no driving into the lagoon except over a bridge.
   if (v.axis === 'x') {
-    if (inRange(I + v.dir)) options.push({ axis: 'x', line: J, dir: v.dir, straight: true })
-    if (inRange(J + 1)) options.push({ axis: 'z', line: I, dir: 1 })
-    if (inRange(J - 1)) options.push({ axis: 'z', line: I, dir: -1 })
+    if (segmentValid('x', J, v.dir > 0 ? I : I - 1)) options.push({ axis: 'x', line: J, dir: v.dir, straight: true })
+    if (segmentValid('z', I, J)) options.push({ axis: 'z', line: I, dir: 1 })
+    if (segmentValid('z', I, J - 1)) options.push({ axis: 'z', line: I, dir: -1 })
   } else {
-    if (inRange(J + v.dir)) options.push({ axis: 'z', line: I, dir: v.dir, straight: true })
-    if (inRange(I + 1)) options.push({ axis: 'x', line: J, dir: 1 })
-    if (inRange(I - 1)) options.push({ axis: 'x', line: J, dir: -1 })
+    if (segmentValid('z', I, v.dir > 0 ? J : J - 1)) options.push({ axis: 'z', line: I, dir: v.dir, straight: true })
+    if (segmentValid('x', J, I)) options.push({ axis: 'x', line: J, dir: 1 })
+    if (segmentValid('x', J, I - 1)) options.push({ axis: 'x', line: J, dir: -1 })
   }
+  // Dead end: turn around.
+  if (!options.length) options.push({ axis: v.axis, line: v.line, dir: -v.dir, uturn: true })
   return { I, J, options }
 }
 
@@ -121,8 +133,8 @@ function startTurn(v, target) {
     // Police: take whichever exit gets closer to the target.
     let best = Infinity
     options.forEach((o) => {
-      const nx = roadLine(o.axis === 'x' ? I + o.dir : I)
-      const nz = roadLine(o.axis === 'z' ? J + o.dir : J)
+      const nx = roadX(o.axis === 'x' ? I + o.dir : I)
+      const nz = roadZ(o.axis === 'z' ? J + o.dir : J)
       const d = Math.hypot(nx - target.x, nz - target.z)
       if (d < best) {
         best = d
@@ -133,29 +145,45 @@ function startTurn(v, target) {
     const weighted = options.flatMap((o) => (o.straight ? [o, o] : [o]))
     choice = weighted[Math.floor(Math.random() * weighted.length)]
   }
-  const nx = roadLine(I)
-  const nz = roadLine(J)
+  const nx = roadX(I)
+  const nz = roadZ(J)
   const entryP = (v.axis === 'x' ? nx : nz) - v.dir * (ROAD / 2)
   const p0 = lanePoint(v.axis, v.line, v.dir, entryP)
   const exitP = (choice.axis === 'x' ? nx : nz) + choice.dir * (ROAD / 2)
   const p2 = lanePoint(choice.axis, choice.line, choice.dir, exitP)
-  const p1 = choice.straight ? { x: (p0.x + p2.x) / 2, z: (p0.z + p2.z) / 2 } : v.axis === 'x' ? { x: p2.x, z: p0.z } : { x: p0.x, z: p2.z }
+  let p1
+  if (choice.straight) p1 = { x: (p0.x + p2.x) / 2, z: (p0.z + p2.z) / 2 }
+  else if (choice.uturn) p1 = { x: nx + (v.axis === 'x' ? v.dir * ROAD * 0.4 : 0), z: nz + (v.axis === 'z' ? v.dir * ROAD * 0.4 : 0) }
+  else p1 = v.axis === 'x' ? { x: p2.x, z: p0.z } : { x: p0.x, z: p2.z }
   const chord = Math.hypot(p2.x - p0.x, p2.z - p0.z)
   const len = (Math.hypot(p1.x - p0.x, p1.z - p0.z) + Math.hypot(p2.x - p1.x, p2.z - p1.z) + chord) / 2
   v.state = 'turn'
   v.turn = { p0, p1, p2, len, t: 0, from: { axis: v.axis, line: v.line, dir: v.dir }, next: { ...choice, p: exitP } }
 }
 
-// Leave the road network and go straight at the target, or rejoin it.
+// Leave the road network and go straight at the target, or rejoin it at the
+// nearest stretch of road that exists, preferring the way it's facing.
 function snapToLane(v) {
   const sx = Math.sin(v.yaw)
   const sz = Math.cos(v.yaw)
-  const axis = Math.abs(sx) > Math.abs(sz) ? 'x' : 'z'
-  const dir = Math.sign(axis === 'x' ? sx : sz) || 1
-  const cross = axis === 'x' ? v.z : v.x
-  const line = clamp(Math.round((cross + HALF) / CELL), 0, GRID)
+  const facing = Math.abs(sx) > Math.abs(sz) ? 'x' : 'z'
+  let best = null
+  for (const axis of [facing, facing === 'x' ? 'z' : 'x']) {
+    const cross = axis === 'x' ? v.z : v.x
+    const along = axis === 'x' ? v.x : v.z
+    const line = clamp(Math.round((cross + halfFor(axis === 'x' ? 'z' : 'x')) / CELL), 0, lineCount(axis))
+    const seg = clamp(Math.floor((along + halfFor(axis)) / CELL), 0, nodeCount(axis) - 1)
+    if (!segmentValid(axis, line, seg)) continue
+    const dir = Math.sign(axis === 'x' ? sx : sz) || 1
+    best = { axis, line, dir, p: along }
+    break
+  }
   const before = { x: v.x, z: v.z }
-  setLane(v, axis, line, dir, axis === 'x' ? v.x : v.z)
+  if (best) setLane(v, best.axis, best.line, best.dir, best.p)
+  else {
+    const spot = randomLanePosition(v, 0, 120)
+    if (spot) setLane(v, spot.axis, spot.line, spot.dir, spot.p)
+  }
   v.offX += before.x - v.x
   v.offZ += before.z - v.z
 }
@@ -201,6 +229,8 @@ function respawnNear(v, focus) {
     v.dirty = true
   }
   v.decor = false
+  v.dropRiders = v.riders.length > 0 // let them off somewhere sensible
+  v.dwell = 0
   v.hp = TRAFFIC_HP
   v.wrecked = false
   v.burning = 0
@@ -267,10 +297,30 @@ export function updateTraffic(dt, ctx) {
     const cruise = v.chasing ? 26 : def.cruise
 
     if (v.state === 'lane') {
-      const nodeCoord = roadLine(v.node)
-      const entry = nodeCoord - v.dir * (ROAD / 2)
+      const entry = nodeCoord(v.axis, v.node) - v.dir * (ROAD / 2)
       const toEntry = (entry - v.p) * v.dir
       let desired = stalled ? 0 : cruise
+
+      // Danfos and kekes pull up at bus stops with people waiting (or riders to drop).
+      if (def.picksUp && !v.chasing) {
+        if (v.dwell > 0) {
+          v.dwell -= dt
+          desired = 0
+        } else {
+          for (const stop of stopsByLane[`${v.axis}:${v.line}:${v.dir}`] ?? []) {
+            const ahead = (stop.p - v.p) * v.dir
+            if (ahead <= -1 || ahead > 30 || stop.id === v.lastStop) continue
+            if (!(ctx.waiting?.[stop.id] > 0) && !v.riders.length) continue
+            desired = Math.min(desired, Math.max(0, ahead - 0.3) * 1.2)
+            if (ahead < 1.5 && v.speed < 0.6) {
+              v.dwell = DWELL
+              v.dwellStop = stop
+              v.dwellNew = true
+              v.lastStop = stop.id
+            }
+          }
+        }
+      }
 
       if (!v.chasing) {
         const I = v.axis === 'x' ? v.node : v.line
@@ -280,13 +330,22 @@ export function updateTraffic(dt, ctx) {
           const mustStop = light === 'red' || (light === 'yellow' && toEntry > STOP_BACK + 4)
           if (mustStop && toEntry > STOP_BACK - 2) desired = Math.min(desired, Math.max(0, toEntry - STOP_BACK) * 1.2)
         }
+        const beforeQueue = desired
         const gap = leaderGap(v)
         if (gap < Infinity) desired = Math.min(desired, Math.max(0, gap - 7.5) * 1.1)
+        const queued = desired < beforeQueue - 2
         // Don't run over the player (on foot or driving).
         const width = def.half[0] + 1.3
+        const beforePlayer = desired
         if (ctx.playerCar) desired = Math.min(desired, Math.max(0, obstacleGap(v, ctx.playerCar.x, ctx.playerCar.z, width) - 6.5) * 1.1)
         if (ctx.pedestrian) desired = Math.min(desired, Math.max(0, obstacleGap(v, ctx.pedestrian.x, ctx.pedestrian.z, width - 0.5) - 4) * 1.1)
+        // How long this driver has been held up, and by whom: drivers lean on
+        // the horn when you are in their way (Traffic.jsx plays it).
+        v.blockedBy = desired < beforePlayer - 2 ? 'player' : queued && v.speed < 2 ? 'queue' : null
+      } else {
+        v.blockedBy = null
       }
+      v.blockedFor = v.blockedBy ? (v.blockedFor ?? 0) + dt : 0
 
       v.speed += clamp(desired - v.speed, -16 * dt, def.accel * 0.4 * dt)
       v.p += v.dir * v.speed * dt

@@ -3,7 +3,7 @@ import Radar from './Radar'
 import { INTRO_LENGTH } from './CameraRig'
 import { currentTarget, INTRO_CALL } from './quests'
 import { blip, setMusic, startAudio } from './audio'
-import { openDialogue } from './GameLogic'
+import { openDialogue, placeInRoom } from './GameLogic'
 import { addChat, connectMultiplayer } from './net'
 import { useGame, world } from './state'
 import './hud.css'
@@ -41,6 +41,9 @@ function startGame() {
   startAudio()
   setMusic(useGame.getState().music)
   world.introStart = performance.now() / 1000
+  // Tunde wakes up at home; Mama has words for him.
+  placeInRoom('home')
+  world.time = 13 * 60
   useGame.setState({ phase: 'intro' })
   setTimeout(() => openDialogue(INTRO_CALL, () => useGame.setState({ phase: 'playing' })), INTRO_LENGTH * 1000)
 }
@@ -278,9 +281,18 @@ export default function Hud() {
               <b>{game.subtitle.speaker}:</b> {game.subtitle.text}
             </div>
           )}
-          <Radar />
+          {!game.inside && <Radar />}
+          {game.hold && (
+            <div className="hold">
+              <span>FILLING THE BAG</span>
+              <div className="bar">
+                <div className="fill" style={{ width: `${game.hold.progress * 100}%`, background: '#7ee07e' }} />
+              </div>
+            </div>
+          )}
         </>
       )}
+      <div className={`fade ${game.fade ? 'on' : ''}`} />
 
       {game.message && (
         <div className="message" key={`message${game.message.key}`} style={{ color: game.message.color }}>

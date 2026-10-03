@@ -10,6 +10,19 @@
 
 const E = true
 const GLASS = 'glass'
+const SEAT = '#4a3a33'
+
+// Seat cushion and backrest for each seat [x, y, z, scale]. The numbers are
+// in the same "person space" as a seated driver (torso center at y 1.24).
+function seats(list) {
+  return list.flatMap(([x, y, z, s]) => {
+    const at = (px, py, pz) => [x + px * s, y + (py - 1.24) * s, z + pz * s]
+    return [
+      [...at(0, 0.92, 0.02), 0.48 * s, 0.12 * s, 0.46 * s, SEAT],
+      [...at(0, 1.2, -0.24), 0.48 * s, 0.6 * s, 0.1 * s, SEAT],
+    ]
+  })
+}
 
 function lights(z, y, x, tail = '#c3262b') {
   return [
@@ -48,6 +61,13 @@ const sedanParts = [
 ]
 
 const sedanWheels = { r: 0.38, at: [[0.88, -0.12, 1.35], [-0.88, -0.12, 1.35], [0.88, -0.12, -1.35], [-0.88, -0.12, -1.35]] }
+const SEDAN_SEAT = [0.42, 0.32, 0.12, 0.82]
+const SEDAN_PASSENGERS = [
+  [-0.42, 0.32, 0.12, 0.82],
+  [0.4, 0.32, -0.85, 0.82],
+  [-0.4, 0.32, -0.85, 0.82],
+]
+sedanParts.push(...seats([SEDAN_SEAT, ...SEDAN_PASSENGERS]))
 
 export const VEHICLES = {
   sedan: {
@@ -55,7 +75,8 @@ export const VEHICLES = {
     half: [0.95, 0.5, 2.15],
     parts: sedanParts,
     wheels: sedanWheels,
-    seat: [0.42, 0.32, 0.12, 0.82],
+    seat: SEDAN_SEAT,
+    passengers: SEDAN_PASSENGERS,
     colors: ['#c9ccd1', '#2a2a30', '#9a2a2a', '#f0f0ea', '#2f5a8a', '#6a6f73'],
     maxSpeed: 45,
     accel: 10,
@@ -72,7 +93,8 @@ export const VEHICLES = {
       [-0.3, 0.98, -0.25, 0.5, 0.14, 0.35, 'sirenB', E],
     ],
     wheels: sedanWheels,
-    seat: [0.42, 0.32, 0.12, 0.82],
+    seat: SEDAN_SEAT,
+    passengers: [],
     colors: ['#1b2a52'],
     maxSpeed: 50,
     accel: 12,
@@ -89,9 +111,20 @@ export const VEHICLES = {
       [0, -0.45, 2.37, 2.0, 0.25, 0.1, '#202020'],
       [0, 0.0, -2.38, 0.8, 0.8, 0.12, '#202020'], // spare wheel
       ...lights(2.36, 0.0, 0.66),
+      ...seats([
+        [0.45, 0.2, 0.55, 0.86],
+        [-0.45, 0.2, 0.55, 0.86],
+        [0.45, 0.2, -0.6, 0.86],
+        [-0.45, 0.2, -0.6, 0.86],
+      ]),
     ],
     wheels: { r: 0.45, at: [[0.92, -0.35, 1.5], [-0.92, -0.35, 1.5], [0.92, -0.35, -1.5], [-0.92, -0.35, -1.5]] },
     seat: [0.45, 0.2, 0.55, 0.86],
+    passengers: [
+      [-0.45, 0.2, 0.55, 0.86],
+      [0.45, 0.2, -0.6, 0.86],
+      [-0.45, 0.2, -0.6, 0.86],
+    ],
     colors: ['#1c1c20', '#f4f4f0', '#45484c', '#6b6f5a'],
     maxSpeed: 42,
     accel: 9,
@@ -120,9 +153,24 @@ export const VEHICLES = {
       [0.2, 1.2, -0.8, 1.0, 0.32, 1.0, '#7a5a3a'], // luggage on the roof rack
       [0, -0.8, 2.42, 2.0, 0.2, 0.1, '#202020'],
       ...lights(2.41, -0.45, 0.7),
+      ...seats([
+        [0.5, 0.06, 1.75, 0.9],
+        [-0.5, 0.06, 1.75, 0.9],
+        [0.5, 0.06, 0.5, 0.9],
+        [-0.5, 0.06, 0.5, 0.9],
+        [0.5, 0.06, -0.8, 0.9],
+        [-0.5, 0.06, -0.8, 0.9],
+      ]),
     ],
     wheels: { r: 0.38, at: [[0.9, -0.72, 1.6], [-0.9, -0.72, 1.6], [0.9, -0.72, -1.6], [-0.9, -0.72, -1.6]] },
     seat: [0.5, 0.06, 1.75, 0.9],
+    passengers: [
+      [-0.5, 0.06, 1.75, 0.9],
+      [0.5, 0.06, 0.5, 0.9],
+      [-0.5, 0.06, 0.5, 0.9],
+      [0.5, 0.06, -0.8, 0.9],
+    ],
+    picksUp: true,
     colors: ['#f2b705', '#e3a600'],
     maxSpeed: 32,
     accel: 7,
@@ -142,13 +190,23 @@ export const VEHICLES = {
       [-0.65, 0.4, -1.0, 0.06, 0.8, 0.06, '#1a1a1a'],
       [0.36, 0.62, 0.95, 0.06, 0.36, 0.06, '#1a1a1a'],
       [-0.36, 0.62, 0.95, 0.06, 0.36, 0.06, '#1a1a1a'],
-      [0, -0.12, -0.25, 1.1, 0.3, 0.6, '#3a2a1a'],
+      ...seats([
+        [0, -0.08, 0.42, 0.85],
+        [0.36, -0.08, -0.45, 0.8],
+        [-0.36, -0.08, -0.45, 0.8],
+      ]),
       [0, 0.2, 1.18, 0.25, 0.15, 0.04, '#fff4c8', E],
       [0.5, -0.2, -1.16, 0.2, 0.12, 0.04, '#c3262b', E],
       [-0.5, -0.2, -1.16, 0.2, 0.12, 0.04, '#c3262b', E],
     ],
     wheels: { r: 0.25, at: [[0, -0.6, 1.0], [0.6, -0.6, -0.8], [-0.6, -0.6, -0.8]] },
     seat: [0, -0.08, 0.42, 0.85],
+    passengers: [
+      [0.36, -0.08, -0.45, 0.8],
+      [-0.36, -0.08, -0.45, 0.8],
+      [0, -0.08, -0.45, 0.8],
+    ],
+    picksUp: true,
     colors: ['#f2b705', '#2e8b3a'],
     maxSpeed: 18,
     accel: 6,
@@ -158,6 +216,7 @@ export const VEHICLES = {
 }
 
 export const GLASS_COLOR = '#bfe3ef'
+export const MAX_PASSENGERS = Math.max(...Object.values(VEHICLES).map((v) => v.passengers.length))
 export const MAX_WHEELS = 4
 
 // How many parts of each kind the biggest vehicle needs, for instance slots.

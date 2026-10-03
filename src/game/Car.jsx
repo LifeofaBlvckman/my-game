@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { CoefficientCombineRule, CuboidCollider, RigidBody } from '@react-three/rapier'
-import { BoxGeometry, Quaternion, Vector3 } from 'three'
+import { BoxGeometry, Quaternion, TorusGeometry, Vector3 } from 'three'
 import { city } from './cityData'
 import { useGame, world } from './state'
 import { partColor, partKind, VEHICLES } from './vehicleTypes'
 import Driver from './Driver'
+import { seatMatrix, steeringWheel } from './drivers'
 import { PLAYER_FACE, PLAYER_LOOK } from './Player'
 import { setEngine } from './audio'
 import { Blob } from './Shadows'
@@ -34,11 +35,20 @@ function partMaterial(p, color) {
   return <meshToonMaterial gradientMap={toonRamp} color={partColor(p, color)} />
 }
 
-// The vehicle's bodywork, and optionally whoever is at the wheel.
-export function Body({ type, color, driver, driverFace }) {
+const wheelRing = new TorusGeometry(0.18, 0.025, 5, 14)
+
+// The vehicle's bodywork, steering wheel, and optionally whoever is inside.
+export function Body({ type, color, driver, driverFace, riders = [] }) {
   const def = VEHICLES[type]
+  const seat = useMemo(() => seatMatrix(def.seat).multiply(steeringWheel), [def])
   return (
     <>
+      <mesh geometry={wheelRing} matrix={seat} matrixAutoUpdate={false}>
+        <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
+      </mesh>
+      {riders.slice(0, def.passengers.length).map((r, i) => (
+        <Driver key={i} look={r} seat={def.passengers[i]} driving={false} />
+      ))}
       {def.parts.map((p, i) => (
         <mesh key={i} geometry={partKind(p) === 'lit' ? carBox : plainBox} position={[p[0], p[1], p[2]]} scale={[p[3], p[4], p[5]]}>
           {partMaterial(p, color)}
@@ -61,6 +71,7 @@ export default function Car() {
   const [, getKeys] = useKeyboardControls()
   const type = useGame((s) => s.carType)
   const inCar = useGame((s) => s.mode === 'car')
+  const riders = useGame((s) => s.riders)
   const color = useGame((s) => s.carColor)
   const def = VEHICLES[type]
   const wheels = useMemo(() => def.wheels.at.map((w, i) => ({ w, front: w[2] > 0, i })), [def])
@@ -97,7 +108,7 @@ export default function Car() {
       // Whatever we hit takes damage too.
       for (const o of vehicles) {
         if (Math.hypot(o.x - hx, o.z - hz) < VEHICLES[o.type].half[2] + 1.5) {
-          damageVehicle(o, impact * 2.5)
+          damageVehicle(o, impact * 2.5, impact)
           if (o.police) world.events.push({ type: 'copHit' })
         }
       }
@@ -164,9 +175,9 @@ export default function Car() {
   })
 
   return (
-    <RigidBody ref={body} colliders={false} position={city.carSpawn} rotation={[0, Math.PI, 0]} enabledRotations={[false, true, false]} canSleep={false}>
+    <RigidBody ref={body} colliders={false} position={city.carSpawn} rotation={[0, city.carSpawnYaw, 0]} enabledRotations={[false, true, false]} canSleep={false}>
       <CuboidCollider key={type} args={def.half} mass={1200} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
-      <Body type={type} color={color} driver={inCar ? PLAYER_LOOK : null} driverFace={PLAYER_FACE} />
+      <Body type={type} color={color} driver={inCar ? PLAYER_LOOK : null} driverFace={PLAYER_FACE} riders={riders} />
       {wheels.map(({ w, front, i }) => (
         <group key={`${type}${i}`} position={w} ref={(el) => (wheelSteer.current[i] = front ? el : null)}>
           <mesh ref={(el) => (wheelSpin.current[i] = el)}>

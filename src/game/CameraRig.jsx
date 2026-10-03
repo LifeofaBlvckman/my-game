@@ -10,7 +10,7 @@ const lookAt = new Vector3()
 const from = new Vector3()
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a))
-export const INTRO_LENGTH = 7 // seconds of fly-in before the phone call
+export const INTRO_LENGTH = 1.5 // seconds before Mama starts talking
 
 // Third-person orbit camera. Click the game to capture the mouse, Esc to release.
 // On the title screen it circles the city; during the intro it swoops down to Tunde.
@@ -71,7 +71,7 @@ export default function CameraRig() {
     const d = hit ? Math.max(1.6, hit.timeOfImpact - 0.3) : distance
     desired.multiplyScalar(d).add(lookAt)
 
-    if (game.phase === 'intro') {
+    if (game.phase === 'intro' && !game.inside) {
       // Swoop from high over Victoria Island down to the usual follow position.
       const k = Math.min(1, (performance.now() / 1000 - world.introStart) / INTRO_LENGTH)
       const e = 1 - Math.pow(1 - k, 3)

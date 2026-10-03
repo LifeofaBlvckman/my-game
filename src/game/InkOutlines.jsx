@@ -64,7 +64,7 @@ void main() {
   // Light grade toward an illustrated palette: slightly muted, with a
   // little paper grain.
   float luma = dot(c, vec3(0.299, 0.587, 0.114));
-  c = mix(c, vec3(luma), 0.08);
+  c = mix(c, vec3(luma), 0.03);
   c *= 0.97 + 0.05 * hash(floor(gl_FragCoord.xy));
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
@@ -85,7 +85,7 @@ export default function InkOutlines() {
         texel: { value: [1, 1] },
         near: { value: 0.1 },
         far: { value: 300 },
-        fadeEnd: { value: 190 },
+        fadeEnd: { value: 260 },
       },
       depthTest: false,
       depthWrite: false,

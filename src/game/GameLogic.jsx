@@ -3,11 +3,12 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { Quaternion, Vector3 } from 'three'
 import { city, zoneAt } from './cityData'
-import { swapWithPlayerCar, vehicles } from './trafficSim'
-import { copsGrabbing, deployCop, ejectDriver, npcNear, npcs, punchNpc, recallCops } from './crowd'
+import { setLane, swapWithPlayerCar, vehicles } from './trafficSim'
+import { alightRiders, callBoarders, copsGrabbing, deployCop, ejectDriver, npcNear, npcs, punchNpc, recallCops, resumeCops, setCarArrestReach, waitingCounts } from './crowd'
+import { INTERIORS, roomExit, roomPoint, roomSpawn } from './rooms'
 import { CHATTER, currentTarget, NPCS, QUESTS, STRANGER_LINES } from './quests'
 import { VEHICLES } from './vehicleTypes'
-import { bust, clang, honk, jingle, punchSound, setHorn, setMusic, setSiren, swoosh, thud } from './audio'
+import { alarm, bust, clang, jingle, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn } from './audio'
 import { CAR_HP, damagePlayerCar, damageVehicle, hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
@@ -42,12 +43,14 @@ function advanceQuest() {
   const { quest, step, money } = useGame.getState()
   const q = QUESTS[quest]
   if (!q) return
+  world.holdTime = 0
   if (step < 0) {
     useGame.setState({ step: 0 })
     banner(`NEW JOB: ${q.title.toUpperCase()}`)
   } else if (step < q.steps.length - 1) {
     useGame.setState({ step: step + 1 })
   } else {
+    if (q.restoresHealth) useGame.setState({ health: 100 })
     useGame.setState({ quest: quest + 1, step: -1, money: money + q.reward })
     jingle()
     message(quest + 1 >= QUESTS.length ? `ALL JOBS DONE!\nEKO O NI BAJE!` : `JOB DONE!\n${naira(q.reward)}`, '#7ee07e', 4500)
@@ -74,6 +77,101 @@ function nearestNamedNpc(from) {
   for (const [id, n] of Object.entries(NPCS)) {
     const d = Math.hypot(n.pos[0] - from.x, n.pos[1] - from.z)
     if (d < TALK_DISTANCE && (!best || d < best.d)) best = { id, n, d }
+  }
+  return best
+}
+
+// --- Buildings ---
+
+function placePlayer(x, y, z, facing) {
+  world.player.setTranslation({ x, y, z }, true)
+  world.player.setLinvel({ x: 0, y: 0, z: 0 }, true)
+  world.focus.set(x, y, z)
+  world.forceFacing = world.heading = facing
+  // Camera behind the way he's facing.
+  world.cameraYaw = facing + Math.PI
+  world.cameraPitch = 0.3
+}
+
+// Put the player inside a room (or back outside its door), no fade.
+export function placeInRoom(id) {
+  const room = INTERIORS[id]
+  const [x, y, z] = roomSpawn(room)
+  placePlayer(x, y, z, Math.PI)
+  world.simFocus = { x: room.door.x, z: room.door.z }
+  useGame.setState({ inside: id })
+}
+
+function placeOutside(id) {
+  const door = INTERIORS[id].door
+  placePlayer(door.x, 1.2, door.z + 0.5, 0)
+  world.simFocus = null
+  useGame.setState({ inside: null })
+}
+
+// Walk through a door with a quick fade to black.
+function goThrough(fn) {
+  if (useGame.getState().fade) return
+  useGame.setState({ fade: true })
+  setTimeout(() => {
+    fn()
+    setTimeout(() => useGame.setState({ fade: false }), 150)
+  }, 350)
+}
+
+const nearDoor = (from) => city.doors.find((d) => Math.hypot(d.x - from.x, d.z - from.z) < 2.4)
+function nearExit() {
+  const id = useGame.getState().inside
+  if (!id) return false
+  const [x, , z] = roomExit(INTERIORS[id])
+  return Math.hypot(x - world.focus.x, z - world.focus.z) < 2.4
+}
+// Things you can use inside: the bed at home and the benches at the gym.
+function nearUsable() {
+  const id = useGame.getState().inside
+  if (id === 'home') {
+    const [x, , z] = roomPoint(INTERIORS.home, 5.4, 3)
+    if (Math.hypot(x - world.focus.x, z - world.focus.z) < 2.2) return 'bed'
+  }
+  if (id === 'gym') {
+    for (const bx of [-6, -2, 2]) {
+      const [x, , z] = roomPoint(INTERIORS.gym, bx, -3)
+      if (Math.hypot(x - world.focus.x, z - world.focus.z) < 1.8) return 'bench'
+    }
+  }
+  return null
+}
+
+function useThing(thing) {
+  if (thing === 'bed') {
+    goThrough(() => {
+      world.time = 7 * 60
+      useGame.setState({ health: 100 })
+      message('GOOD MORNING', '#ffd23a', 2500)
+    })
+  } else if (thing === 'bench') {
+    world.forceFacing = 0
+    world.workout = 3
+    message('NO PAIN, NO GAIN', '#ffd23a', 2200)
+    setTimeout(() => {
+      useGame.setState({ health: 100 })
+      banner('HEALTH FULL')
+    }, 3000)
+  }
+}
+
+// --- Passengers in your own danfo or keke ---
+
+const FARE = 200
+function nearestStop(from, within) {
+  let best = null
+  let bestD = within
+  for (const s of city.busStops) {
+    const d = Math.hypot(s.x - from.x, s.z - from.z)
+    if (d < bestD) {
+      best = s
+      bestD = d
+    }
   }
   return best
 }
@@ -134,6 +232,12 @@ function interact() {
   if (game.phase !== 'playing' || game.dialogue || game.mode !== 'foot' || game.chatOpen) return
   // The key press that closed a dialogue shouldn't open a new one.
   if (performance.now() - (world.dialogueClosedAt ?? 0) < 400) return
+  if (game.fade) return
+  if (game.inside && nearExit()) return goThrough(() => placeOutside(game.inside))
+  const thing = nearUsable()
+  if (thing) return useThing(thing)
+  const door = !game.inside && nearDoor(world.focus)
+  if (door) return goThrough(() => placeInRoom(door.id))
   const near = nearestNamedNpc(world.focus)
   if (near) {
     const target = currentTarget(game.quest, game.step)
@@ -181,7 +285,7 @@ export function resetPlayerCar() {
   world.carBurning = 0
   world.carHp = CAR_HP
   world.carSkipCrash = performance.now() + 500
-  q.setFromAxisAngle(up, Math.PI)
+  q.setFromAxisAngle(up, city.carSpawnYaw)
   world.car.setTranslation({ x: city.carSpawn[0], y: city.carSpawn[1], z: city.carSpawn[2] }, true)
   world.car.setRotation(q, true)
   world.car.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -252,7 +356,7 @@ function resolvePunch() {
       clang()
       fx.sparks(px, 1, pz, 10)
       fx.pow(px, 1.8, pz, 'BANG!')
-      if (!v.wrecked && v.state !== 'parked') honk()
+      if (!v.wrecked && v.state !== 'parked' && world.listener) trafficHorn(v.type, v.x, v.z, world.listener, 0.5, 2)
       if (v.police) addWanted(1)
       return
     }
@@ -391,42 +495,123 @@ export default function GameLogic() {
 
     // Police: busted if they catch you, wanted level drops if you lose them.
     let nearestCop = Infinity
-    for (const v of vehicles) if (v.chasing) nearestCop = Math.min(nearestCop, flat(v, world.focus))
+    // Indoors, the police wait at the door you went through.
+    const copsAim = game.inside ? world.simFocus : world.focus
+    for (const v of vehicles) if (v.chasing) nearestCop = Math.min(nearestCop, flat(v, copsAim))
     setSiren(game.wanted > 0 ? Math.max(0, 1 - nearestCop / 120) : 0)
     const onFoot = game.mode === 'foot'
-    if (game.wanted > 0 && onFoot) {
-      // Patrol cars that have pulled up near you let an officer out.
+    const carStopped = !onFoot && Math.abs(world.carSpeed) < 3
+    // In a stopped car, officers reach in through the door to arrest you.
+    setCarArrestReach(carStopped ? VEHICLES[game.carType].half[0] + 1.4 : 0)
+    if (game.wanted > 0 && (onFoot || carStopped)) {
+      // Patrol cars close to you let an officer out.
       for (const v of vehicles) {
-        if (v.chasing && v.state === 'direct' && !v.officerOut && v.speed < 2 && flat(v, world.focus) < 16) deployCop(v, world.focus)
+        if (v.chasing && !v.officerOut && flat(v, world.focus) < 14) deployCop(v, world.focus)
       }
     }
-    if (game.wanted === 0 || !onFoot) recallCops()
+    if (game.wanted === 0 || (!onFoot && !carStopped)) recallCops()
+    else resumeCops()
     if (game.wanted > 0) {
-      // On foot, an officer has to get hold of you; in a car, they box you in.
-      const caught = onFoot ? copsGrabbing() : nearestCop < 5.5 && Math.abs(world.carSpeed) < 3
+      // An officer has to get hold of you, on foot or through the car door.
+      const caught = copsGrabbing()
       t.busting = caught ? t.busting + dt : Math.max(0, t.busting - dt)
       if (t.busting > 1.2) {
         t.busting = 0
         getBusted()
       }
-      world.calm = nearestCop < 70 ? 0 : (world.calm ?? 0) + dt
+      // Hiding inside doesn't count: you have to get out and lose them.
+      world.calm = nearestCop < 70 || game.inside ? 0 : (world.calm ?? 0) + dt
       if (world.calm > 18) {
         world.calm = 0
         useGame.setState({ wanted: game.wanted - 1 })
       }
     }
 
-    // Driving to a checkpoint.
-    const target = currentTarget(game.quest, game.step)
-    world.objective = target ? { x: target.x, z: target.z } : null
-    if (target?.goto && !game.dialogue && Math.hypot(target.x - world.focus.x, target.z - world.focus.z) < 6 && (!target.vehicle || game.mode === 'car')) {
-      openDialogue(QUESTS[game.quest].steps[game.step].talk, advanceQuest)
+    // Passengers: stop your danfo or keke at a bus stop to let riders off
+    // (they pay) and take on whoever is waiting.
+    const pv = world.playerVehicle
+    if (world.car) {
+      const c = world.car.translation()
+      pv.x = c.x
+      pv.z = c.z
+      pv.yaw = world.carHeading ?? 0
+    }
+    const def = VEHICLES[game.carType]
+    let droppedAt = null
+    if (game.mode === 'car' && def.picksUp && Math.abs(world.carSpeed) < 0.6) {
+      const stop = nearestStop(pv, 9)
+      if (stop && t.lastStop !== stop.id) {
+        t.lastStop = stop.id
+        if (pv.riders.length) {
+          const n = alightRiders(stop, pv)
+          useGame.setState({ money: useGame.getState().money + n * FARE })
+          message(`FARE +${naira(n * FARE)}`, '#7ee07e', 2200)
+          droppedAt = stop
+        }
+        callBoarders(stop, pv, def.passengers.length - pv.riders.length)
+      }
+    }
+    if (game.mode === 'car' && Math.abs(world.carSpeed) > 3) t.lastStop = null
+    if (pv.riders.length !== game.riders.length) useGame.setState({ riders: pv.riders.map((n) => n.look) })
+
+    // Mission steps that complete by themselves.
+    const target = currentTarget(game.quest, game.step, game.inside)
+    world.objective = target && target.x !== undefined ? { x: target.x, z: target.z } : null
+    const stepDef = QUESTS[game.quest]?.steps[game.step]
+    const rightVehicle = !target?.vehicle || (game.mode === 'car' && (target.vehicle === true || game.carType === target.vehicle))
+    if (target && !game.dialogue && !game.fade) {
+      if (target.goto && Math.hypot(target.x - world.focus.x, target.z - world.focus.z) < 6 && rightVehicle) {
+        openDialogue(stepDef.talk, advanceQuest)
+      } else if (target.enter && game.inside === target.enter) {
+        advanceQuest()
+      } else if (target.lose && game.wanted === 0) {
+        banner('YOU LOST THEM')
+        advanceQuest()
+      } else if (target.pickup && rightVehicle && pv.riders.length >= target.count) {
+        banner('PASSENGERS ON BOARD')
+        advanceQuest()
+      } else if (target.dropoff && droppedAt?.id === target.stop.id) {
+        openDialogue(stepDef.talk, advanceQuest)
+      } else if (target.hold && game.inside === target.hold) {
+        const spot = target.spot
+        const there = game.mode === 'foot' && Math.hypot(spot.x - world.focus.x, spot.z - world.focus.z) < 1.6
+        if (there) {
+          if (!world.holdTime && stepDef.alarm) {
+            alarm()
+            useGame.setState({ wanted: Math.max(game.wanted, 3) })
+            message('ALARM!', '#e8343a', 2000)
+          }
+          world.holdTime = (world.holdTime ?? 0) + dt
+          if (world.holdTime >= target.seconds) {
+            banner('GOT THE MONEY')
+            useGame.setState({ hold: null })
+            advanceQuest()
+          }
+        }
+        const progress = Math.min(1, (world.holdTime ?? 0) / target.seconds)
+        if (Math.abs((game.hold?.progress ?? -1) - progress) > 0.02) useGame.setState({ hold: { progress } })
+      }
+    }
+    if (!target?.hold && game.hold) useGame.setState({ hold: null })
+
+    // Fell into the lagoon or the sea.
+    const body = game.mode === 'car' ? world.car : world.player
+    if (body && body.translation().y < -4 && !game.inside) {
+      splash()
+      message('SPLASH!', '#7fd0ff', 2200)
+      if (game.mode === 'car') {
+        exitCar()
+        resetPlayerCar()
+      }
+      const home = INTERIORS.home.door
+      placePlayer(home.x, 1.2, home.z + 0.5, 0)
+      hurtPlayer(20)
     }
 
     t.zone += dt
     if (t.zone > 0.5) {
       t.zone = 0
-      const zone = zoneAt(world.focus.x, world.focus.z)
+      const zone = game.inside ? INTERIORS[game.inside].name : zoneAt(world.focus.x, world.focus.z)
       if (zone !== game.zone) {
         useGame.setState({ zone })
         banner(zone)
@@ -440,8 +625,14 @@ export default function GameLogic() {
     let prompt = null
     if (game.mode === 'foot' && !game.dialogue) {
       const npc = nearestNamedNpc(world.focus)
-      const car = !npc && nearestVehicle(world.focus)
-      if (npc) prompt = `Press E to talk to ${npc.n.name}`
+      const car = !npc && !game.inside && nearestVehicle(world.focus)
+      const door = !game.inside && nearDoor(world.focus)
+      const thing = nearUsable()
+      if (game.inside && nearExit()) prompt = 'Press E to go outside'
+      else if (thing === 'bed') prompt = 'Press E to sleep until morning'
+      else if (thing === 'bench') prompt = 'Press E to work out'
+      else if (door) prompt = `Press E to enter ${door.name}`
+      else if (npc) prompt = `Press E to talk to ${npc.n.name}`
       else if (car?.wrecked) prompt = 'This car is wrecked. Find another one.'
       else if (car) prompt = `Press F to ${car.own ? 'enter' : 'jack'} the ${VEHICLES[car.type].name}`
     }
@@ -464,15 +655,29 @@ export default function GameLogic() {
         return { shadowMap: three.gl.shadowMap.enabled, type: three.gl.shadowMap.type, casters, lights, calls: three.gl.info.render.calls, triangles: three.gl.info.render.triangles }
       },
       state: () => useGame.getState(),
+      carSpeed: () => world.carSpeed,
+      remotes: () => [...(world.net?.remotes.values() ?? [])].map((r) => ({ x: r.x, z: r.z, m: r.s?.m })),
+      heading: () => world.heading,
       focus: () => ({ x: world.focus.x, y: world.focus.y, z: world.focus.z }),
       teleport: (x, z) => {
         world.carSkipCrash = performance.now() + 500
         if (useGame.getState().mode === 'car') world.car.setTranslation({ x, y: 1, z }, true)
-        else world.player.setTranslation({ x, y: 1.5, z }, true)
+        else world.player.setTranslation({ x, y: useGame.getState().inside ? world.focus.y + 0.3 : 1.5, z }, true)
       },
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
-      vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut })),
+      vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut, yaw: v.yaw, blockedBy: v.blockedBy, riders: v.riders?.length ?? 0, dwell: v.dwell })),
+      waiting: () => waitingCounts(),
+      // Put an NPC danfo on the road just before a bus stop.
+      busToStop: (name) => {
+        const stop = city.busStops.find((s) => s.name === name)
+        const v = vehicles.find((v) => v.type === 'danfo' && v.state === 'lane' && !v.riders.length)
+        setLane(v, stop.axis, stop.line, stop.dir, stop.p - stop.dir * 15)
+        v.lastStop = null
+        window.__bus = v
+        window.__stop = stop
+        return vehicles.indexOf(v)
+      },
       cops: () => npcs.filter((n) => n.kind === 'cop' && n.active).map((n) => ({ x: n.x, z: n.z, grab: n.grab, returning: n.returning })),
       npcs: () => NPCS,
       enterOrExit,
@@ -486,6 +691,13 @@ export default function GameLogic() {
         punch()
       },
       faceTo: (x, z) => (world.forceFacing = world.heading = Math.atan2(x - world.focus.x, z - world.focus.z)),
+      doors: () => city.doors,
+      busStops: () => city.busStops,
+      riders: () => world.playerVehicle.riders.length,
+      setQuest: (quest, step = -1) => useGame.setState({ quest, step }),
+      target: () => { const s = useGame.getState(); return currentTarget(s.quest, s.step, s.inside) },
+      enterRoom: (id) => placeInRoom(id),
+      leaveRoom: () => useGame.getState().inside && placeOutside(useGame.getState().inside),
       carHp: () => world.carHp ?? CAR_HP,
       damageCar: (n) => damagePlayerCar(n),
       advanceDialogue: () => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter' })),

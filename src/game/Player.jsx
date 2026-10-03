@@ -100,6 +100,11 @@ export default function Player() {
     poseIn.punchSide = punch?.side ?? 1
     poseIn.flinch = world.flinch / 0.4
     computePose(pose, poseIn)
+    if (world.workout > 0) {
+      // Working out at the gym: arms pumping overhead.
+      world.workout -= dt
+      pose.armL = pose.armR = -0.3 - ((Math.sin(a.time * 4) + 1) / 2) * 2.6
+    }
     if (!grounded && !down) {
       pose.legL = 0.5
       pose.legR = -0.3

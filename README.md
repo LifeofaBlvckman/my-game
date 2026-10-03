@@ -5,45 +5,88 @@ with React Three Fiber (Three.js), Rapier physics and Vite.
 
 ## What's in it
 
-**The city.** A procedural Lagos split into five districts (Ikeja, Yaba,
-Surulere, Lekki and Victoria Island), each announced on screen as you enter it.
-Low-rise mainland blocks have rusty corrugated roofs, burglar bars and rooftop
-water tanks. Victoria Island has glass towers. Billboards sit on the rooftops, and
-Bar Beach wraps around the edge.
+**The city.** A procedural Lagos in two halves, with the lagoon between them:
+
+- **Mainland:** Ikeja, Yaba, Surulere and Ebute Metta. Low-rise blocks with
+  rusty corrugated roofs, burglar bars and rooftop water tanks.
+- **Island:** Lagos Island, Ikoyi, Victoria Island and Lekki. Glass towers and
+  mid-rise offices, with Bar Beach along the edge.
+- **Third Mainland Bridge** and **Carter Bridge** cross the Lagos Lagoon. They
+  have barriers, lamps and pillars down into the water. Fall in and you wash
+  up back home.
+
+Each district is announced on screen as you enter it. The air is clear, so
+you can see across the lagoon.
 
 **Landmarks.**
 - Oja Oba Market and Yaba Tech Market: rows of stalls with traders and shoppers.
 - Lekki Grand Mall: a glass front, a parking lot and shoppers.
-- Three clubs (Club Eko, Owambe Lounge, Afro Vibes): neon signs, a queue and a bouncer.
+- Three clubs (Club Eko, Kwilox, Owambe Lounge): neon signs, a queue and a bouncer.
 - Mama put umbrellas on the sidewalks.
+- Eight bus stops (Oshodi, Yaba, Ojuelegba, Surulere, Obalende, CMS, Ahmadu
+  Bello Way, Lekki Phase 1), each with a shelter and people waiting.
+
+**Buildings you can walk into.** Press **E** at the door:
+
+| Building | Where | Inside |
+| --- | --- | --- |
+| Tunde's house | Surulere | Your bed: sleep until 7:00 and wake up at full health. You start the game here. |
+| Club Eko | Ikeja | DJ booth, flashing dance floor, dancers, couches and a bar. |
+| Kwilox | Victoria Island | A bigger, flashier club. |
+| Iron Gbenga Gym | Yaba | Benches: work out to refill your health. |
+| Mountain of Grace Chapel | Ikeja | Pews, a choir and Pastor Adewale. |
+| No Wahala Bank | Lagos Island | A counter with a cashier, and an alarm. |
+
+"Kwilox" is a made-up name for a Quilox-style club. To rename it, change the
+`'KWILOX'` strings in `cityData.js` and `rooms.js`.
 
 **Traffic.**
 - Danfos, kekes, sedans and jeeps drive on the right and turn at junctions,
-  each with a driver you can see through the glass.
+  each with a driver at the steering wheel that you can see through the glass.
 - They queue behind each other, stop at red lights, and stop for you.
 - Every four-way junction has working traffic lights, zebra crossings and stop lines.
+- Danfos and kekes have passenger seats. They pull up at bus stops where people
+  are waiting: riders get off, the people waiting walk to the door and climb
+  in, and you can see them sitting inside.
+- **Sound:** the nearest vehicles have their own engines (a diesel rumble for
+  danfos, a buzzing two-stroke for kekes), panned left and right as they pass.
+  Drivers lean on the horn when you block them, toot when they're stuck in a
+  jam, and danfos honk just because. Each vehicle type has its own horn.
 
 **Police.** Patrol cars drive in traffic. Knocking people down, fighting near
 them or ramming a police car gives you wanted stars. Police then leave their
-lanes to chase you, sirens on. If you're on foot, officers pull up, get out,
-run you down and grab you: **BUSTED** (₦1,000 fine). In a car, they box you
-in. Get back in a car and they return to theirs; lose them for a while and
-your stars drop.
+lanes to chase you, sirens on. If you're on foot, or sitting in a car that has
+stopped, officers pull up, get out, run to you and grab you, through the car
+door if they have to: **BUSTED** (₦1,000 fine). Drive off and they run back
+to their cars. Lose them for a while and your stars drop. Hiding inside a
+building doesn't work: the police wait at the door.
 
 **People.** About 160 pedestrians, each with a drawn face, plus outfits like
 gele, agbada, iro, braids and caps. Walkers circle the blocks, traders tend
 stalls, and shoppers browse the markets and mall. Cars knock them over, and they
 panic when someone nearby gets hit. Talk to anyone with **E**.
 
-**Jobs.** Four missions from named characters, with name tags, a marker over
+**Jobs.** Six missions from named characters, with name tags, a marker over
 whoever you need next, typewriter dialogue in Pidgin, a "NEXT UP" objective and a
 radar blip. Rewards are paid in naira.
+
+1. **Pepper Run**: take Mama Nkechi's pepper to Iya Basira in Yaba.
+2. **Sunday Service**: Mama sends you to church. See Pastor Adewale at the altar.
+3. **Flash Drive Wahala**: cross Third Mainland Bridge to Lekki for DJ Tobi's flash drive.
+4. **Aso-Ebi for the Owambe**: collect Aunty Funke's outfits from the tailor.
+5. **Danfo Conductor**: drive Baba Femi's danfo, load passengers at
+   Ojuelegba and drop them at CMS on the Island.
+6. **Owo Blow**: rob No Wahala Bank. Stand at the counter while the bag fills
+   and the alarm rings, lose the police, then bring the bag to Skido's garage.
+
+**Passengers.** Drive a danfo or keke and stop at a bus stop. Your riders get
+off and pay ₦200 each, and the people waiting get on.
 
 **Driving.** Any car can be jacked with **F**: the driver gets dragged out,
 and sometimes comes back to fight you. Each vehicle type handles differently,
 and Space is a handbrake drift.
 
-**Day and night.** One game minute passes per real second. At night, windows,
+**Day and night.** One game minute passes per real second. The game starts at 13:00. At night, windows,
 street lamps and club neon light up.
 
 **Fighting and damage.**
@@ -71,7 +114,8 @@ so they won't match between players.
   clothes: Ankara, agbada, iro, gele.
 - Pastel houses with pitched roofs, framed windows and doors, puffy trees.
 - A title screen and an opening fly-in.
-- A synthesized Afrobeats loop, siren, horn, engine, punches and explosions. No audio files.
+- A synthesized Afrobeats loop, siren, horns, engines, a bank alarm, punches
+  and explosions. No audio files.
 
 ## Run it
 
@@ -118,7 +162,7 @@ connection is rate-limited.
 | Space | Jump | Handbrake |
 | Click / X | Punch (click needs the mouse captured) | |
 | Y | Chat (when online) | Chat |
-| E | Talk to whoever is nearby | |
+| E | Talk, go through a door, sleep in your bed, use a gym bench | |
 | F | Get in your car, or jack any other | Get out |
 | Q | | Horn |
 | M / O / T / H | Music on/off, ink outlines on/off, skip an hour, help box | |
@@ -134,24 +178,26 @@ src/
     City.jsx             Ground, buildings, trees, lamps, tanks; static colliders
     Landmarks.jsx        Market stalls, mall, clubs and neon, signs, billboards
     TrafficLights.jsx    Lights, crossings, stop lines (timing in signals.js)
-    trafficSim.js        Traffic and police simulation on the lane grid
+    trafficSim.js        Traffic and police simulation on the lane grid; buses stopping at stops
     Traffic.jsx          Draws all traffic with 3 instanced meshes; kinematic bodies
     vehicleTypes.js      Danfo, keke, sedan, jeep, police: parts, handling
-    crowd.js             Crowd simulation: walkers, idlers, wanderers, knockdowns
+    crowd.js             Crowd simulation: walkers, idlers, wanderers, bus riders, cops on foot
     Pedestrians.jsx      Draws the whole crowd with 2 instanced meshes
     people.js            Body parts and outfits shared by the crowd and <Person>
     faces.js             Canvas-drawn faces, Ankara print, sign textures
     Person.jsx           One character from meshes: the player and named NPCs
     NamedNpcs.jsx        Quest characters, name tags, markers, checkpoints
     quests.js            Characters, missions and dialogue (edit this to add jobs)
+    rooms.js             Building interiors: layout, furniture, people (edit this to add rooms)
+    Interiors.jsx        Draws the room you're in, with its lights and colliders
     Player.jsx / Car.jsx The player and their current vehicle
     CameraRig.jsx        Follow camera, title orbit, intro fly-in
-    GameLogic.jsx        Interactions, carjacking, wanted level, busted, districts
+    GameLogic.jsx        Interactions, doors, passengers, mission steps, wanted level, busted
     DayNight.jsx         Sky, fog and light through the day
     InkOutlines.jsx      Screen-space outline pass
     materials.js         Toon materials and the procedural window shader
     Shadows.jsx          Blob shadows
-    audio.js             Synthesized music and sound effects
+    audio.js             Synthesized music, sound effects, traffic engines and horns
     Hud.jsx, Radar.jsx   2D overlay
     state.js             Zustand store for the HUD, plus a plain object for per-frame data
     shapes.js            Low-poly shapes for characters and cars: rounded boxes, capsules, puffs, roofs
@@ -196,8 +242,17 @@ position and a look), then add an entry to `QUESTS`:
 
 - `giver`: the character's key.
 - `start`: the dialogue lines that start the job.
-- `steps`: either `{ npc, objective, talk }` to talk to someone, or
-  `{ goto: { x, z }, vehicle: true, objective, talk }` to drive somewhere.
+- `steps`: a list of these, done in order:
+  - `{ npc, objective, talk }`: talk to someone.
+  - `{ goto: { x, z }, vehicle: true, objective, talk }`: get somewhere
+    (`vehicle` can also be a type, such as `'danfo'`).
+  - `{ enter: 'church', objective }`: walk into a building from `rooms.js`.
+  - `{ hold: 'bank', seconds, alarm, objective }`: stand on the room's
+    `holdSpot` for a while. `alarm: true` sets off the alarm and three stars.
+  - `{ lose: true, objective }`: get your wanted level back to zero.
+  - `{ pickup: 'OJUELEGBA', count, vehicle, objective }` and
+    `{ dropoff: 'CMS', vehicle, objective, talk }`: carry passengers between bus stops.
+- `restoresHealth: true`: finishing the job refills your health.
 - `reward`: the pay, in naira.
 
 Jobs unlock in order.
@@ -207,8 +262,10 @@ Jobs unlock in order.
 While running `npm run dev`, `window.__game` exposes state and shortcuts for
 automated browser tests: `state()`, `focus()`, `teleport(x, z)`, `setTime(hours)`,
 `setWanted(n)`, `vehicles()`, `npcs()`, `enterOrExit()`, `interact()`, `punch()`,
-`faceTo(x, z)`, `carHp()`, `damageCar(n)`, `cops()` and `renderInfo()` (draw
-calls, triangles, shadow setup). It is left out of production builds.
+`faceTo(x, z)`, `carHp()`, `damageCar(n)`, `cops()`, `doors()`, `busStops()`,
+`waiting()`, `riders()`, `setQuest(quest, step)`, `target()`, `enterRoom(id)`,
+`leaveRoom()`, `busToStop(name)` and `renderInfo()` (draw calls, triangles,
+shadow setup). It is left out of production builds.
 
 ## Credits
 
@@ -217,12 +274,24 @@ objectives, title screen with an intro, and the debug hook were inspired by
 Abeto's *Messenger* and [Glowin/messager](https://github.com/Glowin/messager),
 a Three.js study of it. No code or assets were copied.
 
-## Bringing in Blender models
+## Bringing in your own models
 
-The placeholder character and car are built from boxes in code. To replace them
-with your own models:
+The characters and cars are built from shapes in code. You can replace them with
+models from any app that exports **glTF / GLB**. If Blender is too heavy for
+your laptop, these run well on older Macs:
 
-1. In Blender, model at real-world scale (1 unit = 1 meter) with the front of the
+- **[Blockbench](https://www.blockbench.net)**: free and light, made for
+  low-poly models like these. It runs as an app or in the browser
+  (web.blockbench.net). Export with **File > Export > Export glTF Model**.
+- **[VRoid Studio](https://vroid.com/en/studio)**: free, for characters with
+  sliders for face, hair and clothes. Export as VRM and convert to GLB.
+- **[Mixamo](https://www.mixamo.com)**: free, in the browser. Upload a
+  character and it adds a skeleton and walk, run and punch animations.
+
+The steps below use Blender's menus. Other apps have the same options under
+similar names.
+
+1. Model at real-world scale (1 unit = 1 meter) with the front of the
    car facing **-Y**, the side you see in Front view (Numpad 1). The glTF exporter
    turns that into +Z in Three.js, which is the direction the game treats as forward.
 2. Keep it low-poly: roughly 1,000 to 3,000 triangles per car or character, with
@@ -263,8 +332,12 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 - Car handling: `src/game/vehicleTypes.js` (per vehicle) and the constants in `src/game/Car.jsx`.
 - Traffic density: `TRAFFIC` and `POLICE` in `src/game/trafficSim.js`. Light timing: `src/game/signals.js`.
 - Crowd size: `WALKERS` in `src/game/crowd.js`.
-- City layout: `GRID`, `BLOCK`, `ROAD` and the landmark lists in `src/game/cityData.js`.
-- Time of day: `world.time` in `src/game/state.js` (minutes since midnight; the game starts at 17:00).
+- City layout: `GX`, `GZ`, `BLOCK`, `ROAD`, `MAINLAND_LAST`, `ISLAND_FIRST`,
+  `BRIDGES`, `BUS_STOPS`, `ENTERABLE` and the landmark lists in `src/game/cityData.js`.
+- Rooms: `src/game/rooms.js` (size, colors, furniture, people).
+- Fog distance: `fog` in `src/game/DayNight.jsx`.
+- Time of day: `world.time` in `src/game/state.js` (minutes since midnight).
+  `startGame` in `Hud.jsx` sets the start time.
 
 ## Roadmap
 
@@ -273,6 +346,6 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 3. Okadas weaving through traffic, and go-slow jams on the main roads
 4. Shops and food you can buy with your naira, plus saving progress
 5. More jobs, with timers and chases
-6. Third Mainland Bridge and the lagoon
+6. Okada riders and boats on the lagoon
 7. A hand-built map in Blender to replace or extend the procedural one, split
    into chunks that load as you drive

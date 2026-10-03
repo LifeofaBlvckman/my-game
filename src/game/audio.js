@@ -178,6 +178,7 @@ export function stopAudio() {
   clearInterval(musicTimer)
   ctx?.close()
   ctx = null
+  voices = null
 }
 
 export function punchSound() {
@@ -212,4 +213,129 @@ export function honk() {
 }
 export function swoosh() {
   if (ctx) hiss(ctx.currentTime, 0.08, 0.12, 'bandpass', 2400)
+}
+export function alarm() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  for (let i = 0; i < 8; i++) tone('square', i % 2 ? 960 : 720, t + i * 0.25, 0.22, 0.09)
+}
+export function splash() {
+  if (ctx) hiss(ctx.currentTime, 0.8, 0.7, 'lowpass', 900)
+}
+
+// --- Traffic: engine voices for the nearest vehicles, and their horns ---
+// A small pool of engine voices is handed to whichever vehicles are closest
+// each frame, so the street sounds busy without hundreds of oscillators.
+// Volume falls off with distance and the sound pans left or right of the camera.
+export const ENGINE_VOICES = 4
+const HEAR = 55 // metres
+const ENGINE_SOUND = {
+  // wave, idle Hz, Hz per m/s, filter Hz, loudness
+  sedan: ['sawtooth', 34, 2.2, 380, 1],
+  police: ['sawtooth', 38, 2.4, 420, 1],
+  jeep: ['sawtooth', 28, 1.9, 340, 1.2],
+  danfo: ['sawtooth', 24, 1.6, 300, 1.5], // a tired diesel
+  keke: ['square', 62, 4.2, 900, 0.8], // two-stroke buzz
+}
+// Horn notes per vehicle type.
+const HORNS = {
+  sedan: [[415, 523], 0.24],
+  police: [[311, 370], 0.3],
+  jeep: [[330, 415], 0.3],
+  danfo: [[392, 494], 0.2], // "poh poh"
+  keke: [[740, 880], 0.14],
+}
+let voices = null
+
+function makeVoice() {
+  const o = ctx.createOscillator()
+  const sub = ctx.createOscillator() // a second, lower oscillator gives the rumble
+  const f = ctx.createBiquadFilter()
+  f.type = 'lowpass'
+  const g = ctx.createGain()
+  g.gain.value = 0
+  const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+  o.connect(f)
+  sub.connect(f)
+  f.connect(g)
+  if (pan) g.connect(pan).connect(master)
+  else g.connect(master)
+  o.start()
+  sub.start()
+  return { o, sub, f, g, pan, type: null }
+}
+
+const spatial = (x, z, listener) => {
+  const dx = x - listener.x
+  const dz = z - listener.z
+  const d = Math.hypot(dx, dz)
+  const fall = Math.max(0, 1 - d / HEAR)
+  // Positive pan is to the camera's right.
+  const pan = d > 0.1 ? Math.max(-1, Math.min(1, (dx * listener.rightX + dz * listener.rightZ) / d)) : 0
+  return { d, gain: fall * fall, pan }
+}
+
+// sources: [{ x, z, speed, type }] already sorted nearest first.
+// listener: { x, z, rightX, rightZ }; muted when indoors or in menus.
+export function updateTrafficAudio(sources, listener, muted) {
+  if (!ctx) return
+  voices ??= Array.from({ length: ENGINE_VOICES }, makeVoice)
+  voices.forEach((voice, i) => {
+    const s = muted ? null : sources[i]
+    if (!s) {
+      smooth(voice.g.gain, 0)
+      return
+    }
+    const [wave, idle, perSpeed, filter, loud] = ENGINE_SOUND[s.type] ?? ENGINE_SOUND.sedan
+    if (voice.type !== s.type) {
+      voice.type = s.type
+      voice.o.type = wave
+      voice.sub.type = 'triangle'
+      voice.f.frequency.value = filter
+    }
+    const { gain, pan } = spatial(s.x, s.z, listener)
+    const hz = idle + Math.abs(s.speed) * perSpeed
+    smooth(voice.o.frequency, hz)
+    smooth(voice.sub.frequency, hz / 2)
+    smooth(voice.g.gain, gain * 0.045 * loud * (0.6 + Math.min(Math.abs(s.speed), 20) / 50))
+    if (voice.pan) smooth(voice.pan.pan, pan)
+  })
+}
+
+// A horn blast from a vehicle out in the world.
+export function trafficHorn(type, x, z, listener, length = 0.3, beeps = 1) {
+  if (!ctx) return
+  const { gain, pan } = spatial(x, z, listener)
+  if (gain < 0.01) return
+  const [notes, loud] = HORNS[type] ?? HORNS.sedan
+  const out = ctx.createGain()
+  out.gain.value = 0
+  const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+  const f = ctx.createBiquadFilter()
+  f.type = 'lowpass'
+  f.frequency.value = 1400
+  f.connect(out)
+  if (p) {
+    p.pan.value = pan
+    out.connect(p).connect(master)
+  } else out.connect(master)
+  const t0 = ctx.currentTime + 0.01
+  const peak = gain * loud
+  let end = t0
+  for (let b = 0; b < beeps; b++) {
+    const t = t0 + b * (length + 0.12)
+    out.gain.setValueAtTime(0, t)
+    out.gain.linearRampToValueAtTime(peak, t + 0.015)
+    out.gain.setValueAtTime(peak, t + length)
+    out.gain.linearRampToValueAtTime(0, t + length + 0.03)
+    end = t + length + 0.05
+  }
+  notes.forEach((hz) => {
+    const o = ctx.createOscillator()
+    o.type = 'square'
+    o.frequency.value = hz * (0.98 + Math.random() * 0.04)
+    o.connect(f)
+    o.start(t0)
+    o.stop(end)
+  })
 }

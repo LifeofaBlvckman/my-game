@@ -99,7 +99,8 @@ export default function Pedestrians() {
       const t = world.car.translation()
       car = { x: t.x, z: t.z, yaw: world.heading, speed: world.carSpeed ?? 0, half: VEHICLES[game.carType].half }
     }
-    const hits = updatePedestrians(dt, world.focus, car, game.mode === 'foot' && !world.playerDown, world.events)
+    // While you're indoors, the street carries on around the door you went in by.
+    const hits = updatePedestrians(dt, world.simFocus ?? world.focus, car, game.mode === 'foot' && !world.playerDown && !game.inside, world.events)
     if (hits.length) world.events.push({ type: 'pedHit', hits })
 
     const fx = world.focus.x

@@ -17,6 +17,7 @@ import InkOutlines from './game/InkOutlines'
 import Effects from './game/Effects'
 import RemotePlayers from './game/RemotePlayers'
 import ShadowCasters from './game/ShadowCasters'
+import Interiors from './game/Interiors'
 import Hud from './game/Hud'
 import { keyMap } from './game/controls'
 import { useGame } from './game/state'
@@ -35,7 +36,7 @@ export default function App() {
         shadows="percentage"
         dpr={dpr}
         gl={{ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
-        camera={{ fov: 65, near: 0.1, far: 300, position: [150, 70, 150] }}
+        camera={{ fov: 65, near: 0.1, far: 620, position: [150, 70, 150] }}
       >
         <PerformanceMonitor
           onDecline={() => {
@@ -57,6 +58,7 @@ export default function App() {
             <NamedNpcs />
             <Player />
             <Car />
+            <Interiors />
             <RemotePlayers />
             <Effects />
             <CameraRig />

@@ -1,5 +1,5 @@
 import { fx } from './particles'
-import { npcs, knockDown } from './crowd'
+import { driverGetsOut, knockDown, npcs } from './crowd'
 import { TRAFFIC_HP, vehicles } from './trafficSim'
 import { VEHICLES } from './vehicleTypes'
 import { boom, crashSound, thud } from './audio'
@@ -47,13 +47,25 @@ export function damagePlayerCar(amount) {
 
 // --- Traffic ---
 
-export function damageVehicle(v, amount) {
+const occupied = (v) => v.state !== 'parked' && !v.wrecked && !(v.burning > 0) && !v.officerOut
+
+// Damage a traffic vehicle. A hard enough knock can bring the driver out to
+// argue (and sometimes fight); a fire always gets them out.
+export function damageVehicle(v, amount, impact = 0) {
   if (v.wrecked || amount <= 0) return
   v.hp = (v.hp ?? TRAFFIC_HP) - amount
   v.stall = Math.max(v.stall ?? 0, 2.5)
   if (v.hp <= 0 && !v.burning) {
+    if (occupied(v) && !v.police) driverGetsOut(v.x, v.z, v.yaw, world.focus, 'flee')
     v.burning = BURN_TIME
     v.speed = 0
+    v.state = 'parked'
+    v.chasing = false
+  } else if (impact > 9 && occupied(v) && !v.police && Math.random() < 0.45) {
+    if (driverGetsOut(v.x, v.z, v.yaw, world.focus, Math.random() < 0.6 ? 'fight' : 'flee')) {
+      v.state = 'parked' // they left it where it is
+      v.speed = 0
+    }
   }
 }
 

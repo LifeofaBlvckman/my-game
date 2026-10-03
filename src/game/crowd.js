@@ -52,6 +52,20 @@ city.wanderAreas.forEach((area) => {
   }
 })
 
+// People waiting at bus stops for a danfo or keke.
+const WAITING_PER_STOP = 3
+const stopSpot = (stop, k) => {
+  // Spread along the curb, either side of the shelter.
+  const along = (k - 1) * 1.1
+  return { x: stop.x + (stop.axis === 'x' ? along : 0), z: stop.z + (stop.axis === 'z' ? along : 0) }
+}
+city.busStops.forEach((stop) => {
+  for (let k = 0; k < WAITING_PER_STOP; k++) {
+    const spot = stopSpot(stop, k)
+    npcs.push({ kind: 'idle', role: 'waiting', stop: stop.id, look: randomLook(rand), x: spot.x, z: spot.z, y: SIDEWALK_Y, yaw: stop.yaw, home: { ...spot, yaw: stop.yaw } })
+  }
+})
+
 // Police officers on foot. Hidden until a patrol car pulls up during a chase.
 const COPS = 6
 for (let k = 0; k < COPS; k++) {
@@ -180,6 +194,53 @@ export function recallCops() {
   for (const n of npcs) if (n.kind === 'cop' && n.active) n.returning = true
 }
 
+// You stopped again: officers on their way back come for you instead.
+export function resumeCops() {
+  for (const n of npcs) if (n.kind === 'cop' && n.active) n.returning = false
+}
+
+// --- Bus stop passengers ---
+
+// How many people are waiting at each stop, indexed by stop id.
+export function waitingCounts() {
+  const counts = new Array(city.busStops.length).fill(0)
+  for (const n of npcs) if (n.role === 'waiting' && n.kind === 'idle' && n.active !== false && n.down <= 0) counts[n.stop]++
+  return counts
+}
+
+// A vehicle has stopped at `stop`: up to `max` waiting people walk to it and
+// get in. `vehicle` is any object with x, z, yaw and a riders array.
+export function callBoarders(stop, vehicle, max) {
+  let called = 0
+  for (const n of npcs) {
+    if (called >= max) break
+    if (n.role !== 'waiting' || n.stop !== stop.id || n.kind !== 'idle' || n.active === false || n.down > 0) continue
+    n.kind = 'boarding'
+    n.vehicle = vehicle
+    called++
+  }
+  return called
+}
+
+// Riders get out at `stop` and wait there for the next ride.
+export function alightRiders(stop, vehicle, count = vehicle.riders.length) {
+  const out = vehicle.riders.splice(0, count)
+  out.forEach((n, k) => {
+    const spot = stopSpot(stop, k % WAITING_PER_STOP)
+    const left = vehicle.yaw + Math.PI / 2
+    n.active = true
+    n.kind = 'idle'
+    n.role = 'waiting'
+    n.stop = stop.id
+    n.vehicle = null
+    n.x = vehicle.x + Math.sin(left) * 1.5
+    n.z = vehicle.z + Math.cos(left) * 1.5
+    n.home = { ...spot, yaw: stop.yaw }
+    n.posed = false
+  })
+  return out.length
+}
+
 export const copsGrabbing = () => npcs.some((n) => n.kind === 'cop' && n.active && n.grab && n.down <= 0)
 
 function standDownCop(n) {
@@ -204,11 +265,40 @@ export function ejectDriver(x, z, yaw, focus) {
   }
   if (!pick) return
   const left = yaw + Math.PI / 2
+  knockDown(pick, Math.sin(left), Math.cos(left), 3)
+  // Position after knocking down: knockDown snaps walkers to their route.
+  pick.kind = 'loose'
   pick.x = x + Math.sin(left) * 1.6
   pick.z = z + Math.cos(left) * 1.6
-  knockDown(pick, Math.sin(left), Math.cos(left), 3)
+  pick.ox = pick.oz = 0
   pick.down = 1.4
   pick.afterDown = rand() < 0.35 ? 'fight' : 'flee'
+}
+
+// A driver gets out of their car on their own: to argue after a crash, or to
+// run from a fire.
+export function driverGetsOut(x, z, yaw, focus, mood) {
+  let pick = null
+  let far = -1
+  for (const n of npcs) {
+    if (n.kind !== 'walk' || n.down > 0) continue
+    const d = Math.hypot(n.x - focus.x, n.z - focus.z)
+    if (d > far) {
+      far = d
+      pick = n
+    }
+  }
+  if (!pick) return null
+  const left = yaw + Math.PI / 2
+  pick.kind = 'loose'
+  pick.x = x + Math.sin(left) * 1.5
+  pick.z = z + Math.cos(left) * 1.5
+  pick.ox = pick.oz = pick.vx = pick.vz = 0
+  pick.down = 0
+  pick.yaw = Math.atan2(focus.x - pick.x, focus.z - pick.z)
+  if (mood === 'fight') pick.fight = 14
+  else pick.panic = 8
+  return pick
 }
 
 function walkToward(n, tx, tz, speed, dt) {
@@ -227,8 +317,64 @@ function walkToward(n, tx, tz, speed, dt) {
 // focus: where the player is. car: { x, z, yaw, speed, half } when driving, else null.
 // Returns the positions of NPCs the car knocked down this frame. NPC punches
 // that land on the player are pushed to `events`.
+// How close an officer has to get to a player sitting in a car (0 if the car
+// is moving too fast to be arrested in).
+let copReach = 0
+export function setCarArrestReach(reach) {
+  copReach = reach
+}
+
+// Every few seconds, stops that a bus has emptied fill up again: someone
+// walking past joins the queue, or (out of sight) a walker is moved there.
+let refillTimer = 0
+function refillStops(focus) {
+  const counts = waitingCounts()
+  city.busStops.forEach((stop) => {
+    const hidden = Math.hypot(stop.x - focus.x, stop.z - focus.z) > 90
+    // Too many people dropped off here: the extras go about their day.
+    if (counts[stop.id] > WAITING_PER_STOP + 2 && hidden) {
+      const extra = npcs.find((n) => n.role === 'waiting' && n.stop === stop.id && n.kind === 'idle' && n.active !== false)
+      if (extra) {
+        extra.role = null
+        extra.home = null
+        extra.kind = 'walk'
+        extra.speed ??= 1.1 + rand() * 0.6
+        placeWalker(extra, focus)
+      }
+      return
+    }
+    if (counts[stop.id] >= WAITING_PER_STOP) return
+    let pick = null
+    for (const n of npcs) {
+      if (n.kind !== 'walk' || n.down > 0 || n.panic > 0 || n.x === undefined) continue
+      const d = Math.hypot(n.x - stop.x, n.z - stop.z)
+      if (d < 25 || (hidden && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)) {
+        pick = n
+        if (d < 25) break
+      }
+    }
+    if (!pick) return
+    const spot = stopSpot(stop, counts[stop.id] % WAITING_PER_STOP)
+    if (Math.hypot(pick.x - stop.x, pick.z - stop.z) >= 25) {
+      pick.x = spot.x
+      pick.z = spot.z
+    }
+    pick.kind = 'idle'
+    pick.role = 'waiting'
+    pick.stop = stop.id
+    pick.y = SIDEWALK_Y
+    pick.home = { ...spot, yaw: stop.yaw }
+    pick.posed = false
+  })
+}
+
 export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
   const hits = []
+  refillTimer -= dt
+  if (refillTimer <= 0) {
+    refillTimer = 3
+    refillStops(focus)
+  }
   for (const n of npcs) {
     const dx = (n.x ?? 0) - focus.x
     const dz = (n.z ?? 0) - focus.z
@@ -257,14 +403,15 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
     if (n.kind === 'cop') {
       // Chase the player down and grab them; or walk back to the car.
       const toPlayer = Math.hypot(focus.x - n.x, focus.z - n.z)
-      // Once they have hold of you they keep it until you get properly away.
-      const holding = n.grab ? toPlayer < 1.6 : toPlayer <= 1.05
+      // On foot they grab you; in a stopped car they reach in through the door.
+      const reach = playerOnFoot ? 1.05 : copReach
+      const holding = n.grab ? toPlayer < reach + 0.55 : toPlayer <= reach
       n.grab = false
       if (toPlayer > 150) {
         standDownCop(n)
         continue
       }
-      if (n.returning || !playerOnFoot) {
+      if (n.returning || (!playerOnFoot && !copReach)) {
         const car = n.car
         if (!car || walkToward(n, car.x, car.z, 2.2, dt) < 1.6) standDownCop(n)
       } else if (!holding) {
@@ -293,6 +440,29 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
       }
     } else if (n.fight > 0) {
       n.fight = 0
+    } else if (n.kind === 'boarding') {
+      // Walk to the vehicle's door and climb in; give up if it drives off.
+      const v = n.vehicle
+      const left = v.yaw + Math.PI / 2
+      const doorX = v.x + Math.sin(left) * 1.4
+      const doorZ = v.z + Math.cos(left) * 1.4
+      if (Math.hypot(doorX - n.x, doorZ - n.z) > 14 || v.gone) {
+        n.kind = 'idle'
+        n.vehicle = null
+      } else if (walkToward(n, doorX, doorZ, 2.6, dt) < 0.5) {
+        n.active = false
+        n.kind = 'riding'
+        v.riders.push(n)
+      }
+    } else if (n.kind === 'loose') {
+      // Out of a car: run from the player while scared, then rejoin the crowd
+      // once well out of sight.
+      const away = Math.atan2(n.x - focus.x, n.z - focus.z)
+      if (n.panic > 0) walkToward(n, n.x + Math.sin(away) * 5, n.z + Math.cos(away) * 5, 4, dt)
+      if (Math.hypot(n.x - focus.x, n.z - focus.z) > 120) {
+        n.kind = 'walk'
+        placeWalker(n, focus)
+      }
     } else if (n.kind === 'walk') {
       if (far && dx * dx + dz * dz > RECYCLE * RECYCLE) placeWalker(n, focus)
       n.t += n.dir * n.speed * (n.panic > 0 ? 3.2 : 1) * dt

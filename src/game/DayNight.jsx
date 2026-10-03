@@ -38,7 +38,7 @@ export function daylightAt(hour) {
   return smoothstep(5.5, 7.2, hour) * (1 - smoothstep(18, 19.6, hour))
 }
 
-const skyGeometry = new SphereGeometry(280, 32, 16)
+const skyGeometry = new SphereGeometry(580, 32, 16)
 
 function createSkyMaterial() {
   return new ShaderMaterial({
@@ -170,7 +170,7 @@ export default function DayNight() {
 
   return (
     <>
-      <fog ref={fog} attach="fog" args={['#a6d8cc', 90, 290]} />
+      <fog ref={fog} attach="fog" args={['#a6d8cc', 260, 600]} />
       <mesh ref={sky} geometry={skyGeometry} material={skyMaterial} renderOrder={-10} frustumCulled={false} />
       <hemisphereLight ref={fill} args={['#b3c2d8', '#b3c2d8', 3]} />
       <directionalLight ref={sun} intensity={1.1} castShadow={shadowsOn} />

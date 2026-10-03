@@ -4,9 +4,10 @@ import { faceStyle, makeFaceTexture } from './faces'
 import { SHAPES } from './shapes'
 import { toonRamp } from './materials'
 
-// A driver made of meshes, for the player's car and other players' cars.
-export default function Driver({ look, seat, faceOverride }) {
-  const parts = useMemo(() => driverParts(look), [look])
+// A seated person made of meshes (driver or passenger), for the player's car
+// and other players' cars.
+export default function Driver({ look, seat, faceOverride, driving = true }) {
+  const parts = useMemo(() => driverParts(look, driving), [look, driving])
   const seatM = useMemo(() => seatMatrix(seat), [seat])
   const face = useMemo(() => makeFaceTexture(faceOverride ?? faceStyle(look.face)), [look, faceOverride])
   return (

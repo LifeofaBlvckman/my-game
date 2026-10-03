@@ -7,6 +7,10 @@ export const useGame = create((set) => ({
   mode: 'foot', // 'foot' | 'car'
   carType: 'sedan',
   carColor: '#c9ccd1',
+  riders: [], // looks of passengers in the player's vehicle (for drawing)
+  inside: null, // id of the building the player is in
+  fade: false, // black screen while going through a door
+  hold: null, // { progress } while holding a spot (the bank job)
   speed: 0, // km/h, refreshed a few times a second
   prompt: null, // context hint, e.g. "Press F to enter the Danfo"
   wanted: 0, // 0-5 stars
@@ -56,4 +60,6 @@ export const world = {
   playerDown: 0, // seconds left knocked flat
   punch: null, // { t: 0..1, side, resolved } while a punch animates
   net: null, // multiplayer connection, when online
+  simFocus: null, // where traffic and crowds gather (the door, while you're inside)
+  playerVehicle: { x: 0, z: 0, yaw: 0, riders: [] }, // for passengers boarding your danfo
 }
