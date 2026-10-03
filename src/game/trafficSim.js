@@ -1,4 +1,4 @@
-import { CELL, city, halfFor, hasLight, hasStop, lanePoint, lineCount, mulberry32, nodeCount, nodeCoord, ROAD, roadX, roadZ, segmentValid } from './cityData'
+import { CELL, city, halfFor, hasLight, hasStop, ISLAND, lanePoint, lineCount, mulberry32, nodeCount, nodeCoord, ROAD, roadX, roadZ, segmentValid } from './cityData'
 import { lightFor } from './signals'
 import { VEHICLES } from './vehicleTypes'
 
@@ -7,6 +7,10 @@ import { VEHICLES } from './vehicleTypes'
 // Police cars patrol the same way until you're wanted, then they hunt you.
 
 const MIX = ['danfo', 'danfo', 'danfo', 'keke', 'keke', 'sedan', 'sedan', 'sedan', 'jeep', 'jeep']
+// The Island (Ikoyi, VI, Lekki) is where the money is: mostly big cars.
+const LUX_MIX = ['benz', 'benz', 'benz', 'gwagon', 'gwagon', 'gwagon', 'sports', 'sports', 'jeep', 'danfo', 'keke']
+const mixAt = (x) => (x > ISLAND.minX - 20 ? LUX_MIX : MIX)
+const ISLAND_PARKED = { sedan: 'benz', jeep: 'gwagon' }
 const TRAFFIC = 34
 const POLICE = 6
 const RECYCLE = 190
@@ -95,14 +99,15 @@ function randomLanePosition(near, min, max) {
 export function initTraffic(spawn) {
   const near = { x: spawn[0], z: spawn[2] }
   for (let k = 0; k < TRAFFIC + POLICE; k++) {
-    const v = makeVehicle(k < POLICE ? 'police' : pick(MIX))
     const spot = randomLanePosition(near, 18, 170) ?? randomLanePosition(null, 0, 1e9)
+    const v = makeVehicle(k < POLICE ? 'police' : pick(mixAt(lanePoint(spot.axis, spot.line, spot.dir, spot.p).x)))
     setLane(v, spot.axis, spot.line, spot.dir, spot.p)
     v.speed = VEHICLES[v.type].cruise * 0.6
     vehicles.push(v)
   }
   city.parkedCars.forEach((c) => {
-    const v = makeVehicle(c.type, { state: 'parked', decor: true, x: c.x, z: c.z, yaw: c.yaw })
+    const type = c.x > ISLAND.minX ? (ISLAND_PARKED[c.type] ?? c.type) : c.type
+    const v = makeVehicle(type, { state: 'parked', decor: true, x: c.x, z: c.z, yaw: c.yaw })
     vehicles.push(v)
   })
 }
@@ -225,7 +230,7 @@ function respawnNear(v, focus) {
     v.color = VEHICLES.police.colors[0]
     v.dirty = true
   } else if (!v.police) {
-    v.type = pick(MIX)
+    v.type = pick(mixAt(lanePoint(spot.axis, spot.line, spot.dir, spot.p).x))
     v.color = pick(VEHICLES[v.type].colors)
     v.dirty = true
   }

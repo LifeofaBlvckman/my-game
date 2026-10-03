@@ -179,6 +179,57 @@ const onLand = (x, z) =>
 
 const FLOWER_COLORS = ['#e8364f', '#ffd23a', '#ff8fc8', '#ffffff', '#9b6bff', '#ff7a2f', '#d6248a']
 
+// The hospital (where you wake up after being wasted, and Nurse Ngozi's
+// ambulance job) and a police station (where you're let out after being
+// busted). Each takes over an ordinary block after the city is laid out, so
+// nothing else moves.
+const CIVIC = [
+  { id: 'hospital', name: 'GENERAL HOSPITAL', blocks: [[isl(2), 2], [isl(3), 3], [isl(2), 4], [isl(4), 2]], w: 26, d: 16, h: 14, color: '#f2f4f2', sign: '#c8202a' },
+  { id: 'police', name: 'POLICE STATION', blocks: [[2, 3], [3, 4], [4, 4], [1, 3]], w: 22, d: 14, h: 10, color: '#cfd8e6', sign: '#1b2a52' },
+]
+
+function addCivicBuildings(city) {
+  const inBlock = (o, x, z, pad = 0) => Math.abs(o.x - x) < BLOCK / 2 + pad && Math.abs(o.z - z) < BLOCK / 2 + pad
+  for (const c of CIVIC) {
+    const spot = c.blocks
+      .map(([i, j]) => ({ x: blockX(i), z: blockZ(j) }))
+      .find(
+        ({ x, z }) =>
+          city.blocks.some((b) => b.x === x && b.z === z && b.color === '#b9ae9b') &&
+          !city.parks.some((p) => p.x === x && p.z === z) &&
+          !city.doors.some((d) => inBlock(d, x, z, 2)) &&
+          !city.busStops.some((b) => inBlock(b, x, z, 4)) &&
+          !city.buildings.some((b) => b.landmark && inBlock(b, x, z)),
+      )
+    if (!spot) continue
+    const { x, z } = spot
+    // Clear the lots (and anything standing on those roofs).
+    city.buildings = city.buildings.filter((b) => !inBlock(b, x, z))
+    city.tanks = city.tanks.filter((t) => !inBlock(t, x, z))
+    city.signs = city.signs.filter((g) => !(g.legs && inBlock(g, x, z)))
+    city.parkedCars = city.parkedCars.filter((p) => !inBlock(p, x, z))
+    const front = z + BLOCK / 2
+    const bz = front - 3 - c.d / 2
+    const name = c.id === 'police' ? `${zoneAt(x, z)} ${c.name}` : `LAGOS ${c.name}`
+    city.buildings.push({ x, z: bz, w: c.w, d: c.d, h: c.h, color: c.color, landmark: true })
+    city.solids.push({ x, z: front - 3 + 0.05, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true }) // doors
+    city.solids.push({ x, z: front - 3 + 1.2, w: 6, d: 2.4, h: 0.15, color: '#9a9a9a', y: 3.2 }) // canopy
+    city.signs.push({ text: name, x, y: Math.min(c.h - 1.5, 6.5), z: front - 3 + 0.12, rot: 0, w: Math.min(c.w - 4, 16), h: 1.8, bg: c.sign, fg: '#ffffff', glow: '#ffffff' })
+    if (c.id === 'hospital') {
+      // A big red cross on the roof edge, lit at night.
+      city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 2.6, d: 0.15, h: 0.8, color: '#e8202a', y: c.h - 3, emissive: true })
+      city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 0.8, d: 0.15, h: 2.6, color: '#e8202a', y: c.h - 3.9, emissive: true })
+      city.parkedCars.push({ x: x - 8, z: front + 1.5, yaw: Math.PI / 2, type: 'danfo' })
+    } else {
+      // Patrol cars out front and an officer at the door.
+      city.parkedCars.push({ x: x - 8, z: front + 1.5, yaw: Math.PI / 2, type: 'police' })
+      city.parkedCars.push({ x: x + 9, z: front + 1.5, yaw: -Math.PI / 2, type: 'police' })
+      city.idlers.push({ x: x + 2.2, z: front - 1.6, y: SIDEWALK_Y, yaw: 0, role: 'cop-guard' })
+    }
+    city.doors.push({ id: c.id, name, x, z: front - 3 + 1.3 })
+  }
+}
+
 // Things added after the main layout, from their own random numbers so the
 // buildings and roads stay exactly where they were: flower beds in the parks
 // and along the sidewalks, stop signs, and LASTMA wardens at busy junctions.
@@ -263,6 +314,8 @@ function addStreetDetails(city, rand) {
       }
     }
   }
+
+  addCivicBuildings(city)
 
   // LASTMA wardens at some of the junctions with lights, on a corner.
   const lit = []

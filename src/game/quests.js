@@ -83,6 +83,12 @@ export const NPCS = {
     yaw: 0,
     look: { female: false, face: 1, hair: 'locs', top: '#e04848', bottom: '#212121', robe: false, height: 1.0 },
   },
+  ngozi: {
+    name: 'Nurse Ngozi',
+    ...inRoom('hospital', 1.2, -1.9),
+    yaw: 0,
+    look: { female: true, face: 12, hair: 'puff', hairColor: '#1f1410', top: '#f2f2f2', bottom: '#5fa8c8', robe: false, height: 0.95 },
+  },
   bisi: {
     name: 'Aunty Bisi',
     pos: [blockX(ISLAND_FIRST + 2), MAINLAND.maxZ + 7],
@@ -298,6 +304,7 @@ export const INTRO_CALL = [
 const junction = (i, j) => ({ x: roadX(i), z: roadZ(j) })
 const I = (k) => ISLAND_FIRST + k
 const beachZ = MAINLAND.maxZ + BEACH / 2
+const hospitalDoor = city.doors.find((d) => d.id === 'hospital')
 export const SIDE_JOBS = [
   {
     title: 'Suya Run',
@@ -354,6 +361,33 @@ export const SIDE_JOBS = [
     ],
   },
 ]
+
+// Nurse Ngozi's ambulance job: an accident on the Island, and you're the
+// nearest driver. Drive there, then race the injured man back to the hospital.
+SIDE_JOBS.push({
+  title: 'Ambulance Run',
+  giver: 'ngozi',
+  reward: 6000,
+  start: [
+    line('Nurse Ngozi', 'Abeg, you get motor? Accident just happen for Ozumba Mbadiwe. Our ambulance don spoil again.'),
+    line('Nurse Ngozi', 'Go carry the man come here. Fast fast, before e lose too much blood.'),
+  ],
+  steps: [
+    {
+      goto: { x: roadX(I(3)) + 14, z: roadZ(5) + 3 },
+      vehicle: true,
+      objective: 'DRIVE TO THE ACCIDENT ON OZUMBA MBADIWE',
+      talk: [line('Injured Man', 'Ah! My leg! Thank God you come. Abeg carry me go hospital, quick!')],
+    },
+    {
+      goto: { x: hospitalDoor.x, z: hospitalDoor.z + 6 },
+      vehicle: true,
+      time: 60,
+      objective: 'RUSH HIM TO THE GENERAL HOSPITAL',
+      talk: [line('Nurse Ngozi', 'You do well! The doctors don carry am inside. God bless you, my brother.')],
+    },
+  ],
+})
 
 export const CHATTER = ['How far?', 'Lagos no easy o.', 'No wahala.', 'I dey my lane.', 'Shey you dey alright?', 'Traffic don too much today.', 'Abeg I dey hurry.']
 export const STRANGER_LINES = ['How far, bros?', 'Oga, wetin you dey find?', 'Fine boy, no pimples!', 'E go better.', 'Abeg shift.', 'Sharp guy!', 'You get change for N1000?']

@@ -21,6 +21,7 @@ import ShadowCasters from './game/ShadowCasters'
 import Interiors from './game/Interiors'
 import Hud from './game/Hud'
 import Birds from './game/Birds'
+import Dogs from './game/Dogs'
 import Races from './game/Races'
 import { keyMap } from './game/controls'
 import { useGame } from './game/state'
@@ -82,6 +83,7 @@ export default function App() {
             <StreetDetails />
             <Traffic />
             <Pedestrians />
+            <Dogs />
             <NamedNpcs />
             <Races />
             <Player />

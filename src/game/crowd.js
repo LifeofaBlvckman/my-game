@@ -35,6 +35,8 @@ city.idlers.forEach((spot, k) => {
         ? randomLook(rand, { robe: true })
         : spot.role === 'warden'
           ? { ...WARDEN_LOOK, face: k % 6 }
+          : spot.role === 'cop-guard'
+            ? { ...COP_LOOK }
           : randomLook(rand)
   npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role, home: { ...spot } })
 })

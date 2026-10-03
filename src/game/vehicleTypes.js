@@ -69,6 +69,63 @@ const SEDAN_PASSENGERS = [
 ]
 sedanParts.push(...seats([SEDAN_SEAT, ...SEDAN_PASSENGERS]))
 
+// Island cars: Lagos "big boy" rides.
+const CHROME = '#d9dde2'
+const luxuryParts = [
+  [0, 0.0, 0, 1.98, 0.5, 4.9, 'body'],
+  ...cabin({ x: 0.82, y: 0.55, h: 0.5, front: 0.7, back: -1.45, roofY: 0.82, roofW: 1.62 }),
+  [0, 0.34, 0.55, 1.56, 0.1, 0.25, '#2a2a2e'],
+  [0, 0.06, 2.46, 0.9, 0.28, 0.04, CHROME], // grille
+  [0, 0.3, 2.25, 0.06, 0.12, 0.06, CHROME], // bonnet badge
+  [0.995, 0.08, 0, 0.02, 0.05, 4.4, CHROME],
+  [-0.995, 0.08, 0, 0.02, 0.05, 4.4, CHROME],
+  [0, -0.17, 2.45, 2.0, 0.16, 0.08, '#202020'],
+  [0, -0.17, -2.45, 2.0, 0.16, 0.08, '#202020'],
+  ...lights(2.44, 0.1, 0.66, '#d01a24'),
+]
+const LUXURY_SEAT = [0.42, 0.25, 0.05, 0.82]
+const LUXURY_PASSENGERS = [
+  [-0.42, 0.25, 0.05, 0.82],
+  [0.4, 0.25, -0.95, 0.82],
+  [-0.4, 0.25, -0.95, 0.82],
+]
+luxuryParts.push(...seats([LUXURY_SEAT, ...LUXURY_PASSENGERS]))
+
+const SUV_SEAT = [0.46, 0.28, 0.5, 0.86]
+const SUV_PASSENGERS = [
+  [-0.46, 0.28, 0.5, 0.86],
+  [0.46, 0.28, -0.7, 0.86],
+  [-0.46, 0.28, -0.7, 0.86],
+]
+const suvParts = [
+  [0, -0.2, 0, 2.1, 1.0, 4.8, 'body'],
+  ...cabin({ x: 0.98, y: 0.62, h: 0.66, front: 1.3, back: -2.2, roofY: 0.98, roofW: 2.0 }),
+  [0, 0.35, 1.15, 1.85, 0.1, 0.25, '#2a2a2e'],
+  [0.85, 1.07, -0.4, 0.06, 0.08, 3.2, '#1a1a1a'], // roof rails
+  [-0.85, 1.07, -0.4, 0.06, 0.08, 3.2, '#1a1a1a'],
+  [0, -0.05, 2.42, 1.3, 0.42, 0.06, '#1a1a1a'], // grille
+  [0, 0.05, -2.46, 0.85, 0.85, 0.14, '#202020'], // spare wheel
+  [1.07, -0.62, 0, 0.12, 0.06, 3.0, '#1a1a1a'], // side steps
+  [-1.07, -0.62, 0, 0.12, 0.06, 3.0, '#1a1a1a'],
+  ...lights(2.41, 0.08, 0.74),
+  ...seats([SUV_SEAT, ...SUV_PASSENGERS]),
+]
+
+const SPORTS_SEAT = [0.4, -0.02, -0.25, 0.8]
+const sportsParts = [
+  [0, -0.12, 0, 2.1, 0.36, 4.6, 'body'],
+  [0, 0.1, 1.35, 1.9, 0.1, 1.8, 'body'], // long low bonnet
+  ...cabin({ x: 0.72, y: 0.36, h: 0.34, front: 0.35, back: -1.0, roofY: 0.55, roofW: 1.42 }),
+  [0, 0.2, 0.25, 1.3, 0.08, 0.2, '#2a2a2e'],
+  [0, 0.42, -2.12, 1.9, 0.06, 0.34, '#111111'], // spoiler
+  [0.7, 0.24, -2.12, 0.06, 0.3, 0.1, '#111111'],
+  [-0.7, 0.24, -2.12, 0.06, 0.3, 0.1, '#111111'],
+  [1.06, -0.02, -0.55, 0.03, 0.22, 0.9, '#111111'], // side intakes
+  [-1.06, -0.02, -0.55, 0.03, 0.22, 0.9, '#111111'],
+  ...lights(2.31, 0.0, 0.72),
+  ...seats([SPORTS_SEAT, [-0.4, -0.02, -0.25, 0.8]]),
+]
+
 export const VEHICLES = {
   sedan: {
     name: 'Sedan',
@@ -212,6 +269,45 @@ export const VEHICLES = {
     accel: 6,
     steer: 2.8,
     cruise: 8,
+  },
+  benz: {
+    name: 'Luxury Saloon',
+    half: [1.0, 0.5, 2.45],
+    parts: luxuryParts,
+    wheels: { r: 0.4, at: [[0.9, -0.12, 1.5], [-0.9, -0.12, 1.5], [0.9, -0.12, -1.5], [-0.9, -0.12, -1.5]] },
+    seat: LUXURY_SEAT,
+    passengers: LUXURY_PASSENGERS,
+    colors: ['#111114', '#c9ccd1', '#f4f4f0', '#1d2a44', '#5a1a24'],
+    maxSpeed: 55,
+    accel: 13,
+    steer: 2.3,
+    cruise: 14,
+  },
+  gwagon: {
+    name: 'Big Boy SUV',
+    half: [1.05, 1.0, 2.4],
+    parts: suvParts,
+    wheels: { r: 0.47, at: [[0.95, -0.55, 1.5], [-0.95, -0.55, 1.5], [0.95, -0.55, -1.5], [-0.95, -0.55, -1.5]] },
+    seat: SUV_SEAT,
+    passengers: SUV_PASSENGERS,
+    colors: ['#111114', '#f4f4f0', '#3a4a3a', '#7a7f86'],
+    maxSpeed: 48,
+    accel: 11,
+    steer: 2.0,
+    cruise: 14,
+  },
+  sports: {
+    name: 'Supercar',
+    half: [1.05, 0.38, 2.3],
+    parts: sportsParts,
+    wheels: { r: 0.36, at: [[0.95, -0.2, 1.45], [-0.95, -0.2, 1.45], [0.95, -0.2, -1.45], [-0.95, -0.2, -1.45]] },
+    seat: SPORTS_SEAT,
+    passengers: [[-0.4, -0.02, -0.25, 0.8]],
+    colors: ['#ff7a00', '#f4d03f', '#7ed321', '#e8202a', '#f2f2f2'],
+    maxSpeed: 62,
+    accel: 16,
+    steer: 2.6,
+    cruise: 15,
   },
 }
 

@@ -188,6 +188,63 @@ export const INTERIORS = {
     ],
     holdSpot: [0, -1.8], // where you stand to rob it
   },
+  // Where you wake up after being wasted. Nurse Ngozi gives out the
+  // ambulance job from the front desk.
+  hospital: {
+    name: 'LAGOS GENERAL HOSPITAL',
+    size: [22, 4.2, 16],
+    floor: '#dfe6e2',
+    wall: '#f4f8f4',
+    light: '#f4fbff',
+    props: [
+      [0, 0.55, -1, 5, 1.1, 1, '#2f8a6a', S], // front desk
+      [0, 1.12, -1, 5.1, 0.06, 1.1, '#f2f2f2'],
+      [0, 3.1, -7.85, 1.2, 0.4, 0.06, '#e8202a', G], // red cross on the back wall
+      [0, 3.1, -7.85, 0.4, 1.2, 0.06, '#e8202a', G],
+      ...rowOf(4, -8.5, 2.6, (z) => [-9, 0.32, z, 2.0, 0.64, 1.0, '#f7f7f7', S]), // beds along the left wall
+      ...rowOf(4, -8.5, 2.6, (z) => [-9.85, 0.75, z, 0.25, 0.3, 0.9, '#c9e6f2']), // pillows
+      ...rowOf(4, -8.5, 2.6, (z) => [-7.8, 0.95, z + 0.6, 0.04, 1.9, 0.04, '#b0b4b8']), // drip stands
+      ...rowOf(4, -8.5, 2.6, (z) => [-7.8, 1.8, z + 0.6, 0.18, 0.28, 0.06, '#d8f0ff', G]),
+      ...rowOf(3, -7.2, 2.6, (z) => [-8.95, 1.4, z + 1.3, 2.1, 2.2, 0.04, '#9fd0c8']), // curtains between beds
+      ...rowOf(5, 3.5, 1.2, (x) => [x, 0.24, 5.4, 0.9, 0.48, 0.9, '#3d6f8a', S]), // waiting chairs
+      [8.5, 0.9, -5.5, 1.4, 1.8, 0.7, '#e8e8e8', S], // medicine cabinet
+      [8.5, 1.4, -5.13, 1.2, 0.6, 0.02, '#a8d8e8', G],
+    ],
+    npcs: [
+      { pos: [-9.1, -8.5], y: 0.66, yaw: 0, anim: 'lie', seed: 801 },
+      { pos: [-9.1, -3.3], y: 0.66, yaw: 0, anim: 'lie', seed: 802 },
+      { pos: [4.5, -4], yaw: -Math.PI / 2, anim: 'idle', seed: 803, look: { top: '#f2f2f2', bottom: '#f2f2f2', robe: true } }, // doctor
+      { pos: [4.7, 5.4], yaw: Math.PI, anim: 'sit', seed: 804 },
+      { pos: [7.1, 5.4], yaw: Math.PI, anim: 'sit', seed: 805 },
+    ],
+  },
+  // Where you're let out after being busted.
+  police: {
+    name: 'POLICE STATION',
+    size: [20, 4, 14],
+    floor: '#9aa4ac',
+    wall: '#dfe6ee',
+    light: '#eef4ff',
+    props: [
+      [0, 0.6, -0.5, 8, 1.2, 1, '#1b2a52', S], // charge office counter
+      [0, 1.22, -0.5, 8.1, 0.05, 1.1, '#c9ccd1'],
+      [0, 3.1, -0.5, 6, 0.6, 0.08, '#1b2a52'], // sign
+      [0, 3.1, -0.45, 5.6, 0.4, 0.02, '#ffffff', G],
+      [-5, 1.6, -4.2, 9.5, 3.2, 0.06, '#5a6066'], // cell wall
+      ...rowOf(14, -9.4, 0.62, (x) => [x, 1.6, -3.4, 0.06, 3.2, 0.06, '#3a4046']), // bars
+      [-5, 0.25, -6, 3.2, 0.5, 0.8, '#7a5444', S], // bench in the cell
+      ...rowOf(4, 3.2, 1.3, (x) => [x, 0.25, 4.6, 1.1, 0.5, 0.6, '#6a5040', S]), // waiting bench
+      [7.8, 1.0, -5.5, 2.4, 2.0, 0.6, '#5a6a7a', S], // filing cabinets
+      [6, 0.4, -2.5, 1.6, 0.8, 0.9, '#7a5444', S], // desk
+      [6, 0.86, -2.5, 0.5, 0.06, 0.35, '#2a2d33'],
+    ],
+    npcs: [
+      { pos: [-1.5, -1.6], yaw: 0, anim: 'idle', seed: 901, look: { top: '#1c2333', bottom: '#1c2333', hair: 'cap', hairColor: '#1c2333' } },
+      { pos: [1.8, -1.6], yaw: 0, anim: 'idle', seed: 902, look: { top: '#1c2333', bottom: '#1c2333', hair: 'cap', hairColor: '#1c2333' } },
+      { pos: [6, -3.4], yaw: 0, anim: 'sit', seed: 903, look: { top: '#1c2333', bottom: '#1c2333' } },
+      { pos: [-5.5, -6.1], yaw: 0, anim: 'sit', seed: 904 }, // someone in the cell
+    ],
+  },
 }
 
 // Give each room a spot in the world (in a row, far below the city) and link

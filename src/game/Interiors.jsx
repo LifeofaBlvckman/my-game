@@ -66,6 +66,11 @@ function RoomPerson({ npc, index }) {
       p.armL = p.armR = -0.45
       p.foreL = p.foreR = -0.6
       p.lean = 0
+    } else if (npc.anim === 'lie') {
+      // Lying in a hospital bed (the whole body is turned flat below).
+      p.armL = p.armR = 0.1
+      p.foreL = p.foreR = -0.2
+      p.headNod = Math.sin(t * 0.6) * 0.04
     } else if (npc.anim === 'lift') {
       const k = (Math.sin(t * 1.8) + 1) / 2
       p.armL = p.armR = -0.3 - k * 2.6
@@ -74,6 +79,14 @@ function RoomPerson({ npc, index }) {
     }
     person.current?.animate(p)
   })
+  // Lying down: head on the pillow (towards -x), face up.
+  if (npc.anim === 'lie') {
+    return (
+      <group position={[npc.pos[0], npc.y ?? 0, npc.pos[1]]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+        <Person ref={person} look={look} position={[0, -0.95, 0.1]} />
+      </group>
+    )
+  }
   return <Person ref={person} look={look} position={[npc.pos[0], npc.y ?? 0, npc.pos[1]]} rotation-y={npc.yaw} />
 }
 

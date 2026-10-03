@@ -313,6 +313,21 @@ export function jingle() {
   const t = ctx.currentTime
   ;[523.3, 659.3, 784, 1046.5].forEach((f, i) => tone('triangle', f, t + i * 0.11, 0.35, 0.25))
 }
+// Dogs: a gruff "woof" (a falling tone with a breath of noise) and a yelp.
+// `near` 0..1 sets how loud, by distance.
+export function bark(near = 1) {
+  if (!ctx || near <= 0.02) return
+  const t = ctx.currentTime
+  for (let k = 0; k < 2; k++) {
+    tone('sawtooth', 420, t + k * 0.22, 0.13, 0.12 * near, master, 210)
+    hiss(t + k * 0.22, 0.1, 0.08 * near, 'bandpass', 900)
+  }
+}
+export function yelp(near = 1) {
+  if (!ctx || near <= 0.02) return
+  tone('triangle', 900, ctx.currentTime, 0.25, 0.16 * near, master, 1500)
+}
+
 // Phone sounds: a short double chirp for a text, and a ring (call it again
 // every couple of seconds while the phone rings).
 export function textTone() {

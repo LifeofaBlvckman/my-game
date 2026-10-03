@@ -20,6 +20,7 @@ import { addChat } from './net'
 import { lightFor, signals } from './signals'
 import { lineOfSight } from './sight'
 import { phone } from './phoneline'
+import { dogs, punchDogs } from './strays'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -245,8 +246,8 @@ function placeOutside(id) {
 }
 
 // Walk through a door with a quick fade to black.
-function goThrough(fn) {
-  if (useGame.getState().fade) return
+function goThrough(fn, force = false) {
+  if (useGame.getState().fade && !force) return
   useGame.setState({ fade: true })
   setTimeout(() => {
     fn()
@@ -580,6 +581,8 @@ function resolvePunch() {
   }
 
   if (world.net?.punchPlayers(px, pz)) return landed(px, pz)
+  // A dog: it yelps and runs (no damage).
+  if (punchDogs(px, pz, world.focus)) return landed(px, pz)
 
   const npc = npcNear(px, pz, 0.9)
   if (npc) {
@@ -644,11 +647,15 @@ function getWasted() {
   setTimeout(() => {
     if (useGame.getState().mode === 'car') exitCar()
     world.playerDown = 0
-    world.player.setTranslation({ x: city.spawn[0], y: city.spawn[1], z: city.spawn[2] }, true)
-    world.player.setLinvel({ x: 0, y: 0, z: 0 }, true)
     if (world.carWrecked) resetPlayerCar()
-    const { money } = useGame.getState()
-    useGame.setState({ wasted: false, wanted: 0, health: 100, money: Math.max(0, money - 500) })
+    // You wake up in the General Hospital, patched up, with a bill.
+    goThrough(() => {
+      placeInRoom('hospital')
+      const { money } = useGame.getState()
+      const bill = Math.min(money, 500)
+      useGame.setState({ wasted: false, wanted: 0, health: 100, money: money - bill })
+      setTimeout(() => message(`LAGOS GENERAL HOSPITAL\nHOSPITAL BILL ${naira(bill)}`, '#ffffff', 3500), 600)
+    }, true)
   }, 3000)
 }
 
@@ -661,11 +668,15 @@ function getBusted() {
   message('BUSTED', '#5aa0ff', 3200)
   setTimeout(() => {
     if (useGame.getState().mode === 'car') exitCar()
-    world.player.setTranslation({ x: city.spawn[0], y: city.spawn[1], z: city.spawn[2] }, true)
-    world.player.setLinvel({ x: 0, y: 0, z: 0 }, true)
-    const { money } = useGame.getState()
     if (world.carWrecked) resetPlayerCar()
-    useGame.setState({ busted: false, wanted: 0, health: 100, money: Math.max(0, money - 1000) })
+    // A night at the station, then they let you go once the bail is paid.
+    goThrough(() => {
+      placeInRoom('police')
+      const { money } = useGame.getState()
+      const bail = Math.min(money, 1000)
+      useGame.setState({ busted: false, wanted: 0, health: 100, money: money - bail })
+      setTimeout(() => message(`RELEASED ON BAIL\n${naira(bail)}`, '#7fb3ff', 3500), 600)
+    }, true)
   }, 3000)
 }
 
@@ -1035,6 +1046,8 @@ export default function GameLogic() {
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
       setSignals: (t) => (signals.t = t),
+      hurt: (n) => hurtPlayer(n),
+      dogs: () => dogs.map((d) => ({ x: Math.round(d.x), z: Math.round(d.z), state: d.state, flee: d.flee > 0 })),
       pin: () => world.pin && { x: Math.round(world.pin.x), z: Math.round(world.pin.z), name: world.pin.name },
       placeCar: (x, z, yaw) => {
         world.carSkipCrash = performance.now() + 800
