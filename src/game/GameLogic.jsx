@@ -8,7 +8,8 @@ import { alightRiders, callBoarders, dismissRiders, copsGrabbing, deployCop, eje
 import { WORLD } from './City'
 import { WATER_Y } from './Water'
 import { INTERIORS, mapSpot, roomExit, roomPoint, roomSpawn } from './rooms'
-import { activeJob, activeTarget, CHATTER, NPCS, QUESTS, SIDE_JOBS, STRANGER_LINES } from './quests'
+import { activeJob, activeTarget, CHATTER, npcAround, NPCS, QUESTS, SIDE_JOBS, STRANGER_LINES } from './quests'
+import { brawl, endBrawl, endChase, fugitive, startBrawl, startChase, updateBrawl, updateChase } from './pursuit'
 import { VEHICLES } from './vehicleTypes'
 import { alarm, blip, bust, clang, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn, whistle, setRain, thunder } from './audio'
 import { CAR_HP, damagePlayerCar, damageVehicle, hurtPlayer } from './damage'
@@ -144,6 +145,18 @@ function updateEscape(game, dt, focus) {
 function startStep(def) {
   // Being handed something for this step (the pepper, the flash drive...).
   if (def?.handed) setTimeout(() => banner(def.handed), 1800)
+  // Set pieces: the police turn up, a car to chase, a fight.
+  if (def?.startWanted) {
+    alarm()
+    addWanted(Math.max(0, def.startWanted - useGame.getState().wanted))
+  }
+  if (def?.brawl) {
+    const nk = NPCS.nkechi.pos
+    const at = def.brawl.at === 'fugitive' && fugitive.active ? { x: fugitive.x, z: fugitive.z } : def.brawl.at === 'market' ? { x: nk[0] + 7, z: nk[1] + 0.5 } : (def.brawl.at ?? { x: world.focus.x, z: world.focus.z })
+    startBrawl(def.brawl, at)
+  } else if (brawl.active) endBrawl()
+  if (def?.chase) startChase(def.chase)
+  else if (!(def?.brawl?.at === 'fugitive')) endChase()
   world.holdTime = 0
   world.stepDeadline = def?.time ? performance.now() + def.time * 1000 : null
   useGame.setState({ jobProgress: 0, collected: [], timer: def?.time ?? null })
@@ -228,8 +241,9 @@ function nearestVehicle(from) {
 
 function nearestNamedNpc(from) {
   let best = null
+  const game = useGame.getState()
   for (const [id, n] of Object.entries(NPCS)) {
-    if (!sameLevel(from, n.y ?? 0)) continue
+    if (!sameLevel(from, n.y ?? 0) || !npcAround(n, game)) continue
     const d = Math.hypot(n.pos[0] - from.x, n.pos[1] - from.z)
     // Someone behind a counter or a pulpit can be talked to from a bit further.
     if (d < (n.talkRange ?? TALK_DISTANCE) && (!best || d < best.d)) best = { id, n, d }
@@ -1024,6 +1038,29 @@ export default function GameLogic() {
             openDialogue(stepDef.talk, advanceJob)
           } else banner(`${collected.length}/${target.count}`)
         }
+      } else if (target.chase) {
+        const r = updateChase(dt, world.focus, game.mode === 'car')
+        const pct = Math.round((fugitive.close / 3.5) * 20)
+        if (pct !== game.jobProgress) useGame.setState({ jobProgress: pct })
+        if (r === 'caught') {
+          for (let k = 0; k < 6; k++) fx.smoke(fugitive.x + Math.random() - 0.5, 1.2, fugitive.z + Math.random() - 0.5, true, 0.9)
+          fx.pow(fugitive.x, 2, fugitive.z, 'CRASH!')
+          fx.shake(0.5)
+          thud()
+          message("SKIDO'S JEEP CRASHED!", '#ffd23a', 2500)
+          openDialogue(stepDef.talk, advanceJob)
+        } else if (r === 'escaped') {
+          bust()
+          message('SKIDO GOT AWAY!\nFIND HIM AGAIN', '#ff6b6b', 3000)
+        }
+      } else if (target.brawl) {
+        if (updateBrawl(world.focus, game.mode === 'foot') === 'won') {
+          jingle()
+          endChase()
+          openDialogue(stepDef.talk, advanceJob)
+        }
+      } else if (target.own && game.properties.length > 0) {
+        openDialogue(stepDef.talk, advanceJob)
       } else if (target.enter && game.inside === target.enter) {
         advanceJob()
       } else if (target.lose && game.wanted === 0) {
@@ -1055,6 +1092,7 @@ export default function GameLogic() {
       }
     }
     if (!target?.hold && game.hold) useGame.setState({ hold: null })
+    if (!brawl.active) updateBrawl(world.focus, game.mode === 'foot')
 
     // Into the lagoon or the sea. On foot you just swim (Player.jsx); a car
     // sinks, you swim out, and it's towed back home.
@@ -1187,6 +1225,8 @@ export default function GameLogic() {
       setWanted: (n) => useGame.setState({ wanted: n }),
       gangs: () => gangs.map((g) => ({ id: g.id, x: g.x, z: g.z, state: g.state, members: g.members.map((n) => ({ x: n.x, z: n.z, down: n.down, fight: n.fight, hp: n.hp })) })),
       trespass: () => !!world.trespass,
+      fugitive: () => ({ active: fugitive.active, x: fugitive.x, z: fugitive.z, running: fugitive.running, close: fugitive.close, crashed: fugitive.crashed, leg: fugitive.leg }),
+      brawlers: () => npcs.filter((n) => n.brawler).map((n) => ({ active: n.active, x: n.x, z: n.z, down: n.down, beaten: n.beaten, fight: n.fight, hp: n.hp })),
       setSignals: (t) => (signals.t = t),
       setRain: (v) => (weather.forced = v),
       rain: () => ({ rain: weather.rain, target: weather.target }),

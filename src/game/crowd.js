@@ -116,6 +116,13 @@ function fullHp(n) {
 }
 const PUNCH = { bouncer: 12, thug: 9, soldier: 14 }
 
+// Fighters a mission sends at you (Skido and his boys, the area boys at the
+// market). Hidden until a job needs them (pursuit.js).
+export const SKIDO_LOOK = { face: 3, female: false, hair: 'cap', hairColor: '#e04848', top: '#111111', bottom: '#2a2633', shoes: '#f2efe8', skin: '#4a2c1c', robe: false, hood: false, height: 1.04 }
+for (let k = 0; k < 4; k++) {
+  npcs.push({ kind: 'idle', role: 'thug', brawler: true, active: false, look: k === 0 ? SKIDO_LOOK : thugLook(rand), x: 0, z: 0, y: SIDEWALK_Y })
+}
+
 // Common per-NPC state.
 npcs.forEach((n) => {
   n.yaw ??= 0

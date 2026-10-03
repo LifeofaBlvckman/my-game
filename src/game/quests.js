@@ -1,10 +1,12 @@
 import { BEACH, BLOCK, blockX, blockZ, city, ISLAND, ISLAND_FIRST, MAINLAND, roadX, roadZ, SIDEWALK_Y, zoneAt } from './cityData'
 import { INTERIORS, roomPoint } from './rooms'
+import { brawlTarget, chaseProgress, fugitive } from './pursuit'
 
 // Named characters with something to say. Outdoor ones stand by the
 // landmarks they belong to; some live inside buildings (`room`).
 const front = (j) => blockZ(j) + BLOCK / 2
 const stop = (name) => city.busStops.find((s) => s.name === name)
+const bankDoor = city.doors.find((d) => d.id === 'bank')
 const inRoom = (id, x, z, y = 0) => {
   const p = roomPoint(INTERIORS[id], x, z, y)
   return { pos: [p[0], p[2]], y: p[1], room: id }
@@ -103,8 +105,20 @@ export const NPCS = {
     pos: [blockX(ISLAND_FIRST + 1) - 5, front(4) - 1.8],
     yaw: 0,
     look: { female: false, face: 3, hair: 'cap', hairColor: '#e04848', top: '#111111', bottom: '#2a2633', robe: false, height: 1.04 },
+    goneAt: 6, // after the bank job he disappears with the money (Double Cross)
+  },
+  // The cashier at No Wahala Bank: Skido's "inside person".
+  chioma: {
+    name: 'Chioma',
+    pos: [bankDoor.x + 4.5, bankDoor.z + 0.4],
+    yaw: Math.PI,
+    look: { female: true, face: 13, hair: 'braids', top: '#0d2a4a', bottom: '#1c2333', robe: false, height: 0.96 },
+    from: 5, // only once you know about the bank job
   },
 }
+
+// Is this character out and about right now?
+export const npcAround = (n, game) => (n.goneAt === undefined || game.quest < n.goneAt) && (n.from === undefined || game.quest >= n.from)
 
 // Little stalls for the characters who work on the street.
 Object.values(NPCS).forEach((n) => {
@@ -132,6 +146,10 @@ const line = (speaker, text) => ({ speaker, text })
 //   { lose: true }                lose the police
 //   { pickup: stopName, count }   load passengers at a bus stop
 //   { dropoff: stopName }         let them off at another stop
+//   { startWanted: n }            (with any step) the police come for you as it starts
+//   { chase: { route } }          run a fleeing car off the road (pursuit.js)
+//   { brawl: { boss, goons } }    beat up whoever turns up (boss: flooring the first one ends it)
+//   { own: true }                 buy a house or the garage
 // `talk` lines play when a step completes.
 export const QUESTS = [
   {
@@ -288,6 +306,98 @@ export const QUESTS = [
       },
     ],
   },
+  {
+    title: 'Double Cross',
+    giver: 'chioma',
+    reward: 80000,
+    start: [
+      line('Chioma', '{name}! Thank God. Abeg come here, make nobody hear us.'),
+      line('Chioma', 'Skido never pay me one kobo. E don carry the whole bank money, and e dey tell people say na YOU rob the bank.'),
+      line(P, 'Skido? After everything? Fifty-fifty, na wetin we talk.'),
+      line('Chioma', 'E dey hide for him garage for Ikeja. Go meet am before e japa. But {my guy|my sister}... shine your eye.'),
+    ],
+    steps: [
+      {
+        goto: HIDEOUT,
+        objective: 'FIND SKIDO AT SKIDO MOTORS IN IKEJA',
+        talk: [
+          line('Mechanic', 'Skido? E just comot now now. E say if anybody come find am, make I call police.'),
+          line('Mechanic', '...and I don call them already. Sorry o, na work.'),
+          line(P, 'Skido sell me?!'),
+        ],
+      },
+      { lose: true, startWanted: 3, objective: 'SKIDO SOLD YOU OUT! LOSE THE POLICE' },
+      {
+        chase: { route: [[1, 1], [4, 1], [4, 3], [2, 3], [2, 5], [5, 5], [5, 7], [1, 7], [1, 5], [3, 5]], speed: 13, type: 'jeep', color: '#111111' },
+        vehicle: true,
+        objective: "SKIDO IS RUNNING IN A BLACK JEEP. GET A CAR, CATCH HIM AND RUN HIM OFF THE ROAD",
+        talk: [line('Chioma (phone)', 'I see am for my tracker... e don crash! Na your chance, no let am run!')],
+      },
+      {
+        brawl: { boss: true, goons: 2, at: 'fugitive' },
+        objective: 'SKIDO AND HIS BOYS JUMPED OUT. BEAT SKIDO',
+        talk: [
+          line('Skido', 'Abeg! Abeg! Take am, take everything! Na devil push me.'),
+          line(P, 'We be brothers, Skido. You for just talk.'),
+          line('Skido', 'I go comot Lagos today. You no go ever see my face again.'),
+        ],
+      },
+      {
+        npc: 'chioma',
+        carry: 'moneybag',
+        handed: 'YOU TAKE BACK THE BAG OF MONEY',
+        objective: 'BRING THE MONEY TO CHIOMA AT MARINA',
+        talk: [
+          line('Chioma', 'You get am! Ah, {name}, you be real one.'),
+          line('Chioma', 'Half for you, half for me. We go forget Skido like bad dream.'),
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Market Wahala',
+    giver: 'nkechi',
+    reward: 15000,
+    start: [
+      line('Mama Nkechi', '{name}, see trouble! Some area boys dey collect money from every trader for this market.'),
+      line('Mama Nkechi', 'Dem don seize Iya Ronke tomatoes. Abeg, you get strong hand. Pursue them comot here!'),
+    ],
+    steps: [
+      {
+        brawl: { goons: 3, at: 'market' },
+        objective: 'CHASE THE AREA BOYS OUT OF OJA OBA MARKET',
+        talk: [line('Area boy', 'Ehn! Ehn! We don hear, we no go come back again!')],
+      },
+      {
+        npc: 'nkechi',
+        objective: 'TELL MAMA NKECHI THEY ARE GONE',
+        talk: [
+          line('Mama Nkechi', 'See as dem run! You be lion, {my son|my daughter}.'),
+          line('Mama Nkechi', 'All the traders contribute something for you. Take am.'),
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Landlord',
+    giver: 'mama',
+    reward: 10000,
+    start: [
+      line('Mama', '{name}, I hear say you don dey make money for Lagos now. Na wetin you dey do with am?'),
+      line('Mama', 'Money wey you no use buy property na water wey you pour for sand. Go get your own place.'),
+      line('Mama', 'Yaba Flats dey sell one room for ₦25,000. Or if your hand reach, Lekki. Or at least buy garage.'),
+    ],
+    steps: [
+      {
+        own: true,
+        objective: 'BUY YOUR OWN PLACE (LOOK FOR THE "FOR SALE" BOARDS)',
+        talk: [
+          line('Mama (phone)', 'My {son|daughter} don become landlord! I go tell everybody for church.'),
+          line('Mama (phone)', 'Here, small something to furnish am. No forget your mama o.'),
+        ],
+      },
+    ],
+  },
 ]
 
 // Waking up at home: Mama sends Tunde out for the day.
@@ -412,14 +522,14 @@ export function activeJob(game) {
 // What the player should be doing right now, and where the marker goes.
 export function activeTarget(game) {
   const a = activeJob(game)
-  return a ? jobTarget(a.job, a.step, game.inside, game.jobProgress ?? 0, game.collected) : null
+  return a ? jobTarget(a.job, a.step, game.inside, game.jobProgress ?? 0, game.collected, game) : null
 }
 
 export function currentTarget(questIndex, step, inside = null) {
   return jobTarget(QUESTS[questIndex], step, inside)
 }
 
-function jobTarget(q, step, inside = null, progress = 0, collected = null) {
+function jobTarget(q, step, inside = null, progress = 0, collected = null, game = null) {
   if (!q) return null
   if (step < 0) {
     const g = NPCS[q.giver]
@@ -441,6 +551,20 @@ function jobTarget(q, step, inside = null, progress = 0, collected = null) {
     return { hold: s.hold, seconds: s.seconds, ...placeFor(s.hold, p[0], p[2], inside), spot: { x: p[0], z: p[2], y: p[1] }, objective: s.objective }
   }
   if (s.lose) return { lose: true, objective: s.objective }
+  if (s.chase) {
+    const at = fugitive.active ? fugitive : { x: roadX(s.chase.route[0][0]), z: roadZ(s.chase.route[0][1]) }
+    const pct = Math.round(chaseProgress() * 100)
+    return { chase: true, vehicle: s.vehicle, x: at.x, z: at.z, objective: pct > 0 ? `RUN SKIDO OFF THE ROAD! STAY CLOSE (${pct}%)` : s.objective }
+  }
+  if (s.brawl) {
+    const at = brawlTarget() ?? { x: 0, z: 0 }
+    return { brawl: true, x: at.x, z: at.z, objective: s.objective }
+  }
+  if (s.own) {
+    const owned = game?.properties ?? []
+    const forSale = city.properties.filter((p) => !owned.includes(p.id)).sort((a, b) => a.price - b.price)[0]
+    return { own: true, x: forSale?.x, z: forSale?.z, objective: s.objective }
+  }
   if (s.checkpoints) {
     const at = s.checkpoints[Math.min(progress, s.checkpoints.length - 1)]
     const next = s.checkpoints[progress + 1]

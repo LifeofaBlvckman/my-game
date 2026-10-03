@@ -4,7 +4,7 @@ import { Billboard } from '@react-three/drei'
 import { CanvasTexture, SRGBColorSpace } from 'three'
 import Person from './Person'
 import { Blob } from './Shadows'
-import { activeTarget, NPCS, SIDE_JOBS } from './quests'
+import { activeTarget, npcAround, NPCS, SIDE_JOBS } from './quests'
 import { computePose, lookFromSeed } from './people'
 import { unlit } from './materials'
 import { useGame } from './state'
@@ -123,9 +123,11 @@ export default function NamedNpcs() {
   const offering = new Set(sideJob ? [] : SIDE_JOBS.map((j) => j.giver))
   return (
     <group>
-      {Object.entries(NPCS).map(([id, n]) => (
-        <Npc key={id} id={id} n={n} active={target?.npc === id} offering={offering.has(id)} />
-      ))}
+      {Object.entries(NPCS)
+        .filter(([, n]) => npcAround(n, useGame.getState()))
+        .map(([id, n]) => (
+          <Npc key={id} id={id} n={n} active={target?.npc === id} offering={offering.has(id)} />
+        ))}
       {target?.goto && <Checkpoint x={target.x} z={target.z} />}
       {target?.checkpoints && <Checkpoint key={`c${target.done}`} x={target.x} z={target.z} radius={target.vehicle ? 6 : 3.5} />}
       {target?.checkpoints && target.next && <Checkpoint key={`n${target.done}`} x={target.next.x} z={target.next.z} radius={target.vehicle ? 6 : 3.5} faint />}

@@ -18,6 +18,7 @@ import DayNight from './game/DayNight'
 import InkOutlines from './game/InkOutlines'
 import Effects from './game/Effects'
 import RemotePlayers from './game/RemotePlayers'
+import Fugitive from './game/Fugitive'
 import ShadowCasters from './game/ShadowCasters'
 import Interiors from './game/Interiors'
 import Hud from './game/Hud'
@@ -94,6 +95,7 @@ export default function App() {
             <Car />
             <Interiors />
             <RemotePlayers />
+            <Fugitive />
             <Effects />
             <CameraRig />
             <GameLogic />
