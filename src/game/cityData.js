@@ -230,6 +230,122 @@ function addCivicBuildings(city) {
   }
 }
 
+// Ikeja Cantonment: an army barracks in a walled compound. Two long halls,
+// a parade ground with soldiers drilling, a watchtower, a flag and army
+// trucks. The gate faces the road; walking (or driving) in is trespassing.
+const BARRACKS_BLOCK = [0, 1]
+function addBarracks(city) {
+  const inBlock = (o, x, z, pad = 0) => Math.abs(o.x - x) < BLOCK / 2 + pad && Math.abs(o.z - z) < BLOCK / 2 + pad
+  const x = blockX(BARRACKS_BLOCK[0])
+  const z = blockZ(BARRACKS_BLOCK[1])
+  city.buildings = city.buildings.filter((b) => !inBlock(b, x, z))
+  city.tanks = city.tanks.filter((t) => !inBlock(t, x, z))
+  city.signs = city.signs.filter((g) => !(g.legs && inBlock(g, x, z)))
+  city.parkedCars = city.parkedCars.filter((p) => !inBlock(p, x, z))
+  city.trees = city.trees.filter((t) => !inBlock(t, x, z, -3.2))
+  const H = BLOCK / 2 - 3.2 // the wall, just inside the pavement
+  const GATE = 3.6 // half the gate opening
+  const WALL = '#c9c0a8'
+  const OLIVE = '#56603f'
+  const solid = (o) => city.solids.push({ collider: true, ...o })
+  // Keep the pavement in front of the gate clear for the trucks.
+  const gateway = (o) => Math.abs(o.x - x) < GATE + 4 && Math.abs(o.z - (z + H)) < 4.5
+  city.flowerBeds = city.flowerBeds.filter((o) => !gateway(o))
+  city.flowers = city.flowers.filter((o) => !gateway(o))
+  city.trees = city.trees.filter((o) => !gateway(o))
+  // Perimeter wall with a white band, and a gap for the gate at the front.
+  solid({ x, z: z - H, w: H * 2, d: 0.4, h: 2.6, color: WALL })
+  solid({ x: x - H, z, w: 0.4, d: H * 2, h: 2.6, color: WALL })
+  solid({ x: x + H, z, w: 0.4, d: H * 2, h: 2.6, color: WALL })
+  const side = (H - GATE) / 2
+  solid({ x: x - GATE - side, z: z + H, w: side * 2, d: 0.4, h: 2.6, color: WALL })
+  solid({ x: x + GATE + side, z: z + H, w: side * 2, d: 0.4, h: 2.6, color: WALL })
+  for (const k of [-1, 1]) {
+    solid({ x: x + k * (GATE + 0.3), z: z + H, w: 0.7, d: 0.7, h: 3.6, color: '#e9e4d6' }) // gate pillars
+    city.solids.push({ x: x + k * (GATE + 0.3), z: z + H, w: 0.8, d: 0.8, h: 0.2, color: OLIVE, y: 3.6 })
+  }
+  city.solids.push({ x, z: z + H, w: GATE * 2 + 1.4, d: 0.5, h: 0.5, color: OLIVE, y: 3.4 }) // arch
+  // Red and white boom barrier, raised for the trucks.
+  for (let k = 0; k < 6; k++) city.solids.push({ x: x - GATE + 0.6, z: z + H + 0.5, w: 0.14, d: 0.14, h: 0.6, color: k % 2 ? '#f4f4f0' : '#c8202a', y: 1 + k * 0.6 })
+  city.solids.push({ x: x - GATE + 0.6, z: z + H + 0.5, w: 0.4, d: 0.4, h: 1, color: '#2b2b26' })
+  // Sentry box by the gate, and sandbags.
+  solid({ x: x + GATE + 2.2, z: z + H - 1.6, w: 1.6, d: 1.6, h: 2.4, color: OLIVE })
+  city.solids.push({ x: x + GATE + 2.2, z: z + H - 1.6, w: 2, d: 2, h: 0.18, color: '#3e4530', y: 2.4 })
+  city.solids.push({ x: x + GATE + 2.2, z: z + H - 0.79, w: 1.1, d: 0.04, h: 0.6, color: '#bfe3ef', y: 1.3 })
+  for (const k of [-1, 1]) solid({ x: x + k * (GATE - 1.4), z: z + H - 3, w: 1.8, d: 0.8, h: 0.9, color: '#a8946a' })
+  // The halls (with windows), and their tin roofs.
+  city.buildings.push({ x: x - 5.5, z: z - 9.5, w: 15, d: 8, h: 5, color: '#8a8f6a', landmark: true })
+  city.buildings.push({ x: x + 9, z: z - 9.5, w: 9, d: 8, h: 5, color: '#8a8f6a', landmark: true })
+  city.solids.push({ x: x - 5.5, z: z - 9.5, w: 15.8, d: 8.8, h: 0.25, color: '#6f7a5a', y: 5 })
+  city.solids.push({ x: x + 9, z: z - 9.5, w: 9.8, d: 8.8, h: 0.25, color: '#6f7a5a', y: 5 })
+  city.solids.push({ x: x - 5.5, z: z - 5.48, w: 2.4, d: 0.1, h: 2.6, color: '#ffd9a0', emissive: true })
+  city.signs.push({ text: '72 BATTALION', x: x - 5.5, y: 3.8, z: z - 5.38, rot: 0, w: 6, h: 0.9, bg: OLIVE, fg: '#ffffff' })
+  // Parade ground and the flag.
+  city.solids.push({ x: x - 2, z: z + 2, w: 17, d: 10, h: 0.05, color: '#d6d0bf', y: 0.12 })
+  solid({ x: x - 2, z: z + 9, w: 0.18, d: 0.18, h: 9, color: '#e6e6e6' })
+  city.solids.push({ x: x - 2, z: z + 9, w: 1.2, d: 1.2, h: 0.4, color: '#e9e4d6' })
+  ;['#1f8a3a', '#f7f7f2', '#1f8a3a'].forEach((color, k) => city.solids.push({ x: x - 1.32 + k * 0.42, z: z + 9, w: 0.42, d: 0.04, h: 1.3, color, y: 7.4 }))
+  // Watchtower in the front corner: four legs, a deck, a rail and a roof,
+  // with a searchlight.
+  const tx = x - H + 3
+  const tz = z + H - 3.4
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) solid({ x: tx + a * 1.3, z: tz + b * 1.3, w: 0.25, d: 0.25, h: 6, color: '#5b4a35' })
+  city.solids.push({ x: tx, z: tz, w: 3.4, d: 3.4, h: 0.25, color: '#6b5640', y: 6 })
+  for (const [a, b, w, d] of [[0, -1.6, 3.4, 0.12], [0, 1.6, 3.4, 0.12], [-1.6, 0, 0.12, 3.4], [1.6, 0, 0.12, 3.4]]) city.solids.push({ x: tx + a, z: tz + b, w, d, h: 1, color: OLIVE, y: 6.25 })
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) city.solids.push({ x: tx + a * 1.55, z: tz + b * 1.55, w: 0.12, d: 0.12, h: 1.9, color: '#5b4a35', y: 6.25 })
+  city.solids.push({ x: tx, z: tz, w: 4, d: 4, h: 0.22, color: '#4d5639', y: 8.15 })
+  city.solids.push({ x: tx + 1.2, z: tz + 1.6, w: 0.5, d: 0.3, h: 0.35, color: '#fff7c0', y: 7.4, emissive: true })
+  // Signs: over the gate, and a warning on the wall.
+  city.signs.push({ text: 'NIGERIAN ARMY\nIKEJA CANTONMENT', x, y: 4.5, z: z + H + 0.3, rot: 0, w: 8, h: 1.5, bg: '#3e4530', fg: '#ffffff' })
+  city.signs.push({ text: 'MILITARY ZONE\nNO ENTRY', x: x + GATE + side, y: 1.4, z: z + H + 0.22, rot: 0, w: 3.6, h: 1.1, bg: '#c8202a', fg: '#ffffff' })
+  // Army trucks.
+  city.parkedCars.push({ x: x + 7, z: z + 3.5, yaw: 0, type: 'truck', color: '#4b5536' })
+  city.parkedCars.push({ x: x + 11, z: z + 3.5, yaw: 0, type: 'truck', color: '#4b5536' })
+  // Soldiers: two at the gate, a squad drilling, their sergeant, and one up
+  // the tower.
+  const y = SIDEWALK_Y
+  city.idlers.push({ x: x - GATE - 0.9, z: z + H + 1, y, yaw: 0, role: 'soldier' })
+  city.idlers.push({ x: x + GATE + 0.9, z: z + H + 1, y, yaw: 0, role: 'soldier' })
+  for (let k = 0; k < 4; k++) city.idlers.push({ x: x - 6.5 + k * 2.4, z: z + 1.5, y: 0.17, yaw: 0, role: 'soldier', drill: true })
+  city.idlers.push({ x: x - 2.9, z: z + 5.6, y: 0.17, yaw: Math.PI, role: 'soldier' })
+  city.idlers.push({ x: tx, z: tz, y: 6.25, yaw: 0, role: 'soldier', lookout: true })
+  city.barracks = { x, z, half: H, gateX: x, gateZ: z + H, name: 'IKEJA CANTONMENT' }
+}
+
+// Area boys: little gangs on street corners who want you to "settle" them.
+const GANG_BLOCKS = [[1, 4], [3, 3], [4, 5], [0, 6], [2, 1], [4, 0]]
+function addAreaBoys(city) {
+  city.gangs = []
+  const clear = (x, z) =>
+    city.trees.every((t) => Math.hypot(t.x - x, t.z - z) > 1.5) &&
+    city.lamps.every((l) => Math.hypot(l.x - x, l.z - z) > 1.2) &&
+    city.doors.every((d) => Math.hypot(d.x - x, d.z - z) > 8) &&
+    city.busStops.every((b) => Math.hypot(b.x - x, b.z - z) > 8) &&
+    city.foodSpots.every((f) => Math.hypot(f.x - x, f.z - z) > 5) &&
+    city.stopSigns.every((g) => Math.hypot(g.x - x, g.z - z) > 1.5) &&
+    city.flowerBeds.every((b) => Math.abs(b.x - x) > b.w / 2 + 1 || Math.abs(b.z - z) > b.d / 2 + 1) &&
+    (city.wardens ?? []).every((w) => Math.hypot(w.x - x, w.z - z) > 6) &&
+    city.footbridges.every((f) => Math.hypot(f.x - x, f.z - z) > 16)
+  for (const [i, j] of GANG_BLOCKS) {
+    const bx = blockX(i)
+    const bz = blockZ(j)
+    const inset = BLOCK / 2 - 1.6
+    for (const [sx, sz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const x = bx + sx * inset
+      const z = bz + sz * inset
+      if (!clear(x, z)) continue
+      const id = city.gangs.length
+      city.gangs.push({ id, x, z })
+      // Three of them loafing about the corner, facing the street.
+      const out = Math.atan2(sx, sz)
+      ;[[0, 0], [-sx * 1.3, 0.5 * sz], [0.5 * sx, -sz * 1.3]].forEach(([dx, dz], k) =>
+        city.idlers.push({ x: x + dx, z: z + dz, y: SIDEWALK_Y, yaw: out + (k - 1) * 0.6, role: 'thug', gang: id, lead: k === 0 }),
+      )
+      break
+    }
+  }
+}
+
 // Raised footbridges over busy roads: a deck high enough for a danfo to pass
 // under, with a ramp up from the pavement on each side. One on the Mainland,
 // two on the Island. Each crosses an "x" road (one running along x), part
@@ -375,6 +491,7 @@ function addStreetDetails(city, rand) {
   }
 
   addCivicBuildings(city)
+  addBarracks(city)
   addFootbridges(city)
 
   // LASTMA wardens at some of the junctions with lights, on a corner.
@@ -391,6 +508,7 @@ function addStreetDetails(city, rand) {
     city.wardens.push({ x, z, nx, nz })
     city.idlers.push({ x, z, y: SIDEWALK_Y, yaw: Math.atan2(nx - x, nz - z), role: 'warden' })
   }
+  addAreaBoys(city)
 }
 
 export function generateCity(seed = 2026) {

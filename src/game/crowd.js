@@ -1,5 +1,5 @@
 import { BEACH, BLOCK, city, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
-import { COP_LOOK, lookFromSeed, randomLook, WARDEN_LOOK } from './people'
+import { COP_LOOK, lookFromSeed, randomLook, SOLDIER_LOOK, thugLook, WARDEN_LOOK } from './people'
 import { weather } from './weather'
 
 // Crowd simulation. Plain objects updated every frame; Pedestrians.jsx draws them.
@@ -66,8 +66,12 @@ city.idlers.forEach((spot, k) => {
           ? { ...WARDEN_LOOK, face: k % 6 }
           : spot.role === 'cop-guard'
             ? { ...COP_LOOK }
-          : randomLook(rand)
-  npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role, home: { ...spot } })
+            : spot.role === 'soldier'
+              ? { ...SOLDIER_LOOK, face: [3, 0, 5, 1, 6][k % 5], height: 1.0 + (k % 3) * 0.03 }
+              : spot.role === 'thug'
+                ? thugLook(rand)
+                : randomLook(rand)
+  npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role, gang: spot.gang, lead: spot.lead, drill: spot.drill, lookout: spot.lookout, home: { ...spot } })
 })
 
 city.wanderAreas.forEach((area) => {
@@ -105,6 +109,13 @@ for (let k = 0; k < COPS; k++) {
   npcs.push({ kind: 'cop', role: 'cop', look: { ...COP_LOOK, height: 0.98 + k * 0.015 }, active: false, x: 0, z: 0, y: 0 })
 }
 
+// How many punches it takes to floor someone, and how hard they hit back.
+const HARD = new Set(['bouncer', 'thug', 'soldier'])
+function fullHp(n) {
+  return { bouncer: 4, cop: 3, thug: 3, soldier: 5 }[n.role] ?? 2
+}
+const PUNCH = { bouncer: 12, thug: 9, soldier: 14 }
+
 // Common per-NPC state.
 npcs.forEach((n) => {
   n.yaw ??= 0
@@ -116,9 +127,10 @@ npcs.forEach((n) => {
   n.fight = 0 // seconds left fighting the player
   n.punchT = -1
   n.punchCooldown = 0
-  n.hp = n.role === 'bouncer' ? 4 : n.role === 'cop' ? 3 : 2
-  // Bouncers always fight back; about one in four others will too.
-  n.tough = n.role === 'bouncer' || (n.role !== 'trader' && n.role !== 'cop' && rand() < 0.25)
+  n.hp = fullHp(n)
+  // Bouncers, area boys and soldiers always fight back; about one in four
+  // others will too.
+  n.tough = HARD.has(n.role) || (n.role !== 'trader' && n.role !== 'cop' && rand() < 0.25)
   n.vx = 0
   n.vz = 0
   n.ox = 0 // push offset (from the player bumping into them)
@@ -155,7 +167,7 @@ export function knockDown(n, dx, dz, force) {
   n.down = 5
   n.fight = 0
   n.punchT = -1
-  n.hp = n.role === 'bouncer' ? 4 : n.role === 'cop' ? 3 : 2
+  n.hp = fullHp(n)
   n.yaw = Math.atan2(-dx, -dz) // fall away from the hit
   panicAround(n)
 }
@@ -523,12 +535,12 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
       if (n.punchT >= 0) {
         const before = n.punchT
         n.punchT += dt * 3
-        if (before < 0.5 && n.punchT >= 0.5 && d < FIGHT_RANGE + 0.4) events.push({ type: 'npcPunch', x: n.x, z: n.z, damage: n.role === 'bouncer' ? 12 : 7 })
+        if (before < 0.5 && n.punchT >= 0.5 && d < FIGHT_RANGE + 0.4) events.push({ type: 'npcPunch', x: n.x, z: n.z, damage: PUNCH[n.role] ?? 7 })
         if (n.punchT > 1) n.punchT = -1
       } else if (d < FIGHT_RANGE + 0.2 && n.punchCooldown <= 0) {
         n.punchT = 0
         n.punchSide = -(n.punchSide ?? 1)
-        n.punchCooldown = n.role === 'bouncer' ? 0.8 : 1.1
+        n.punchCooldown = n.role === 'bouncer' || n.role === 'soldier' ? 0.8 : 1.1
       }
     } else if (n.fight > 0) {
       n.fight = 0

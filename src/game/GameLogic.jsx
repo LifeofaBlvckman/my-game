@@ -23,6 +23,7 @@ import { lineOfSight } from './sight'
 import { phone } from './phoneline'
 import { dogs, punchDogs } from './strays'
 import { updateWeather, weather } from './weather'
+import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks } from './streetlife'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -505,6 +506,7 @@ function interact() {
   if (game.inside && nearExit()) return goThrough(() => placeOutside(game.inside))
   const thing = nearUsable()
   if (thing) return useThing(thing)
+  if (!game.inside && gangAsking()) return settleGang()
   const door = !game.inside && nearDoor(world.focus)
   if (door) return goThrough(() => placeInRoom(door.id))
   const near = nearestNamedNpc(world.focus)
@@ -843,6 +845,9 @@ export default function GameLogic() {
     }
     updateEscape(game, dt, copsAim)
     checkRedLights(game)
+    // Area boys on the corners, and soldiers guarding the barracks.
+    updateAreaBoys(dt, game, world.focus)
+    updateBarracks(dt, game, world.focus, addWanted)
 
     // Passengers: stop your danfo or keke at a bus stop to let riders off
     // (they pay) and take on whoever is waiting.
@@ -1009,6 +1014,7 @@ export default function GameLogic() {
       else if (thing === 'laptop') (prompt = 'Press E to decorate your room'), act('KeyE', '🛋️', 'Decorate')
       else if (thing === 'bed') (prompt = 'Press E to sleep until morning'), act('KeyE', '🛏️', 'Sleep')
       else if (thing === 'bench') (prompt = 'Press E to work out'), act('KeyE', '🏋️', 'Lift')
+      else if (!game.inside && gangAsking()) (prompt = `Press E to settle the area boys (${naira(SETTLE)})`), act('KeyE', '💸', 'Settle')
       else if (door) (prompt = `Press E to enter ${door.name}`), act('KeyE', '🚪', 'Enter')
       else if (npc) (prompt = `Press E to talk to ${npc.n.name}`), act('KeyE', '💬', 'Talk')
       else if (car?.wrecked) prompt = 'This car is wrecked. Find another one.'
@@ -1080,6 +1086,8 @@ export default function GameLogic() {
       },
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
+      gangs: () => gangs.map((g) => ({ id: g.id, x: g.x, z: g.z, state: g.state, members: g.members.map((n) => ({ x: n.x, z: n.z, down: n.down, fight: n.fight, hp: n.hp })) })),
+      trespass: () => !!world.trespass,
       setSignals: (t) => (signals.t = t),
       setRain: (v) => (weather.forced = v),
       rain: () => ({ rain: weather.rain, target: weather.target }),

@@ -130,6 +130,46 @@ export default function Pedestrians() {
           pose.foreL = -0.1
           pose.twist = Math.sin(time * 0.4 + i) * 0.5
         }
+        const calm = !poseIn.moving && n.down <= 0 && !(n.panic > 0) && !(n.fight > 0)
+        if (n.role === 'soldier' && calm) {
+          if (n.drill) {
+            // Drill: marching on the spot, arms swinging stiff, in step.
+            const step = Math.sin(time * 4.2)
+            pose.legL = -0.55 * Math.max(0, step)
+            pose.legR = -0.55 * Math.max(0, -step)
+            pose.shinL = 0.9 * Math.max(0, step)
+            pose.shinR = 0.9 * Math.max(0, -step)
+            pose.armL = 0.6 * step
+            pose.armR = -0.6 * step
+            pose.foreL = pose.foreR = -0.05
+          } else if (n.lookout) {
+            // Up the tower, scanning the street.
+            pose.twist = Math.sin(time * 0.35 + i) * 0.7
+            pose.armR = -2.6
+            pose.foreR = -1.6
+          } else {
+            // At attention by the gate.
+            pose.armL = pose.armR = 0
+            pose.foreL = pose.foreR = -0.05
+            pose.splayL = 0.04
+            pose.splayR = -0.04
+          }
+        } else if (n.role === 'thug' && calm) {
+          if (n.demanding) {
+            // "Settle us!": one hand out, palm up, the other waving.
+            pose.armR = -1.25
+            pose.foreR = -0.35
+            pose.armL = -0.9 + Math.sin(time * 5 + i) * 0.3
+            pose.foreL = -1.3
+            pose.headNod = -0.08
+          } else {
+            // Loafing: arms folded, weight shifting.
+            pose.armL = pose.armR = -0.55
+            pose.foreL = pose.foreR = -2.2
+            pose.twist = Math.sin(time * 0.6 + i * 2) * 0.15
+            pose.lean = -0.05
+          }
+        }
         if (n.grab) {
           // An officer taking hold of you.
           pose.armL = pose.armR = -1.35

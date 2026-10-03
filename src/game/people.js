@@ -35,6 +35,22 @@ export function randomLook(rand, overrides = {}) {
 // Nigeria Police Force: dark uniform and cap.
 // LASTMA traffic warden: lemon shirt, maroon trousers and beret.
 export const WARDEN_LOOK = { face: 2, female: false, top: '#f2dc3a', bottom: '#6b1f2e', hair: 'cap', hairColor: '#6b1f2e', skin: '#4a2c1c', robe: false, height: 1.0, shoes: '#111111' }
+// Nigerian Army: olive fatigues, a dark green beret and boots.
+export const SOLDIER_LOOK = { face: 3, female: false, top: '#4b5536', bottom: '#3e4530', hair: 'cap', hairColor: '#24301c', skin: '#4a2c1c', robe: false, hood: false, height: 1.04, shoes: '#1a1a14' }
+// Area boys: singlets, rough jeans, a cap turned around or a clean-shaved head.
+export function thugLook(rand) {
+  return randomLook(rand, {
+    female: false,
+    face: [0, 1, 3, 5, 6][Math.floor(rand() * 5)],
+    top: ['#f7f1e3', '#e04848', '#36324a', '#1f1a24', '#ef8a2a'][Math.floor(rand() * 5)],
+    bottom: ['#3a63a8', '#2a2633', '#5a6a7a'][Math.floor(rand() * 3)],
+    hair: rand() < 0.5 ? 'bald' : 'cap',
+    hairColor: ['#e04848', '#1f1a24', '#f4d03f'][Math.floor(rand() * 3)],
+    robe: false,
+    hood: false,
+    height: 1.02 + rand() * 0.08,
+  })
+}
 export const COP_LOOK = { face: 5, female: false, top: '#1c2333', bottom: '#1c2333', hair: 'cap', hairColor: '#1c2333', skin: '#5a3624', robe: false, height: 1.02, shoes: '#111111' }
 
 export function lookFromSeed(seed, overrides) {

@@ -107,7 +107,7 @@ export function initTraffic(spawn) {
   }
   city.parkedCars.forEach((c) => {
     const type = c.x > ISLAND.minX ? (ISLAND_PARKED[c.type] ?? c.type) : c.type
-    const v = makeVehicle(type, { state: 'parked', decor: true, x: c.x, z: c.z, yaw: c.yaw })
+    const v = makeVehicle(type, { state: 'parked', decor: true, x: c.x, z: c.z, yaw: c.yaw, ...(c.color && { color: c.color }) })
     vehicles.push(v)
   })
 }
