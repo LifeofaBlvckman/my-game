@@ -402,6 +402,36 @@
   outline: none;
 }
 
+.sign-in {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.sign-in .name-field input {
+  width: min(210px, 46vw);
+}
+.sign-in .pin input {
+  width: min(110px, 26vw);
+  letter-spacing: 4px;
+}
+.save-hint {
+  max-width: 420px;
+  margin: 10px auto 0;
+  font: 13px/1.4 Arial, Helvetica, sans-serif;
+  opacity: 0.85;
+}
+.sign-error {
+  max-width: 420px;
+  margin: 8px auto 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(200, 32, 42, 0.85);
+  font: bold 13px/1.4 Arial, Helvetica, sans-serif;
+}
+.start:disabled {
+  opacity: 0.6;
+}
+
 .chat {
   position: absolute;
   left: 24px;
@@ -573,6 +603,35 @@
 .touch-btn.small {
   order: -1;
   margin-bottom: 6px;
+}
+.touch-btn.mini {
+  width: 44px;
+  height: 44px;
+}
+.touch-btn.mini .icon {
+  font-size: 18px;
+}
+.car-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+/* Pedals: tall rounded rectangles you can rest a thumb on. */
+.touch-btn.pedal {
+  width: 70px;
+  height: 104px;
+  border-radius: 18px;
+}
+.touch-btn.pedal .icon {
+  font-size: 22px;
+}
+.touch-btn.pedal.gas {
+  background: rgba(196, 240, 190, 0.94);
+  height: 128px;
+}
+.touch-btn.pedal.brake {
+  background: rgba(255, 205, 200, 0.94);
 }
 .touch-btn:active {
   transform: translate(2px, 2px);
@@ -799,4 +858,143 @@
   font-size: 11px;
   letter-spacing: 2px;
   color: #ffd23a;
+}
+
+/* Full-screen menus: wardrobe, decorating, phone. */
+.panel-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(20, 22, 30, 0.45);
+  pointer-events: auto;
+}
+.panel {
+  width: min(560px, 100%);
+  max-height: min(640px, 100%);
+  overflow-y: auto;
+  padding: 14px;
+  border: 2px solid #3d4a5c;
+  border-radius: 14px;
+  background: #f6f6f2;
+  box-shadow: 6px 6px 0 #3d4a5c;
+  color: #3d4a5c;
+  text-shadow: none;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.panel-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.panel-money {
+  font-weight: bold;
+  color: #2a8a3a;
+}
+.panel-close {
+  width: 34px;
+  height: 34px;
+  border: 2px solid #3d4a5c;
+  border-radius: 8px;
+  background: #fff;
+  color: #3d4a5c;
+  font-size: 16px;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.tabs button {
+  flex: 1;
+  padding: 8px 4px;
+  border: 2px solid #3d4a5c;
+  border-radius: 8px;
+  background: #fff;
+  color: #3d4a5c;
+  font: bold 13px Arial, Helvetica, sans-serif;
+}
+.tabs button.active {
+  background: #ffe38a;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 2px solid #c9cdd2;
+  border-radius: 10px;
+  background: #fff;
+  color: #3d4a5c;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.card.active {
+  border-color: #3d4a5c;
+  background: #fff6d0;
+}
+.card:disabled {
+  opacity: 0.45;
+}
+.swatch {
+  width: 46px;
+  height: 46px;
+  border: 2px solid #3d4a5c;
+  border-radius: 50%;
+}
+.card-name {
+  font-weight: bold;
+  font-size: 13px;
+  text-align: center;
+}
+.card-note {
+  font-size: 11px;
+  color: #6a7686;
+}
+.swatch-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
+}
+.swatch-row span {
+  width: 52px;
+  font-weight: bold;
+  font-size: 13px;
+}
+.dot {
+  width: 30px;
+  height: 30px;
+  border: 2px solid #c9cdd2;
+  border-radius: 50%;
+}
+.dot.active {
+  border: 3px solid #3d4a5c;
+}
+
+.save-badge {
+  margin-top: 4px;
+  font: bold 12px Arial, Helvetica, sans-serif;
+  color: #cfe6f2;
+  text-align: right;
+}
+.save-badge.warn {
+  color: #ffb3a8;
 }

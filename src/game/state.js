@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { Vector3 } from 'three'
+import { DEFAULT_OUTFIT } from './wardrobe'
+import { DEFAULT_DECOR } from './decor'
 
 // React-facing state: only things the HUD needs to re-render on.
 export const useGame = create((set) => ({
@@ -39,6 +41,14 @@ export const useGame = create((set) => ({
   collected: [],
   timer: null, // seconds left on a timed step
   music: 'calm', // 'calm' | 'afro' | 'off' (M cycles)
+  // What Tunde wears and how his room looks (saved), and what he owns.
+  outfit: DEFAULT_OUTFIT,
+  decor: DEFAULT_DECOR,
+  owned: [], // ids of clothes and furniture bought
+  panel: null, // 'wardrobe' | 'decor' | 'phone' while a full-screen menu is open
+  // Saved games
+  account: null, // { name, token } when signed in, null for a guest
+  saveStatus: null, // 'saving' | 'saved' | 'offline' for the little cloud icon
   // Multiplayer
   playerName: '',
   online: false,
@@ -72,4 +82,5 @@ export const world = {
   net: null, // multiplayer connection, when online
   simFocus: null, // where traffic and crowds gather (the door, while you're inside)
   playerVehicle: { x: 0, z: 0, yaw: 0, riders: [] }, // for passengers boarding your danfo
+  playSeconds: 0, // time played on this save (rain comes after a while)
 }

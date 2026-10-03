@@ -3,9 +3,11 @@ import { createServer } from 'node:http'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { attachMultiplayer } from './multiplayer.js'
+import { createSaves } from './saves.js'
 
 // Production server: serves the built game from dist/ and hosts multiplayer
-// on the same port. Run `npm run build` first, then `npm start`.
+// and saved games (/api, see saves.js) on the same port. Run `npm run build`
+// first, then `npm start`.
 
 const root = resolve(fileURLToPath(new URL('../dist', import.meta.url)))
 const port = Number(process.env.PORT) || 3000
@@ -35,7 +37,10 @@ function fileFor(url) {
   return join(root, 'index.html')
 }
 
+const saves = createSaves()
+
 const server = createServer((req, res) => {
+  if (req.url?.startsWith('/api/')) return saves(req, res)
   const file = fileFor(req.url)
   if (!file) {
     res.writeHead(403).end()

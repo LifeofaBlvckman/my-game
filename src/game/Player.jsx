@@ -9,6 +9,7 @@ import Person from './Person'
 import { computePose } from './people'
 import { Blob } from './Shadows'
 import EmoteBubble from './EmoteBubble'
+import { hasPattern, lookFromOutfit } from './wardrobe'
 import { useGame, world } from './state'
 
 // Like in Messenger, the everyday pace is a jog; Shift is a flat-out sprint.
@@ -17,8 +18,7 @@ const SPRINT = 9.5
 const JUMP = 6
 const FOOT_OFFSET = 0.9 // capsule center to the soles of the feet
 
-// Tunde: Ankara shirt, jeans, low cut and a beard.
-export const PLAYER_LOOK = { face: 1, skin: '#6e4430', female: false, top: '#e07b1a', bottom: '#3a63a8', hair: 'short', hairColor: '#1f1410', robe: false, height: 1 }
+// Tunde: by default an Ankara shirt, jeans and a low cut (wardrobe.js), and a beard.
 export const PLAYER_FACE = { female: false, beard: true, mouth: 'grin', brows: true }
 const PUNCH_TIME = 0.32
 
@@ -38,6 +38,8 @@ export default function Player() {
   const mode = useGame((s) => s.mode)
   const carry = useGame((s) => s.carry)
   const carryColor = useGame((s) => s.carryColor)
+  const outfit = useGame((s) => s.outfit)
+  const look = useMemo(() => lookFromOutfit(outfit), [outfit])
   const shirt = useMemo(makeAnkaraTexture, [])
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function Player() {
     world.playerDown = Math.max(0, (world.playerDown ?? 0) - dt)
     world.flinch = Math.max(0, (world.flinch ?? 0) - dt)
     const down = world.playerDown > 0
-    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted || !!game.wasted || down || !!game.chatOpen || !!world.raceHold
+    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted || !!game.wasted || down || !!game.chatOpen || !!game.panel || !!world.raceHold
 
     const { forward, back, left, right, run, jump } = frozen ? {} : getKeys()
 
@@ -155,7 +157,7 @@ export default function Player() {
     <RigidBody ref={body} colliders={false} position={city.spawn} enabledRotations={[false, false, false]} canSleep={false}>
       <CapsuleCollider args={[0.55, 0.35]} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
       <group ref={visual} position-y={-FOOT_OFFSET} visible={mode === 'foot'}>
-        <Person ref={person} look={PLAYER_LOOK} shirtMap={shirt} faceOverride={PLAYER_FACE} carry={carry} carryColor={carryColor} />
+        <Person ref={person} look={look} shirtMap={hasPattern(outfit) ? shirt : null} faceOverride={PLAYER_FACE} carry={carry} carryColor={carryColor} />
         <Blob position-y={0.03} scale={[0.9, 1, 0.9]} />
       </group>
       {mode === 'foot' && <EmoteBubble get={() => world.emote} y={1.4} />}

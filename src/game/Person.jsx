@@ -50,7 +50,8 @@ const Person = forwardRef(function Person({ look, shirtMap, faceOverride, outlin
       {parts.map((p, i) => (
         <group key={`${carry ?? ''}${i}`}>
           <mesh ref={keep(i, 'main')} geometry={SHAPES[p.shape]} matrixAutoUpdate={false} matrix={p.local}>
-            <meshToonMaterial gradientMap={toonRamp} color={i === torso && shirtMap ? '#ffffff' : p.color} map={i === torso ? (shirtMap ?? null) : null} />
+            {/* Keyed so taking the patterned shirt off really drops the texture. */}
+            <meshToonMaterial key={i === torso && shirtMap ? 'map' : 'plain'} gradientMap={toonRamp} color={i === torso && shirtMap ? '#ffffff' : p.color} map={i === torso ? (shirtMap ?? null) : null} />
           </mesh>
           {outline && <mesh ref={keep(i, 'line')} geometry={SHAPES[p.shape]} material={inkOutline} matrixAutoUpdate={false} matrix={p.local} userData={{ noShadow: true }} />}
         </group>

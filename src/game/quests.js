@@ -5,8 +5,8 @@ import { INTERIORS, roomPoint } from './rooms'
 // landmarks they belong to; some live inside buildings (`room`).
 const front = (j) => blockZ(j) + BLOCK / 2
 const stop = (name) => city.busStops.find((s) => s.name === name)
-const inRoom = (id, x, z) => {
-  const p = roomPoint(INTERIORS[id], x, z)
+const inRoom = (id, x, z, y = 0) => {
+  const p = roomPoint(INTERIORS[id], x, z, y)
   return { pos: [p[0], p[2]], y: p[1], room: id }
 }
 
@@ -32,7 +32,8 @@ export const NPCS = {
   },
   pastor: {
     name: 'Pastor Adewale',
-    ...inRoom('church', 0, -9.2),
+    // On the altar platform (0.8 m up), behind the pulpit.
+    ...inRoom('church', 0, -10.6, 0.8),
     yaw: 0,
     look: { female: false, face: 5, hair: 'short', top: '#1c2333', bottom: '#1c2333', robe: true, height: 1.0 },
   },

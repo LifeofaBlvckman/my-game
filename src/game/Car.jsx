@@ -8,7 +8,8 @@ import { useGame, world } from './state'
 import { partColor, partKind, VEHICLES } from './vehicleTypes'
 import Driver from './Driver'
 import { seatMatrix, steeringWheel } from './drivers'
-import { PLAYER_FACE, PLAYER_LOOK } from './Player'
+import { PLAYER_FACE } from './Player'
+import { lookFromOutfit } from './wardrobe'
 import { setEngine } from './audio'
 import { Blob } from './Shadows'
 import { fx } from './particles'
@@ -76,6 +77,8 @@ export default function Car() {
   const inCar = useGame((s) => s.mode === 'car')
   const riders = useGame((s) => s.riders)
   const color = useGame((s) => s.carColor)
+  const outfit = useGame((s) => s.outfit)
+  const driverLook = useMemo(() => lookFromOutfit(outfit), [outfit])
   const def = VEHICLES[type]
   const wheels = useMemo(() => def.wheels.at.map((w, i) => ({ w, front: w[2] > 0, i })), [def])
 
@@ -88,7 +91,7 @@ export default function Car() {
     if (!b) return
     const dt = Math.min(rawDt, 0.1)
     const game = useGame.getState()
-    const driving = game.mode === 'car' && game.phase === 'playing' && !game.dialogue && !world.carWrecked && !game.chatOpen && !game.wasted && !game.busted
+    const driving = game.mode === 'car' && game.phase === 'playing' && !game.dialogue && !game.panel && !world.carWrecked && !game.chatOpen && !game.wasted && !game.busted
     const keys = driving && !world.raceHold ? getKeys() : {} // held on the start line until GO
 
     const r = b.rotation()
@@ -121,9 +124,13 @@ export default function Car() {
     let latX = v.x - fwd.x * speed
     let latZ = v.z - fwd.z * speed
 
-    const throttle = Number(!!keys.forward) - Number(!!keys.back)
+    // Touch: the stick gives smooth throttle (push up) and steering; the
+    // pedals press the same keys as W and S.
+    const stick = driving && !world.raceHold ? world.stick : null
+    let throttle = Number(!!keys.forward) - Number(!!keys.back)
+    if (stick && throttle === 0 && Math.abs(stick.y) > 0.3) throttle = Math.max(-1, Math.min(1, (-stick.y - Math.sign(-stick.y) * 0.3) / 0.6))
     if (throttle !== 0) {
-      const braking = Math.abs(speed) > 0.5 && Math.sign(speed) !== throttle
+      const braking = Math.abs(speed) > 0.5 && Math.sign(speed) !== Math.sign(throttle)
       const accel = braking ? BRAKE : throttle > 0 ? def.accel : def.accel * 0.8
       speed += throttle * accel * dt
     } else {
@@ -158,8 +165,14 @@ export default function Car() {
     }
 
     // Steering only turns the car while it's rolling, and tightens at low speed.
-    const steerInput = Number(!!keys.left) - Number(!!keys.right)
-    steer.current += (steerInput - steer.current) * Math.min(1, dt * 8)
+    let steerInput = Number(!!keys.left) - Number(!!keys.right)
+    if (stick) {
+      // A small dead zone, gentle near the middle, and less lock at speed so
+      // a thumb can hold a straight line on the expressway.
+      const x = Math.abs(stick.x) < 0.08 ? 0 : -stick.x
+      steerInput = Math.sign(x) * Math.abs(x) ** 1.5 * (1 - Math.min(0.4, Math.abs(speed) / 70))
+    }
+    steer.current += (steerInput - steer.current) * Math.min(1, dt * (stick ? 10 : 8))
     const rolling = Math.max(-1, Math.min(1, speed / 6))
     const yawRate = (steer.current * def.steer * rolling * (keys.jump ? 1.4 : 1)) / (1 + Math.abs(speed) / 35)
     b.setAngvel({ x: 0, y: yawRate, z: 0 }, true)
@@ -188,7 +201,7 @@ export default function Car() {
   return (
     <RigidBody ref={body} colliders={false} position={city.carSpawn} rotation={[0, city.carSpawnYaw, 0]} enabledRotations={[false, true, false]} canSleep={false}>
       <CuboidCollider key={type} args={def.half} mass={1200} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
-      <Body type={type} color={color} driver={inCar ? PLAYER_LOOK : null} driverFace={PLAYER_FACE} riders={riders} />
+      <Body type={type} color={color} driver={inCar ? driverLook : null} driverFace={PLAYER_FACE} riders={riders} />
       {wheels.map(({ w, front, i }) => (
         <group key={`${type}${i}`} position={w} ref={(el) => (wheelSteer.current[i] = front ? el : null)}>
           <mesh ref={(el) => (wheelSpin.current[i] = el)}>

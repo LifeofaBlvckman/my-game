@@ -3,16 +3,20 @@ import { extname, join } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { attachMultiplayer } from './server/multiplayer.js'
+import { createSaves } from './server/saves.js'
 
-// Hosts the multiplayer server on the same address as the dev server, so
-// `npm run dev -- --host` is all it takes to play with friends on your Wi-Fi.
+// Hosts the multiplayer server and saved games on the same address as the
+// dev server, so `npm run dev -- --host` is all it takes to play with friends
+// on your Wi-Fi.
 const multiplayer = {
   name: 'eko-multiplayer',
   configureServer(server) {
     if (server.httpServer) attachMultiplayer(server.httpServer)
+    server.middlewares.use(createSaves())
   },
   configurePreviewServer(server) {
     if (server.httpServer) attachMultiplayer(server.httpServer)
+    server.middlewares.use(createSaves())
   },
 }
 

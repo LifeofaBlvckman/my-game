@@ -8,6 +8,7 @@ import { computePose, lookFromSeed } from './people'
 import { INTERIORS } from './rooms'
 import { toonRamp, unlit } from './materials'
 import { useGame } from './state'
+import { homeColors, homeProps } from './decor'
 
 const geometries = { box: new BoxGeometry(1, 1, 1), sphere: new SphereGeometry(0.5, 12, 8), cylinder: new CylinderGeometry(0.5, 0.5, 1, 14) }
 const DANCE_COLORS = ['#ff2fb4', '#39e6ff', '#ffd23a', '#7a4dff', '#3fe07a'].map((c) => new Color(c))
@@ -73,7 +74,7 @@ function RoomPerson({ npc, index }) {
     }
     person.current?.animate(p)
   })
-  return <Person ref={person} look={look} position={[npc.pos[0], 0, npc.pos[1]]} rotation-y={npc.yaw} />
+  return <Person ref={person} look={look} position={[npc.pos[0], npc.y ?? 0, npc.pos[1]]} rotation-y={npc.yaw} />
 }
 
 // Flashing club floor tiles.
@@ -107,6 +108,10 @@ function DanceFloor({ spec }) {
 
 function Room({ room }) {
   const [W, H, D] = room.size
+  // Tunde's room is decorated the way the player chose.
+  const decor = useGame((s) => (room.id === 'home' ? s.decor : null))
+  const props = useMemo(() => (decor ? homeProps(decor) : room.props), [decor, room])
+  const { wall, floor } = decor ? homeColors(decor) : room
   const walls = [
     [0, H / 2, -D / 2, W, H, WALL],
     [-W / 2, H / 2, 0, WALL, H, D],
@@ -118,22 +123,22 @@ function Room({ room }) {
   return (
     <group position={room.origin}>
       <mesh position={[0, -0.25, 0]} scale={[W, 0.5, D]} geometry={geometries.box}>
-        <meshToonMaterial gradientMap={toonRamp} color={room.floor} />
+        <meshToonMaterial gradientMap={toonRamp} color={floor} />
       </mesh>
       <mesh position={[0, H + 0.25, 0]} scale={[W, 0.5, D]} geometry={geometries.box}>
-        <meshToonMaterial gradientMap={toonRamp} color={room.wall} />
+        <meshToonMaterial gradientMap={toonRamp} color={wall} />
       </mesh>
       {walls.map(([x, y, z, w, h, d], i) => (
         <mesh key={i} position={[x, y, z]} scale={[w, h, d]} geometry={geometries.box}>
-          <meshToonMaterial gradientMap={toonRamp} color={room.wall} />
+          <meshToonMaterial gradientMap={toonRamp} color={wall} />
         </mesh>
       ))}
       {/* The way out: a glowing doorway in the middle of the front wall */}
       <mesh position={[0, 1.2, D / 2 + 0.2]} scale={[3, 2.4, 0.1]} geometry={geometries.box}>
         <meshBasicMaterial color="#fff1c8" toneMapped={false} />
       </mesh>
-      {room.props.map((p, i) => (
-        <Prop key={i} p={p} />
+      {props.map((p, i) => (
+        <Prop key={`${i}${p[6]}`} p={p} />
       ))}
       {room.danceFloor && <DanceFloor spec={room.danceFloor} />}
       {room.npcs.map((n, i) => (
@@ -147,10 +152,10 @@ function Room({ room }) {
         ))}
         {/* The doorway itself is solid: you leave with E, not by walking through. */}
         <CuboidCollider args={[1.5, H / 2, WALL / 2]} position={[0, H / 2, D / 2 + 0.3]} />
-        {room.props
+        {props
           .filter((p) => p[7]?.solid)
           .map(([x, y, z, w, h, d], i) => (
-            <CuboidCollider key={`p${i}`} args={[w / 2, h / 2, d / 2]} position={[x, y, z]} />
+            <CuboidCollider key={`p${i}:${x},${z}`} args={[w / 2, h / 2, d / 2]} position={[x, y, z]} />
           ))}
       </RigidBody>
     </group>

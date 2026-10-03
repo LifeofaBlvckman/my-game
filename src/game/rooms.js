@@ -15,6 +15,17 @@ function rowOf(n, x0, step, make) {
   return Array.from({ length: n }, (_, k) => make(x0 + k * step, k))
 }
 
+// A church pew for people sitting at local z: a seat at sitting height with a
+// backrest behind them and an end panel at each side.
+const PEW_ROWS = [-5.5, -3.1, -0.7, 1.7, 4.1, 6.5]
+const pew = (x, z) => [
+  [x, 0.38, z - 0.1, 5.5, 0.08, 0.6, '#8a5e3c', S], // seat
+  [x, 0.17, z - 0.1, 5.3, 0.34, 0.08, '#6a4428'], // front rail under the seat
+  [x, 0.74, z + 0.24, 5.5, 0.64, 0.08, '#8a5e3c', S], // backrest
+  [x - 2.75, 0.45, z, 0.1, 0.9, 0.7, '#6a4428', S], // ends
+  [x + 2.75, 0.45, z, 0.1, 0.9, 0.7, '#6a4428', S],
+]
+
 export const INTERIORS = {
   home: {
     name: "TUNDE'S HOUSE",
@@ -40,7 +51,13 @@ export const INTERIORS = {
       [0, 2.95, 0, 1.8, 0.04, 0.2, '#555555'],
       [-6.9, 1.8, 0, 0.05, 1.2, 1.6, '#9fd6e8', G], // window
       [6.9, 1.8, 0, 0.05, 1.2, 1.6, '#9fd6e8', G],
+      [2.7, 1.1, 4.45, 1.6, 2.2, 0.8, '#7a5444', S], // wardrobe (change clothes)
+      [2.7, 1.1, 4.04, 0.03, 2.0, 0.02, '#4a3428'],
+      [2.5, 0.46, -2.5, 0.5, 0.03, 0.35, '#2a2d33'], // laptop (decorate)
+      [2.5, 0.62, -2.68, 0.5, 0.3, 0.02, '#7fd0ff', G],
     ],
+    wardrobe: [2.7, 3.4],
+    laptop: [2.5, -1.6],
     npcs: [],
   },
   club: {
@@ -129,18 +146,23 @@ export const INTERIORS = {
     light: '#fff1d6',
     props: [
       [0, 0.4, -10.5, 12, 0.8, 4, '#7a5444', S], // altar platform
+      [0, 0.2, -8.2, 4, 0.4, 0.6, '#6a4838', S], // step up to it
       [0, 1.4, -9.6, 1.2, 1.2, 0.8, '#5a3a2a', S], // pulpit
+      [0, 2.02, -9.75, 1.3, 0.06, 0.6, '#3a2418'], // reading board
       [0, 3.6, -12.9, 0.4, 3, 0.1, '#d4af37', G], // cross
       [0, 4.2, -12.9, 1.8, 0.4, 0.1, '#d4af37', G],
-      ...rowOf(6, -5, 2.6, (z) => [-4, 0.45, z, 5.5, 0.9, 0.7, '#7a5444', S]), // pews
-      ...rowOf(6, -5, 2.6, (z) => [4, 0.45, z, 5.5, 0.9, 0.7, '#7a5444', S]),
+      ...PEW_ROWS.flatMap((z) => [-4, 4].flatMap((x) => pew(x, z))),
+      [0, 0.005, 1.5, 2.4, 0.01, 19, '#a3262e'], // carpet down the aisle
       ...rowOf(4, -8, 5, (z) => [-8.95, 3, z, 0.05, 2.2, 1.2, ['#e04848', '#2f5fb8', '#f4d03f', '#3f9a4a'][Math.abs(z) % 4], G]), // stained glass
       ...rowOf(4, -8, 5, (z) => [8.95, 3, z, 0.05, 2.2, 1.2, ['#3f9a4a', '#f4d03f', '#2f5fb8', '#e04848'][Math.abs(z) % 4], G]),
     ],
     npcs: [
-      ...rowOf(4, -4, 2.6, (z, k) => ({ pos: [-5, z + 0.4], yaw: Math.PI, anim: 'sit', seed: 600 + k })),
-      ...rowOf(4, -4, 2.6, (z, k) => ({ pos: [3, z + 0.4], yaw: Math.PI, anim: 'sit', seed: 610 + k })),
-      ...rowOf(5, -4, 2, (x, k) => ({ pos: [x, -11.5], yaw: 0, anim: 'dance', seed: 620 + k, look: { robe: true, top: '#6a2a8a', bottom: '#6a2a8a' } })), // choir
+      // The congregation, on the pews (a few seats left free).
+      ...PEW_ROWS.slice(0, 5).flatMap((z, r) =>
+        [-5.6, -4.1, -2.6, 2.6, 4.1, 5.6].filter((_, k) => (k + r) % 3 !== 2).map((x, k) => ({ pos: [x, z], yaw: Math.PI, anim: 'sit', seed: 600 + r * 6 + k })),
+      ),
+      // The choir, up on the altar platform.
+      ...rowOf(5, -4, 2, (x, k) => ({ pos: [x, -11.7], y: 0.8, yaw: 0, anim: 'dance', seed: 640 + k, look: { robe: true, top: '#6a2a8a', bottom: '#6a2a8a' } })),
     ],
   },
   bank: {

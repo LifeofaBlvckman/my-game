@@ -6,6 +6,8 @@ import { blip, setMusic, startAudio } from './audio'
 import TouchControls, { isTouch } from './TouchControls'
 import { openDialogue, placeInRoom } from './GameLogic'
 import { addChat, connectMultiplayer } from './net'
+import { applySave, signedInName, signIn, startAutosave } from './save'
+import { Decorate, Wardrobe } from './Panels'
 import { useGame, world } from './state'
 import './hud.css'
 
@@ -29,27 +31,52 @@ function savedName() {
   }
 }
 
-function startGame() {
-  if (useGame.getState().phase !== 'title') return
+let starting = false
+async function startGame() {
+  if (useGame.getState().phase !== 'title' || starting) return
   const name = (document.getElementById('player-name')?.value ?? '').trim().slice(0, 16) || 'Tunde'
+  const pin = (document.getElementById('player-pin')?.value ?? '').trim()
   try {
     localStorage.setItem(NAME_KEY, name)
   } catch {
     // Private windows can refuse storage; the name just won't be remembered.
   }
-  useGame.setState({ playerName: name })
-  connectMultiplayer(name)
+  // Sign in (or carry on as a guest) and load the save before anything starts.
+  starting = true
+  useGame.setState({ signInError: null, signingIn: true })
+  let result
+  try {
+    result = await signIn(name, pin)
+  } catch (err) {
+    starting = false
+    useGame.setState({ signInError: err.message, signingIn: false })
+    return
+  }
+  starting = false
+  useGame.setState({ signingIn: false })
+  applySave(result.save)
+  const returning = !!result.save
+  useGame.setState({ playerName: useGame.getState().account?.name ?? name })
+  connectMultiplayer(useGame.getState().playerName)
   startAudio()
   setMusic(useGame.getState().music)
+  startAutosave()
   world.introStart = performance.now() / 1000
-  // Tunde wakes up at home; Mama has words for him.
+  // Tunde wakes up at home; Mama has words for him (the first time).
   placeInRoom('home')
   world.time = 13 * 60
   useGame.setState({ phase: 'intro' })
-  setTimeout(() => openDialogue(INTRO_CALL, () => useGame.setState({ phase: 'playing' })), INTRO_LENGTH * 1000)
+  setTimeout(() => {
+    if (!returning) return openDialogue(INTRO_CALL, () => useGame.setState({ phase: 'playing' }))
+    useGame.setState({ phase: 'playing', message: { text: `WELCOME BACK\n${useGame.getState().playerName.toUpperCase()}`, color: '#ffd23a', key: Date.now() } })
+    setTimeout(() => useGame.setState({ message: null }), 3000)
+  }, INTRO_LENGTH * 1000)
 }
 
 function Title() {
+  const error = useGame((s) => s.signInError)
+  const busy = useGame((s) => s.signingIn)
+  const known = signedInName()
   useEffect(() => {
     const onKey = (e) => e.code === 'Enter' && startGame()
     window.addEventListener('keydown', onKey)
@@ -62,12 +89,22 @@ function Title() {
           EKO <span>STREETS</span>
         </h1>
         <p className="tagline">Lagos, Nigeria. Twenty million people. One city.</p>
-        <label className="name-field">
-          Your name
-          <input id="player-name" maxLength={16} defaultValue={savedName()} placeholder="Tunde" autoComplete="off" />
-        </label>
-        <button className="start" onClick={startGame}>
-          {isTouch ? 'Tap to start' : 'Press Enter to start'}
+        <div className="sign-in">
+          <label className="name-field">
+            Your name
+            <input id="player-name" maxLength={16} defaultValue={known ?? savedName()} placeholder="Tunde" autoComplete="username" />
+          </label>
+          <label className="name-field pin">
+            PIN
+            <input id="player-pin" type="password" inputMode="numeric" maxLength={8} placeholder={known ? 'signed in' : '4 digits'} autoComplete="current-password" />
+          </label>
+        </div>
+        <p className="save-hint">
+          {known ? `Signed in as ${known}: your game saves online.` : 'Add a 4-digit PIN to save your game online and carry on from any phone or computer. A new name makes a new save.'}
+        </p>
+        {error && <p className="sign-error">{error}</p>}
+        <button className="start" onClick={startGame} disabled={busy}>
+          {busy ? 'Loading your game…' : isTouch ? 'Tap to start' : 'Press Enter to start'}
         </button>
         {isTouch ? (
           <ul className="keys">
@@ -97,6 +134,21 @@ function Title() {
       </div>
     </div>
   )
+}
+
+// A little cloud in the corner: "Saved" for a moment after each save, or a
+// warning while the save server can't be reached.
+function SaveBadge() {
+  const status = useGame((s) => s.saveStatus)
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    if (status !== 'saved') return
+    setShow(true)
+    const id = setTimeout(() => setShow(false), 1800)
+    return () => clearTimeout(id)
+  }, [status])
+  if (status === 'offline') return <div className="save-badge warn">☁ Not saved (offline)</div>
+  return show ? <div className="save-badge">☁ Saved</div> : null
 }
 
 function IntroCaptions() {
@@ -270,6 +322,7 @@ export default function Hud() {
             </div>
             <div className="money">₦{String(game.money).padStart(8, '0')}</div>
             <Stars wanted={game.wanted} evading={game.evading} />
+            <SaveBadge />
           </div>
 
           {game.race && game.race.phase !== 'watching' && !game.dialogue && <RacePanel race={game.race} />}
@@ -319,7 +372,7 @@ export default function Hud() {
             </div>
           )}
           {!game.inside && <Radar />}
-          {isTouch && !game.dialogue && <TouchControls />}
+          {isTouch && !game.dialogue && !game.panel && <TouchControls />}
           {game.hold && (
             <div className="hold">
               <span>FILLING THE BAG</span>
@@ -338,6 +391,8 @@ export default function Hud() {
         </div>
       )}
       {game.dialogue && <Dialogue dialogue={game.dialogue} />}
+      {game.panel === 'wardrobe' && <Wardrobe />}
+      {game.panel === 'decor' && <Decorate />}
     </div>
   )
 }

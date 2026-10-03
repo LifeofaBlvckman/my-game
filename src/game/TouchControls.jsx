@@ -9,6 +9,7 @@ import { useGame, world } from './state'
 //  - one big action button that becomes whatever makes sense right now
 //    (talk, enter, drive, eat, race... or punch), and a small jump button
 //  - two square buttons: ☰ for the rest (friends, chat, music, help) and 😀
+//  - in a car: the left thumb steers, GAS and BRAKE pedals on the right
 // They press the same keys the keyboard would, so the game doesn't need to know.
 export const isTouch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window)
 
@@ -40,15 +41,20 @@ function MoveZone() {
     }
     const nx = dx / STICK
     const ny = dy / STICK
-    key('KeyW', ny < -0.35)
-    key('KeyS', ny > 0.35)
-    key('KeyA', nx < -0.35)
-    key('KeyD', nx > 0.35)
-    key('ShiftLeft', d > STICK * 0.95 && useGame.getState().mode === 'foot')
+    // The car reads the stick directly, for smooth steering and throttle;
+    // on foot it presses the movement keys.
+    world.stick = { x: nx, y: ny }
+    const foot = useGame.getState().mode === 'foot'
+    key('KeyW', foot && ny < -0.35)
+    key('KeyS', foot && ny > 0.35)
+    key('KeyA', foot && nx < -0.35)
+    key('KeyD', foot && nx > 0.35)
+    key('ShiftLeft', foot && d > STICK * 0.95)
     setKnob({ x: dx, y: dy, cx, cy })
   }
   const release = () => {
     pointer.current = null
+    world.stick = null
     ;['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft'].forEach((c) => key(c, false))
     setKnob(null)
   }
@@ -225,8 +231,22 @@ export default function TouchControls() {
       {panel === 'emoji' && <EmojiGrid onDone={() => setPanel(null)} />}
       <div className="touch-actions">
         {caption && <div className="action-caption">{caption}</div>}
-        <HoldButton key={main.key + main.icon} code={main.key} icon={main.icon} label={main.label} className={`big ${action ? 'glow' : ''}`} />
-        {car ? <HoldButton code="KeyF" icon="🚪" label="Exit" className="small" /> : <HoldButton code="Space" icon="⤴" className="small" />}
+        {car ? (
+          // Driving: steer with the left thumb, pedals under the right.
+          <>
+            <div className="car-extras">
+              <HoldButton code="KeyF" icon="🚪" className="mini" />
+              <HoldButton key={main.key + main.icon} code={main.key} icon={main.icon} className={`mini ${action ? 'glow' : ''}`} />
+            </div>
+            <HoldButton code="KeyS" icon="◼" label="BRAKE" className="pedal brake" />
+            <HoldButton code="KeyW" icon="▲" label="GAS" className="pedal gas" />
+          </>
+        ) : (
+          <>
+            <HoldButton key={main.key + main.icon} code={main.key} icon={main.icon} label={main.label} className={`big ${action ? 'glow' : ''}`} />
+            <HoldButton code="Space" icon="⤴" className="small" />
+          </>
+        )}
       </div>
     </div>
   )

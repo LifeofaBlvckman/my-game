@@ -361,8 +361,14 @@ function nearExit() {
 function nearUsable() {
   const id = useGame.getState().inside
   if (id === 'home') {
-    const [x, , z] = roomPoint(INTERIORS.home, 5.4, 3)
-    if (Math.hypot(x - world.focus.x, z - world.focus.z) < 2.2) return 'bed'
+    const home = INTERIORS.home
+    const near = (lx, lz, r) => {
+      const [x, , z] = roomPoint(home, lx, lz)
+      return Math.hypot(x - world.focus.x, z - world.focus.z) < r
+    }
+    if (near(...home.wardrobe, 1.3)) return 'wardrobe'
+    if (near(...home.laptop, 1.3)) return 'laptop'
+    if (near(5.4, 3, 2.2)) return 'bed'
   }
   if (id === 'gym') {
     for (const bx of [-6, -2, 2]) {
@@ -374,6 +380,8 @@ function nearUsable() {
 }
 
 function useThing(thing) {
+  if (thing === 'wardrobe') return useGame.setState({ panel: 'wardrobe' })
+  if (thing === 'laptop') return useGame.setState({ panel: 'decor' })
   if (thing === 'bed') {
     goThrough(() => {
       world.time = 7 * 60
@@ -407,6 +415,13 @@ function nearestStop(from, within) {
   return best
 }
 
+// Passengers get out beside a vehicle and walk back to the nearest bus stop
+// (the car changed hands, or it was towed away).
+function letRidersOff(vehicle) {
+  if (!vehicle.riders?.length) return
+  alightRiders(nearestStop(vehicle, Infinity), vehicle)
+}
+
 function exitCar() {
   const c = world.car.translation()
   const left = world.carHeading + Math.PI / 2
@@ -429,6 +444,10 @@ function enterOrExit() {
     // Carjacking: drag whoever is driving out, then the traffic vehicle and
     // the player's car swap places.
     const v = target.v
+    // Nobody rides along into a different car: your old passengers and the
+    // jacked car's passengers all get out.
+    letRidersOff(v)
+    letRidersOff(world.playerVehicle)
     if (v.state !== 'parked' && !v.officerOut) {
       ejectDriver(v.x, v.z, v.yaw, world.focus)
       fx.pow(v.x, 2, v.z, 'OI!')
@@ -460,7 +479,7 @@ function enterOrExit() {
 
 function interact() {
   const game = useGame.getState()
-  if (game.phase !== 'playing' || game.dialogue || game.mode !== 'foot' || game.chatOpen) return
+  if (game.phase !== 'playing' || game.dialogue || game.panel || game.mode !== 'foot' || game.chatOpen) return
   // The key press that closed a dialogue shouldn't open a new one.
   if (performance.now() - (world.dialogueClosedAt ?? 0) < 400) return
   if (game.fade) return
@@ -520,6 +539,7 @@ function policeNearby(radius = 45) {
 }
 
 export function resetPlayerCar() {
+  letRidersOff(world.playerVehicle)
   world.carWrecked = false
   world.carBurning = 0
   world.carHp = CAR_HP
@@ -927,12 +947,14 @@ export default function GameLogic() {
     let prompt = null
     let action = null
     const act = (key, icon, label) => (action = { key, icon, label })
-    if (game.mode === 'foot' && !game.dialogue) {
+    if (game.mode === 'foot' && !game.dialogue && !game.panel) {
       const npc = nearestNamedNpc(world.focus)
       const car = !npc && !game.inside && nearestVehicle(world.focus)
       const door = !game.inside && nearDoor(world.focus)
       const thing = nearUsable()
       if (game.inside && nearExit()) (prompt = 'Press E to go outside'), act('KeyE', '🚪', 'Exit')
+      else if (thing === 'wardrobe') (prompt = 'Press E to change clothes'), act('KeyE', '👕', 'Clothes')
+      else if (thing === 'laptop') (prompt = 'Press E to decorate your room'), act('KeyE', '🛋️', 'Decorate')
       else if (thing === 'bed') (prompt = 'Press E to sleep until morning'), act('KeyE', '🛏️', 'Sleep')
       else if (thing === 'bench') (prompt = 'Press E to work out'), act('KeyE', '🏋️', 'Lift')
       else if (door) (prompt = `Press E to enter ${door.name}`), act('KeyE', '🚪', 'Enter')
