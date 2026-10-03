@@ -19,6 +19,7 @@ export { raceInteract }
 import { addChat } from './net'
 import { lightFor, signals } from './signals'
 import { lineOfSight } from './sight'
+import { phone } from './phoneline'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -682,7 +683,12 @@ export default function GameLogic() {
     window.addEventListener('mousedown', onMouse)
     const onKey = (e) => {
       const game = useGame.getState()
-      if (game.chatOpen || e.target instanceof HTMLInputElement) return
+      if (game.chatOpen || game.panel || e.target instanceof HTMLInputElement) return
+      if (e.code === 'KeyP' && game.phase === 'playing') {
+        document.exitPointerLock?.()
+        phone.open()
+        return
+      }
       if (e.code === 'KeyY' && game.phase === 'playing') {
         e.preventDefault()
         document.exitPointerLock?.()
@@ -1029,6 +1035,7 @@ export default function GameLogic() {
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
       setSignals: (t) => (signals.t = t),
+      pin: () => world.pin && { x: Math.round(world.pin.x), z: Math.round(world.pin.z), name: world.pin.name },
       placeCar: (x, z, yaw) => {
         world.carSkipCrash = performance.now() + 800
         world.car.setTranslation({ x, y: 1, z }, true)

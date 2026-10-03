@@ -8,6 +8,8 @@ import { Body } from './Car'
 import { Blob } from './Shadows'
 import EmoteBubble from './EmoteBubble'
 import { computePose, lookFromSeed } from './people'
+import { hasPattern, lookFromOutfit } from './wardrobe'
+import { makeAnkaraTexture } from './faces'
 import { FLAGS } from './net'
 import { fx } from './particles'
 import { VEHICLES } from './vehicleTypes'
@@ -44,7 +46,13 @@ function RemotePlayer({ id }) {
   const person = useRef()
   const anim = useRef({ phase: 0, t: 0, pose: {}, input: {}, hitCooldown: 0 })
   const [shape, setShape] = useState({ m: r?.s?.m ?? 'f', c: r?.s?.c ?? 'sedan', k: r?.s?.k ?? '#c9ccd1' })
-  const look = useMemo(() => lookFromSeed(hashName(r?.name ?? 'player'), { robe: false }), [r?.name])
+  // What they chose in their wardrobe, or (an older game) a look from their name.
+  const outfit = useGame((st) => st.remoteLooks[id])
+  const look = useMemo(() => {
+    const seeded = lookFromSeed(hashName(r?.name ?? 'player'), { robe: false, female: false })
+    return outfit ? lookFromOutfit(outfit, seeded) : seeded
+  }, [outfit, r?.name])
+  const shirt = useMemo(makeAnkaraTexture, [])
   const tag = useMemo(() => nameTag(r?.name ?? 'Player'), [r?.name])
   const tagMesh = useRef()
   const camera = useThree((st) => st.camera)
@@ -129,7 +137,7 @@ function RemotePlayer({ id }) {
         <>
           <CapsuleCollider args={[0.55, 0.35]} />
           <group ref={visual} position-y={-0.9}>
-            <Person ref={person} look={look} />
+            <Person ref={person} look={look} shirtMap={outfit && hasPattern(outfit) ? shirt : null} />
           </group>
           <Blob position-y={-0.88} scale={[0.9, 1, 0.9]} />
         </>

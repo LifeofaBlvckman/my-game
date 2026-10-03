@@ -56,6 +56,14 @@ export const useGame = create((set) => ({
   remotes: [], // ids of other players
   chat: [], // [{ id, name, text, key }]
   chatOpen: false,
+  remoteLooks: {}, // id -> outfit other players are wearing
+  // The phone (phone.js): contacts online, text threads, a call in progress.
+  contacts: [], // [{ id, name, here }]
+  threads: {}, // id -> { name, msgs: [{ me, text, at }] }
+  unread: 0,
+  call: null, // { id, name, state: 'ringing' | 'incoming' | 'on' }
+  phoneToast: null, // { text, key } a text that just came in
+  phoneView: null, // id of the open conversation, or null for the contact list
   set,
 }))
 

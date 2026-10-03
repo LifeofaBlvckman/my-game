@@ -35,12 +35,14 @@ const byId = (list, id) => list.find((c) => c.id === id) ?? list[0]
 // Tunde's body, face and skin never change; the clothes do.
 const BASE = { face: 1, skin: '#6e4430', female: false, robe: false, height: 1 }
 
-export function lookFromOutfit(outfit = DEFAULT_OUTFIT) {
+// `body` swaps in someone else's face and skin (other players).
+export function lookFromOutfit(outfit = DEFAULT_OUTFIT, body = null) {
   const top = byId(TOPS, outfit.top)
   const bottom = byId(BOTTOMS, outfit.bottom)
   const head = byId(HEADS, outfit.head)
   return {
     ...BASE,
+    ...(body && { face: body.face, skin: body.skin }),
     top: top.top,
     // A robe covers the trousers: same cloth all the way down.
     bottom: top.robe ? top.top : bottom.bottom,
@@ -48,6 +50,17 @@ export function lookFromOutfit(outfit = DEFAULT_OUTFIT) {
     hair: head.hair,
     hairColor: head.hairColor,
   }
+}
+
+// A new player's first outfit, from the free clothes, picked by their name so
+// friends don't all start out dressed the same.
+export function starterOutfit(name = '') {
+  if (!name || name.toLowerCase() === 'tunde') return DEFAULT_OUTFIT
+  let h = 7
+  for (const ch of name.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  const free = (list) => list.filter((c) => c.price === 0)
+  const pick = (list, k) => free(list)[k % free(list).length].id
+  return { top: pick(TOPS, h), bottom: pick(BOTTOMS, h >> 3), head: pick(HEADS, h >> 6) }
 }
 
 export const hasPattern = (outfit = DEFAULT_OUTFIT) => byId(TOPS, outfit.top).pattern === 'ankara'

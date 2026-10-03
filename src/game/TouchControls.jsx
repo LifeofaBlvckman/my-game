@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { EMOTES, emote } from './emotes'
 import { useGame, world } from './state'
+import { phone } from './phoneline'
 
 // On-screen controls for phones and tablets, kept as quiet as Messenger's:
 //  - left half: put a thumb down anywhere and drag to move (the stick only
@@ -8,7 +9,7 @@ import { useGame, world } from './state'
 //  - right half: drag to look around
 //  - one big action button that becomes whatever makes sense right now
 //    (talk, enter, drive, eat, race... or punch), and a small jump button
-//  - two square buttons: ☰ for the rest (friends, chat, music, help) and 😀
+//  - square buttons: ☰ for the rest (friends, chat, music, help), 😀 and 📱
 //  - in a car: the left thumb steers, GAS and BRAKE pedals on the right
 // They press the same keys the keyboard would, so the game doesn't need to know.
 export const isTouch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window)
@@ -126,7 +127,7 @@ function HoldButton({ code, icon, label, className = '' }) {
 }
 
 // Messenger-style square icon button.
-function Square({ icon, onPress, active }) {
+function Square({ icon, onPress, active, badge }) {
   return (
     <button
       className={`sq-btn ${active ? 'active' : ''}`}
@@ -138,6 +139,7 @@ function Square({ icon, onPress, active }) {
       onClick={(e) => e.stopPropagation()}
     >
       {icon}
+      {badge > 0 && <span className="badge">{badge}</span>}
     </button>
   )
 }
@@ -203,6 +205,7 @@ export default function TouchControls() {
   const mode = useGame((s) => s.mode)
   const action = useGame((s) => s.action)
   const prompt = useGame((s) => s.prompt)
+  const unread = useGame((s) => s.unread)
   const [panel, setPanel] = useState(null) // 'menu' | 'emoji' | null
   useEffect(() => {
     const off = () => [...held].forEach((c) => key(c, false))
@@ -226,6 +229,7 @@ export default function TouchControls() {
       <div className="touch-side">
         <Square icon="☰" active={panel === 'menu'} onPress={() => setPanel((p) => (p === 'menu' ? null : 'menu'))} />
         <Square icon="😀" active={panel === 'emoji'} onPress={() => setPanel((p) => (p === 'emoji' ? null : 'emoji'))} />
+        <Square icon="📱" badge={unread} onPress={() => (setPanel(null), phone.open())} />
       </div>
       {panel === 'menu' && <Menu onClose={() => setPanel(null)} />}
       {panel === 'emoji' && <EmojiGrid onDone={() => setPanel(null)} />}

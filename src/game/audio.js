@@ -313,6 +313,20 @@ export function jingle() {
   const t = ctx.currentTime
   ;[523.3, 659.3, 784, 1046.5].forEach((f, i) => tone('triangle', f, t + i * 0.11, 0.35, 0.25))
 }
+// Phone sounds: a short double chirp for a text, and a ring (call it again
+// every couple of seconds while the phone rings).
+export function textTone() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  tone('sine', 1318.5, t, 0.12, 0.18)
+  tone('sine', 1760, t + 0.1, 0.18, 0.18)
+}
+export function ringTone() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  for (let k = 0; k < 2; k++) for (let n = 0; n < 8; n++) tone('sine', n % 2 ? 880 : 988, t + k * 0.5 + n * 0.05, 0.06, 0.14)
+}
+
 // A traffic warden's whistle: two sharp trills.
 export function whistle() {
   if (!ctx) return

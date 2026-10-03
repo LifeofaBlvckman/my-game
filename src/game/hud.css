@@ -998,3 +998,295 @@
 .save-badge.warn {
   color: #ffb3a8;
 }
+
+/* The phone */
+.phone {
+  display: flex;
+  flex-direction: column;
+  width: min(340px, 100%);
+  height: min(600px, 100%);
+  padding: 10px 12px 14px;
+  border: 3px solid #1d1d22;
+  border-radius: 28px;
+  background: #f6f6f2;
+  box-shadow: 6px 6px 0 #3d4a5c;
+  color: #3d4a5c;
+  text-shadow: none;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.phone-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px 6px;
+  font: bold 12px Arial, Helvetica, sans-serif;
+}
+.ph-close {
+  border: 0;
+  background: none;
+  color: #3d4a5c;
+  font-size: 16px;
+}
+.phone-title {
+  margin: 4px 4px 8px;
+  font-size: 20px;
+}
+.phone-empty {
+  margin: 12px 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #6a7686;
+}
+.contacts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.contacts li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border-top: 1px solid #dcdcd4;
+}
+.contact {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: #3d4a5c;
+  text-align: left;
+}
+.contact-name {
+  display: flex;
+  flex-direction: column;
+  font: bold 15px Arial, Helvetica, sans-serif;
+}
+.contact-name small {
+  font-weight: normal;
+  font-size: 11px;
+  color: #6a7686;
+}
+.avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ff9ee3;
+  color: #2a1a2e;
+  font: bold 17px Arial, Helvetica, sans-serif;
+}
+.avatar.big {
+  width: 92px;
+  height: 92px;
+  font-size: 40px;
+}
+.ph-icon {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #c9cdd2;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 17px;
+}
+.thread {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.thread-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #dcdcd4;
+}
+.thread-head b {
+  flex: 1;
+  font-size: 16px;
+}
+.ph-back {
+  border: 0;
+  background: none;
+  color: #3d4a5c;
+  font: bold 28px/1 Arial, Helvetica, sans-serif;
+}
+.msgs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 2px;
+  overflow-y: auto;
+}
+.msg {
+  max-width: 80%;
+  padding: 7px 11px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.35;
+  word-wrap: break-word;
+}
+.msg.them {
+  align-self: flex-start;
+  background: #e6e8ec;
+}
+.msg.me {
+  align-self: flex-end;
+  background: #3d8bfd;
+  color: #fff;
+}
+.msg.sys {
+  align-self: center;
+  background: none;
+  font-size: 12px;
+  color: #6a7686;
+}
+.compose {
+  display: flex;
+  gap: 6px;
+}
+.compose input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 2px solid #c9cdd2;
+  border-radius: 20px;
+  font: 15px Arial, Helvetica, sans-serif;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.compose button {
+  width: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #3d8bfd;
+  color: #fff;
+  font-size: 18px;
+}
+.call-screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 15px;
+}
+.call-screen b {
+  font-size: 22px;
+}
+.call-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+.call-buttons button,
+.call-alert button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 22px;
+  color: #fff;
+  font: bold 14px Arial, Helvetica, sans-serif;
+}
+.answer {
+  background: #2fa84f;
+}
+.hangup {
+  background: #d93838;
+}
+.talk {
+  background: #3d8bfd;
+}
+.ph-link {
+  border: 0;
+  background: none;
+  color: #3d8bfd;
+  font: bold 14px Arial, Helvetica, sans-serif;
+}
+.call-alert {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 16px;
+  border: 2px solid #1d1d22;
+  border-radius: 26px;
+  background: #f6f6f2;
+  box-shadow: 4px 4px 0 #3d4a5c;
+  color: #3d4a5c;
+  text-shadow: none;
+  font: bold 14px Arial, Helvetica, sans-serif;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.call-alert.small {
+  top: calc(64px + env(safe-area-inset-top));
+  font-size: 12px;
+}
+.call-alert.small button {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.phone-toast {
+  position: absolute;
+  top: calc(112px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(420px, 86vw);
+  padding: 8px 14px;
+  border: 2px solid #1d1d22;
+  border-radius: 14px;
+  background: #f6f6f2;
+  color: #3d4a5c;
+  text-shadow: none;
+  font: bold 13px Arial, Helvetica, sans-serif;
+  pointer-events: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phone-btn {
+  position: absolute;
+  right: 24px;
+  top: 190px;
+  padding: 8px 12px;
+  border: 2px solid #3d4a5c;
+  border-radius: 12px;
+  background: rgba(246, 246, 242, 0.92);
+  box-shadow: 3px 3px 0 #3d4a5c;
+  color: #3d4a5c;
+  font: bold 16px Arial, Helvetica, sans-serif;
+  pointer-events: auto;
+}
+.phone-btn kbd {
+  font: bold 11px Arial, Helvetica, sans-serif;
+}
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #d93838;
+  color: #fff;
+  font: bold 11px/18px Arial, Helvetica, sans-serif;
+  text-align: center;
+}
+.sq-btn {
+  position: relative;
+}

@@ -2,6 +2,8 @@ import { hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
 import { onRaceMessage } from './racing'
+import { phoneMessage } from './phoneline'
+import { cleanOutfit } from './wardrobe'
 
 // Client side of multiplayer. Connects to the server on the same address the
 // game was loaded from; if there isn't one, the game just stays single player.
@@ -17,6 +19,8 @@ export function addChat(name, text, system = false) {
 }
 
 const syncRoster = (net) => useGame.setState({ remotes: [...net.remotes.keys()], players: net.remotes.size + 1 })
+
+const setLook = (id, o) => o && useGame.setState({ remoteLooks: { ...useGame.getState().remoteLooks, [id]: cleanOutfit(o) } })
 
 function addRemote(net, id, name, s) {
   net.remotes.set(id, { id, name, samples: s ? [{ time: performance.now(), ...s }] : [], x: s?.p[0] ?? 0, y: s?.p[1] ?? -500, z: s?.p[2] ?? 0 /* parked out of the way until their first update */, yaw: s?.y ?? 0, s })
@@ -39,6 +43,8 @@ function scheduleReconnect(name) {
 export function connectMultiplayer(name) {
   if (world.net || typeof WebSocket === 'undefined') return world.net
   if (!connectMultiplayer.watching) {
+    // New clothes: show them to everyone.
+    useGame.subscribe((s, prev) => s.outfit !== prev.outfit && world.net?.look(s.outfit))
     // Coming back to the tab: reconnect straight away.
     connectMultiplayer.watching = true
     document.addEventListener('visibilitychange', () => {
@@ -79,6 +85,9 @@ export function connectMultiplayer(name) {
     },
     emote(e) {
       net.send({ t: 'emote', e })
+    },
+    look(o) {
+      net.send({ t: 'look', o })
     },
     // A punch landing at (px, pz): did it hit another player on foot?
     punchPlayers(px, pz) {
@@ -126,8 +135,12 @@ export function connectMultiplayer(name) {
       retryDelay = 2000
       net.id = msg.id
       world.time = msg.time
-      msg.players.forEach((p) => addRemote(net, p.id, p.name, p.s))
+      msg.players.forEach((p) => {
+        addRemote(net, p.id, p.name, p.s)
+        setLook(p.id, p.o)
+      })
       useGame.setState({ online: true })
+      net.look(useGame.getState().outfit)
       syncRoster(net)
       const where = msg.room > 1 ? ` (room ${msg.room})` : ''
       addChat(null, msg.players.length ? `Online${where}. ${msg.players.length} other player${msg.players.length > 1 ? 's' : ''} here.` : `Online${where}. Share this address with friends so they can join.`, true)
@@ -155,6 +168,10 @@ export function connectMultiplayer(name) {
     } else if (msg.t === 'emote') {
       const r = net.remotes.get(msg.id)
       if (r) r.emote = { e: msg.e, at: performance.now() }
+    } else if (msg.t === 'look') {
+      setLook(msg.id, msg.o)
+    } else if (['roster', 'dm', 'ring', 'answer', 'hangup', 'pin'].includes(msg.t)) {
+      phoneMessage(msg)
     } else if (msg.t === 'full') {
       full = true
       addChat(null, 'The server is full, so you are playing offline.', true)

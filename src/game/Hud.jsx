@@ -8,6 +8,9 @@ import { openDialogue, placeInRoom } from './GameLogic'
 import { addChat, connectMultiplayer } from './net'
 import { applySave, signedInName, signIn, startAutosave } from './save'
 import { Decorate, Wardrobe } from './Panels'
+import Phone, { PhoneAlerts } from './Phone'
+import { phone } from './phoneline'
+import { starterOutfit } from './wardrobe'
 import { useGame, world } from './state'
 import './hud.css'
 
@@ -56,6 +59,7 @@ async function startGame() {
   useGame.setState({ signingIn: false })
   applySave(result.save)
   const returning = !!result.save
+  if (!returning) useGame.setState({ outfit: starterOutfit(name) })
   useGame.setState({ playerName: useGame.getState().account?.name ?? name })
   connectMultiplayer(useGame.getState().playerName)
   startAudio()
@@ -393,6 +397,14 @@ export default function Hud() {
       {game.dialogue && <Dialogue dialogue={game.dialogue} />}
       {game.panel === 'wardrobe' && <Wardrobe />}
       {game.panel === 'decor' && <Decorate />}
+      {game.panel === 'phone' && <Phone />}
+      {game.phase === 'playing' && <PhoneAlerts />}
+      {game.phase === 'playing' && !isTouch && !game.panel && (
+        <button className="phone-btn" onClick={() => phone.open()}>
+          📱 <kbd>P</kbd>
+          {game.unread > 0 && <span className="badge">{game.unread}</span>}
+        </button>
+      )}
     </div>
   )
 }

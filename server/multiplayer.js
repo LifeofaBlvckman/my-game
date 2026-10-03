@@ -16,7 +16,8 @@ const RACE_MAX_MS = 180000
 const MAX_PLAYERS = 256 // per server
 const MAX_MESSAGE = 2048
 const MAX_RATE = 40 // messages per second per client
-const VEHICLE_TYPES = new Set(['sedan', 'police', 'jeep', 'danfo', 'keke'])
+const VEHICLE_TYPES = new Set(['sedan', 'police', 'jeep', 'danfo', 'keke', 'benz', 'gwagon', 'sports'])
+const OUTFIT_ID = /^[a-z0-9-]{1,16}$/
 const HEX = /^#[0-9a-f]{6}$/i
 const START_MINUTES = 17 * 60
 
@@ -109,7 +110,7 @@ export function attachMultiplayer(httpServer) {
           id: player.id,
           room: player.roomNumber,
           time: minutes(),
-          players: [...player.room.values()].filter((p) => p.id !== player.id).map((p) => ({ id: p.id, name: p.name, s: p.state })),
+          players: [...player.room.values()].filter((p) => p.id !== player.id).map((p) => ({ id: p.id, name: p.name, s: p.state, o: p.look })),
         })
         broadcast(player.room, { t: 'join', id: player.id, name: player.name }, player.id)
         // A race is waiting for racers: let the newcomer know.
@@ -159,6 +160,28 @@ export function attachMultiplayer(httpServer) {
           broadcast(room, { t: 'race', a: 'result', id: player.id, name: player.name, place: race.finished.length, time: Math.max(0, num(msg.time, 600)) })
           checkRaceOver(room)
         }
+      } else if (msg.t === 'look') {
+        // What someone's wearing (ids from the game's wardrobe).
+        const o = msg.o ?? {}
+        if (![o.top, o.bottom, o.head].every((v) => OUTFIT_ID.test(v ?? ''))) return
+        player.look = { top: o.top, bottom: o.bottom, head: o.head }
+        broadcast(player.room, { t: 'look', id: player.id, o: player.look }, player.id)
+      } else if (msg.t === 'roster') {
+        // The phone's contacts: everyone online, in any room.
+        send(ws, { t: 'roster', players: [...players.values()].filter((p) => p.id !== player.id).map((p) => ({ id: p.id, name: p.name, here: p.room === player.room })) })
+      } else if (['dm', 'ring', 'answer', 'hangup', 'pin'].includes(msg.t)) {
+        // Phone: texts, calls and shared locations go to one player, anywhere.
+        const target = players.get(msg.to)
+        if (!target || target === player || now - (player.lastPhone ?? 0) < 250) return
+        player.lastPhone = now
+        const from = { from: player.id, name: player.name }
+        if (msg.t === 'dm') {
+          const text = clean(msg.text, 200)
+          if (text) send(target.ws, { t: 'dm', ...from, text })
+        } else if (msg.t === 'pin') {
+          const p = player.state?.p
+          if (p) send(target.ws, { t: 'pin', ...from, x: p[0], z: p[2] })
+        } else send(target.ws, { t: msg.t, ...from })
       } else if (msg.t === 'emote') {
         // Emoji reactions: an index into the client's list, at most a couple a second.
         const e = num(msg.e, 7) | 0
