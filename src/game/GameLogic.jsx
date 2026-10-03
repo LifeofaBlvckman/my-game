@@ -791,7 +791,12 @@ export default function GameLogic() {
           message(`FARE +${naira(n * FARE)}`, '#7ee07e', 2200)
           droppedAt = stop
         }
-        callBoarders(stop, pv, def.passengers.length - pv.riders.length)
+      }
+      // Anyone waiting (or turning up while you wait) gets on, while there's room.
+      if (stop) {
+        const coming = npcs.filter((n) => n.kind === 'boarding' && n.vehicle === pv).length
+        const room = def.passengers.length - pv.riders.length - coming
+        if (room > 0) callBoarders(stop, pv, room)
       }
     }
     if (game.mode === 'car' && Math.abs(world.carSpeed) > 3) t.lastStop = null

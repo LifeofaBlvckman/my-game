@@ -379,9 +379,20 @@ function refillStops(focus) {
         if (d < 25) break
       }
     }
+    // You're at the stop and nobody's nearby: someone from out of sight
+    // walks up along the sidewalk instead.
+    let walkUp = false
+    if (!pick && !hidden) {
+      pick = npcs.find((n) => n.kind === 'walk' && n.down <= 0 && !(n.panic > 0) && n.x !== undefined && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)
+      walkUp = !!pick
+    }
     if (!pick) return
     const spot = stopSpot(stop, counts[stop.id] % WAITING_PER_STOP)
-    if (Math.hypot(pick.x - stop.x, pick.z - stop.z) >= 25) {
+    if (walkUp) {
+      const side = rand() < 0.5 ? 1 : -1
+      pick.x = stop.x + (stop.axis === 'x' ? side * 14 : 0)
+      pick.z = stop.z + (stop.axis === 'z' ? side * 14 : 0)
+    } else if (Math.hypot(pick.x - stop.x, pick.z - stop.z) >= 25) {
       pick.x = spot.x
       pick.z = spot.z
     }
