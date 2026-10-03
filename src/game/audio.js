@@ -290,6 +290,38 @@ export function setMusic(style) {
   if (musicGain) smooth(musicGain.gain, style === 'afro' ? MUSIC_VOLUME.afro : 0)
   if (calmGain) smooth(calmGain.gain, style === 'calm' ? MUSIC_VOLUME.calm : 0)
 }
+// Rain on everything: looped noise through a soft filter; thunder now and
+// then in a downpour.
+let rainGain = null
+export function setRain(level, muffled = false) {
+  if (!ctx) return
+  if (!rainGain) {
+    noise ??= noiseBuffer()
+    const src = ctx.createBufferSource()
+    src.buffer = noise
+    src.loop = true
+    const hp = ctx.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 500
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 6000
+    rainGain = ctx.createGain()
+    rainGain.gain.value = 0
+    rainGain.lp = lp
+    src.connect(hp).connect(lp).connect(rainGain).connect(master)
+    src.start()
+  }
+  smooth(rainGain.gain, level * (muffled ? 0.05 : 0.16))
+  smooth(rainGain.lp.frequency, muffled ? 900 : 6000)
+}
+export function thunder() {
+  if (!ctx) return
+  const t = ctx.currentTime + 0.4
+  hiss(t, 2.6, 0.5, 'lowpass', 160)
+  hiss(t + 0.15, 1.6, 0.25, 'lowpass', 420)
+}
+
 export function setSiren(volume) {
   if (siren) smooth(siren.gain, volume * 0.12)
 }

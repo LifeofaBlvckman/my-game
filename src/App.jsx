@@ -22,6 +22,7 @@ import Interiors from './game/Interiors'
 import Hud from './game/Hud'
 import Birds from './game/Birds'
 import Dogs from './game/Dogs'
+import Rain from './game/Rain'
 import Races from './game/Races'
 import { keyMap } from './game/controls'
 import { useGame } from './game/state'
@@ -75,6 +76,7 @@ export default function App() {
         <ShadowCasters />
         <DayNight />
         <Birds />
+        <Rain />
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]}>
             <City />

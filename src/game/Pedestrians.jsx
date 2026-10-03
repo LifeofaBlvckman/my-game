@@ -8,6 +8,7 @@ import { FACE_COLS, getFaceAtlas } from './faces'
 import { toon, toonRamp } from './materials'
 import { SHAPES } from './shapes'
 import { useGame, world } from './state'
+import { weather } from './weather'
 import { VEHICLES } from './vehicleTypes'
 import { blobGeometry, blobMaterial } from './Shadows'
 
@@ -110,7 +111,7 @@ export default function Pedestrians() {
       const repose = !n.posed || d2 < LOD_DISTANCE * LOD_DISTANCE || (frame.current + i) % 3 === 0
       if (repose) {
         n.posed = true
-        const fast = n.panic > 0 || n.fight > 0 || n.kind === 'cop'
+        const fast = n.panic > 0 || n.fight > 0 || n.kind === 'cop' || (n.kind === 'walk' && weather.rain > 0.4)
         n.phase += rawDt * (n.moving ? (fast ? 11 : 7.5) : 0)
         poseIn.phase = n.phase
         poseIn.t = time + i

@@ -9,7 +9,7 @@ import { WORLD } from './City'
 import { INTERIORS, mapSpot, roomExit, roomPoint, roomSpawn } from './rooms'
 import { activeJob, activeTarget, CHATTER, NPCS, QUESTS, SIDE_JOBS, STRANGER_LINES } from './quests'
 import { VEHICLES } from './vehicleTypes'
-import { alarm, blip, bust, clang, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn, whistle } from './audio'
+import { alarm, blip, bust, clang, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn, whistle, setRain, thunder } from './audio'
 import { CAR_HP, damagePlayerCar, damageVehicle, hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
@@ -21,6 +21,7 @@ import { lightFor, signals } from './signals'
 import { lineOfSight } from './sight'
 import { phone } from './phoneline'
 import { dogs, punchDogs } from './strays'
+import { updateWeather, weather } from './weather'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -553,6 +554,8 @@ export function resetPlayerCar() {
   useGame.setState({ carType: 'sedan', carColor: '#c9ccd1' })
 }
 
+const RAIN_LINES = ['Rain don start o! Make I run!', 'Ah, see rain! My hair o!', 'This rain no go small today.', 'Quick quick, find shade!']
+
 const ANGRY = ['Ah! Wetin I do you?', 'You dey craze?', 'Oya come and fight me!', 'Na wa for you o!']
 
 let punchSide = 1
@@ -767,6 +770,20 @@ export default function GameLogic() {
         getWasted()
       }
     }
+    // Weather: rain after a while of playing (weather.js).
+    if (game.phase === 'playing') world.playSeconds = (world.playSeconds ?? 0) + dt
+    if (updateWeather(dt, world.playSeconds) && !game.inside) {
+      useGame.setState({ subtitle: { speaker: 'Passer-by', text: RAIN_LINES[Math.floor(Math.random() * RAIN_LINES.length)], key: ++bannerKey } })
+      const key = bannerKey
+      setTimeout(() => useGame.getState().subtitle?.key === key && useGame.setState({ subtitle: null }), 3000)
+    }
+    setRain(weather.rain, !!game.inside)
+    if (weather.rain > 0.85 && performance.now() > weather.nextThunder) {
+      weather.nextThunder = performance.now() + 18000 + Math.random() * 30000
+      if (!game.inside) weather.flash = 1
+      thunder()
+    }
+
     // Health slowly comes back once you've stayed out of trouble for a bit.
     if (game.health < 100 && performance.now() - (world.lastHurt ?? 0) > 6000 && !game.wasted) {
       t.regen = (t.regen ?? 0) + dt * 3
@@ -1046,6 +1063,8 @@ export default function GameLogic() {
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
       setSignals: (t) => (signals.t = t),
+      setRain: (v) => (weather.forced = v),
+      rain: () => ({ rain: weather.rain, target: weather.target }),
       hurt: (n) => hurtPlayer(n),
       dogs: () => dogs.map((d) => ({ x: Math.round(d.x), z: Math.round(d.z), state: d.state, flee: d.flee > 0 })),
       pin: () => world.pin && { x: Math.round(world.pin.x), z: Math.round(world.pin.z), name: world.pin.name },

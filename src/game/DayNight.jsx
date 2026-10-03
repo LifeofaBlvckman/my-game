@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { BackSide, Color, Object3D, ShaderMaterial, SphereGeometry, Vector3 } from 'three'
 import { nightUniform } from './materials'
 import { useGame, world } from './state'
+import { weather } from './weather'
 
 // Sky through the day: [hour, zenith, horizon, clouds]. Daytime is the flat
 // teal of an illustrated sky, with lighter painted cloud shapes.
@@ -100,6 +101,10 @@ function createSkyMaterial() {
 
 const sunDir = new Vector3()
 
+const RAIN_ZENITH = new Color('#7f8b94')
+const RAIN_HORIZON = new Color('#a3adb3')
+const RAIN_CLOUD = new Color('#8e979c')
+
 export default function DayNight() {
   const fill = useRef()
   const sun = useRef()
@@ -144,13 +149,22 @@ export default function DayNight() {
         break
       }
     }
+    // Rain greys the sky, pulls the haze in, and dims the sun.
+    const wet = weather.rain
+    if (wet > 0) {
+      zenith.value.lerp(RAIN_ZENITH, wet * 0.85)
+      horizon.value.lerp(RAIN_HORIZON, wet * 0.85)
+      cloud.value.lerp(RAIN_CLOUD, wet * 0.9)
+    }
     fog.current.color.copy(horizon.value)
+    fog.current.near = 260 - 200 * wet
+    fog.current.far = 600 - 320 * wet
     sky.current.position.copy(camera.position)
 
     // Flat cool fill; its brightness sets how dark shadows are.
     fill.current.color.lerpColors(FILL_NIGHT, FILL_DAY, day)
     fill.current.groundColor.copy(fill.current.color)
-    fill.current.intensity = 3.3 - 0.3 * day
+    fill.current.intensity = 3.3 - 0.3 * day - 0.5 * wet + weather.flash * 5 // lightning
 
     // Sun arcs east to west and warms near the horizon; the moon stands in at night.
     const angle = ((hour - 6) / 12) * Math.PI
@@ -158,7 +172,7 @@ export default function DayNight() {
     if (day > 0.02) sunDir.set(Math.cos(angle), Math.max(0.25, Math.sin(angle)), 0.45).normalize()
     else sunDir.set(-0.4, 0.8, 0.45).normalize()
     sun.current.color.lerpColors(SUN_DUSK, SUN_DAY, Math.min(1, height * 2.5)).lerp(MOON, 1 - day)
-    sun.current.intensity = 1.05 + 0.6 * day
+    sun.current.intensity = (1.05 + 0.6 * day) * (1 - 0.6 * wet)
 
     // Keep the shadow camera centered on the player, snapped to whole shadow
     // map texels so shadow edges don't shimmer as you move.

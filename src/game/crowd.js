@@ -1,5 +1,6 @@
 import { BEACH, BLOCK, city, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
 import { COP_LOOK, lookFromSeed, randomLook, WARDEN_LOOK } from './people'
+import { weather } from './weather'
 
 // Crowd simulation. Plain objects updated every frame; Pedestrians.jsx draws them.
 const WALKERS = 70
@@ -504,7 +505,8 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
       }
     } else if (n.kind === 'walk') {
       if (far && dx * dx + dz * dz > RECYCLE * RECYCLE) placeWalker(n, focus)
-      n.t += n.dir * n.speed * (n.panic > 0 ? 3.2 : 1) * dt
+      // Rain: everyone hurries.
+      n.t += n.dir * n.speed * (n.panic > 0 ? 3.2 : 1 + weather.rain * 1.2) * dt
       const p = loopPoint(n)
       // Ease back onto the loop after being knocked off it.
       if (n.x !== undefined && Math.hypot(p.x - n.x, p.z - n.z) > 0.5) {
