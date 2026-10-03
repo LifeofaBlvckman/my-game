@@ -1225,6 +1225,8 @@ export default function GameLogic() {
       setWanted: (n) => useGame.setState({ wanted: n }),
       gangs: () => gangs.map((g) => ({ id: g.id, x: g.x, z: g.z, state: g.state, members: g.members.map((n) => ({ x: n.x, z: n.z, down: n.down, fight: n.fight, hp: n.hp })) })),
       trespass: () => !!world.trespass,
+      online: () => !!world.net,
+      remoteChases: () => [...(world.net?.remotes.values() ?? [])].map((r) => ({ name: r.name, w: r.s?.w, pc: r.s?.pc, pf: r.s?.pf })),
       fugitive: () => ({ active: fugitive.active, x: fugitive.x, z: fugitive.z, running: fugitive.running, close: fugitive.close, crashed: fugitive.crashed, leg: fugitive.leg }),
       brawlers: () => npcs.filter((n) => n.brawler).map((n) => ({ active: n.active, x: n.x, z: n.z, down: n.down, beaten: n.beaten, fight: n.fight, hp: n.hp })),
       setSignals: (t) => (signals.t = t),
