@@ -9,8 +9,8 @@ import { world } from './state'
 // the way Messenger does it. Each flock circles slowly somewhere over the
 // player; each bird flaps for a bit, then glides. They roost at night.
 
-const FLOCKS = 4
-const PER_FLOCK = 7
+const FLOCKS = 11
+const PER_FLOCK = 8
 const COUNT = FLOCKS * PER_FLOCK
 
 // One wing: a thin swept triangle from the body out to the tip (+x).
@@ -35,9 +35,10 @@ export default function Birds() {
     const rand = mulberry32(77)
     const flocks = Array.from({ length: FLOCKS }, (_, f) => ({
       angle: rand() * Math.PI * 2,
-      radius: 70 + rand() * 90,
-      speed: (0.05 + rand() * 0.04) * (f % 2 ? 1 : -1),
-      height: 38 + rand() * 30,
+      // Some wheel close overhead, low over the roofs; others far and high.
+      radius: (f % 3 === 0 ? 30 : 60) + rand() * 110,
+      speed: (0.05 + rand() * 0.05) * (f % 2 ? 1 : -1),
+      height: (f % 3 === 0 ? 28 : 38) + rand() * 34,
       drift: rand() * 100,
     }))
     const list = Array.from({ length: COUNT }, (_, i) => {

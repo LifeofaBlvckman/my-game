@@ -117,7 +117,10 @@ export default function Radar() {
       for (const r of world.net?.remotes.values() ?? []) {
         if (!r.s) continue
         const spot = mapSpot(r.x, r.z)
-        blip(spot.x, spot.z, rot, '#ff6fd0', 5)
+        // A friend on the run flashes red and blue, with their police behind.
+        const flash = r.s.w > 0 && Math.floor(performance.now() / 250) % 2 === 0
+        for (const c of r.s.pc ?? []) blip(c[0], c[1], rot, flash ? '#3060ff' : '#ff3030', 3)
+        blip(spot.x, spot.z, rot, r.s.w > 0 ? (flash ? '#ff3030' : '#3060ff') : '#ff6fd0', 5)
       }
       // A location a friend sent from their phone: a flashing pink square.
       if (world.pin && performance.now() < world.pin.until && Math.floor(performance.now() / 400) % 2) blip(world.pin.x, world.pin.z, rot, '#ff6fd0', 6, true)

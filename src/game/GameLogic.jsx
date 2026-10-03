@@ -816,7 +816,9 @@ export default function GameLogic() {
     // Indoors, the police wait at the door you went through.
     const copsAim = game.inside ? world.simFocus : world.focus
     for (const v of vehicles) if (v.chasing) nearestCop = Math.min(nearestCop, flat(v, copsAim))
-    setSiren(game.wanted > 0 ? Math.max(0, 1 - nearestCop / 120) : 0)
+    // Our chase, or (fainter) a friend's chase going past us.
+    setSiren(Math.max(game.wanted > 0 ? Math.max(0, 1 - nearestCop / 120) : 0, game.inside ? 0 : (world.remoteSiren ?? 0) * 0.7))
+    world.remoteSiren = 0
     const onFoot = game.mode === 'foot'
     const carStopped = !onFoot && Math.abs(world.carSpeed) < 3
     // In a stopped car, officers reach in through the door to arrest you.

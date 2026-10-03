@@ -27,6 +27,9 @@ const clean = (text, max) =>
     .trim()
     .slice(0, max)
 const num = (v, limit) => (Number.isFinite(v) ? Math.max(-limit, Math.min(limit, v)) : 0)
+// A player's police chase: a few [x, z, heading(, height)] for others to draw.
+const points = (list, max, size) =>
+  Array.isArray(list) ? list.slice(0, max).filter(Array.isArray).map((p) => [num(p[0], 1000), num(p[1], 1000), num(p[2], 10), num(p[3], 50)].slice(0, size)) : []
 
 export function attachMultiplayer(httpServer) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE })
@@ -144,6 +147,9 @@ export function attachMultiplayer(httpServer) {
           k: HEX.test(msg.k) ? msg.k : '#c9ccd1',
           a: num(msg.a, 255) | 0, // animation flags
           u: num(msg.u, 1), // punch progress
+          w: Math.max(0, Math.min(5, num(msg.w, 5) | 0)), // wanted stars
+          pc: points(msg.pc, 3, 3), // police cars chasing them
+          pf: points(msg.pf, 3, 4), // police officers on foot
         }
         broadcast(player.room, { t: 's', id: player.id, ...player.state }, player.id)
       } else if (msg.t === 'hit') {
