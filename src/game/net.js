@@ -20,7 +20,11 @@ export function addChat(name, text, system = false) {
 
 const syncRoster = (net) => useGame.setState({ remotes: [...net.remotes.keys()], players: net.remotes.size + 1 })
 
-const setLook = (id, o) => o && useGame.setState({ remoteLooks: { ...useGame.getState().remoteLooks, [id]: cleanOutfit(o) } })
+const setLook = (id, o) => {
+  if (!o) return
+  const g = o.g === 'girl' ? 'girl' : 'boy'
+  useGame.setState({ remoteLooks: { ...useGame.getState().remoteLooks, [id]: { ...cleanOutfit(o, g), g } } })
+}
 
 function addRemote(net, id, name, s) {
   net.remotes.set(id, { id, name, samples: s ? [{ time: performance.now(), ...s }] : [], x: s?.p[0] ?? 0, y: s?.p[1] ?? -500, z: s?.p[2] ?? 0 /* parked out of the way until their first update */, yaw: s?.y ?? 0, s })
@@ -44,7 +48,7 @@ export function connectMultiplayer(name) {
   if (world.net || typeof WebSocket === 'undefined') return world.net
   if (!connectMultiplayer.watching) {
     // New clothes: show them to everyone.
-    useGame.subscribe((s, prev) => s.outfit !== prev.outfit && world.net?.look(s.outfit))
+    useGame.subscribe((s, prev) => (s.outfit !== prev.outfit || s.gender !== prev.gender) && world.net?.look(s.outfit))
     // Coming back to the tab: reconnect straight away.
     connectMultiplayer.watching = true
     document.addEventListener('visibilitychange', () => {
@@ -86,8 +90,9 @@ export function connectMultiplayer(name) {
     emote(e) {
       net.send({ t: 'emote', e })
     },
+    // What you're wearing, and boy or girl.
     look(o) {
-      net.send({ t: 'look', o })
+      net.send({ t: 'look', o: { ...o, g: useGame.getState().gender } })
     },
     // A punch landing at (px, pz): did it hit another player on foot?
     punchPlayers(px, pz) {

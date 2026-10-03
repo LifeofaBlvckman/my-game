@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Radar from './Radar'
 import { INTRO_LENGTH } from './CameraRig'
 import { activeTarget, INTRO_CALL } from './quests'
@@ -10,7 +10,8 @@ import { applySave, signedInName, signIn, startAutosave } from './save'
 import { Decorate, Wardrobe } from './Panels'
 import Phone, { PhoneAlerts } from './Phone'
 import { phone } from './phoneline'
-import { starterOutfit } from './wardrobe'
+import { cleanOutfit, starterOutfit } from './wardrobe'
+import { personalize } from './who'
 import { useGame, world } from './state'
 import './hud.css'
 
@@ -34,13 +35,30 @@ function savedName() {
   }
 }
 
+const GENDER_KEY = 'eko-streets-gender'
+function savedGender() {
+  try {
+    return localStorage.getItem(GENDER_KEY) === 'girl' ? 'girl' : 'boy'
+  } catch {
+    return 'boy'
+  }
+}
+
 let starting = false
 async function startGame() {
   if (useGame.getState().phase !== 'title' || starting) return
-  const name = (document.getElementById('player-name')?.value ?? '').trim().slice(0, 16) || 'Tunde'
+  // You play as yourself: no default name.
+  const name = (document.getElementById('player-name')?.value ?? '').trim().slice(0, 16)
+  if (name.length < 2) {
+    useGame.setState({ signInError: 'Type the name you want to be called (at least 2 letters).' })
+    document.getElementById('player-name')?.focus()
+    return
+  }
+  const gender = useGame.getState().gender
   const pin = (document.getElementById('player-pin')?.value ?? '').trim()
   try {
     localStorage.setItem(NAME_KEY, name)
+    localStorage.setItem(GENDER_KEY, gender)
   } catch {
     // Private windows can refuse storage; the name just won't be remembered.
   }
@@ -59,14 +77,18 @@ async function startGame() {
   useGame.setState({ signingIn: false })
   applySave(result.save)
   const returning = !!result.save
-  if (!returning) useGame.setState({ outfit: starterOutfit(name) })
+  // Boy or girl is whatever was picked just now (it can change between
+  // games); clothes that don't suit the choice give way to a starter outfit.
+  const kept = cleanOutfit(useGame.getState().outfit, gender)
+  const fits = returning && JSON.stringify(kept) === JSON.stringify(useGame.getState().outfit) && useGame.getState().gender === gender
+  useGame.setState({ gender, outfit: fits ? kept : starterOutfit(name, gender) })
   useGame.setState({ playerName: useGame.getState().account?.name ?? name })
   connectMultiplayer(useGame.getState().playerName)
   startAudio()
   setMusic(useGame.getState().music)
   startAutosave()
   world.introStart = performance.now() / 1000
-  // Tunde wakes up at home; Mama has words for him (the first time).
+  // You wake up at home; Mama has words for you (the first time).
   placeInRoom('home')
   world.time = 13 * 60
   useGame.setState({ phase: 'intro' })
@@ -75,6 +97,25 @@ async function startGame() {
     useGame.setState({ phase: 'playing', message: { text: `WELCOME BACK\n${useGame.getState().playerName.toUpperCase()}`, color: '#ffd23a', key: Date.now() } })
     setTimeout(() => useGame.setState({ message: null }), 3000)
   }, INTRO_LENGTH * 1000)
+}
+
+// Boy or girl, before you start.
+function GenderPicker() {
+  const gender = useGame((s) => s.gender)
+  useEffect(() => useGame.setState({ gender: savedGender() }), [])
+  return (
+    <div className="gender-pick" role="radiogroup" aria-label="Play as">
+      {[
+        ['boy', '👦🏾', 'Boy'],
+        ['girl', '👧🏾', 'Girl'],
+      ].map(([id, icon, label]) => (
+        <button key={id} role="radio" aria-checked={gender === id} className={gender === id ? 'active' : ''} onClick={() => useGame.setState({ gender: id })}>
+          <span>{icon}</span>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function Title() {
@@ -93,10 +134,11 @@ function Title() {
           EKO <span>STREETS</span>
         </h1>
         <p className="tagline">Lagos, Nigeria. Twenty million people. One city.</p>
+        <GenderPicker />
         <div className="sign-in">
           <label className="name-field">
             Your name
-            <input id="player-name" maxLength={16} defaultValue={known ?? savedName()} placeholder="Tunde" autoComplete="username" />
+            <input id="player-name" maxLength={16} defaultValue={known ?? savedName()} placeholder="Type your name" autoComplete="username" />
           </label>
           <label className="name-field pin">
             PIN
@@ -177,7 +219,9 @@ const TYPE_MS = 22
 
 function Dialogue({ dialogue }) {
   const { lines, index } = dialogue
-  const line = lines[index]
+  const raw = lines[index]
+  // Lines can name the player or depend on boy/girl (who.js).
+  const line = useMemo(() => ({ speaker: personalize(raw.speaker), text: personalize(raw.text) }), [raw])
   const [shown, setShown] = useState(0)
   const shownRef = useRef(0)
 
@@ -333,14 +377,14 @@ export default function Hud() {
           {target && !game.dialogue && !(game.race && ['grid', 'running'].includes(game.race.phase)) && (
             <div className={`objective ${game.sideJob ? 'side' : ''}`}>
               <span>{game.sideJob ? 'SIDE JOB' : 'NEXT UP'}</span>
-              {target.objective}
+              {personalize(target.objective)}
               {game.timer != null && <b className={`timer ${game.timer <= 10 ? 'low' : ''}`}>⏱ {game.timer}s</b>}
             </div>
           )}
 
           {(game.prompt || (showHelp && !isTouch)) && !game.dialogue && (
             <div className="help">
-              {game.prompt ?? (
+              {personalize(game.prompt) ?? (
                 <>
                   Click to look around. <b>WASD</b> move, <b>Shift</b> run, <b>Click</b>/<b>X</b> punch, <b>E</b> talk, <b>F</b> get in or jack a car,
                   <b>Q</b> horn. Follow the yellow marker on the radar. <b>H</b> hides this.
@@ -351,7 +395,7 @@ export default function Hud() {
 
           {game.banner && (
             <div className="banner" key={`banner${game.banner.key}`}>
-              {game.banner.text}
+              {personalize(game.banner.text)}
             </div>
           )}
           {game.mode === 'car' && (
@@ -372,7 +416,7 @@ export default function Hud() {
           )}
           {game.subtitle && !game.dialogue && (
             <div className="subtitle">
-              <b>{game.subtitle.speaker}:</b> {game.subtitle.text}
+              <b>{personalize(game.subtitle.speaker)}:</b> {personalize(game.subtitle.text)}
             </div>
           )}
           {!game.inside && <Radar />}
@@ -391,7 +435,7 @@ export default function Hud() {
 
       {game.message && (
         <div className="message" key={`message${game.message.key}`} style={{ color: game.message.color }}>
-          {game.message.text}
+          {personalize(game.message.text)}
         </div>
       )}
       {game.dialogue && <Dialogue dialogue={game.dialogue} />}

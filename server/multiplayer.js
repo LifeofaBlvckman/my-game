@@ -164,7 +164,7 @@ export function attachMultiplayer(httpServer) {
         // What someone's wearing (ids from the game's wardrobe).
         const o = msg.o ?? {}
         if (![o.top, o.bottom, o.head].every((v) => OUTFIT_ID.test(v ?? ''))) return
-        player.look = { top: o.top, bottom: o.bottom, head: o.head }
+        player.look = { top: o.top, bottom: o.bottom, head: o.head, g: o.g === 'girl' ? 'girl' : 'boy' }
         broadcast(player.room, { t: 'look', id: player.id, o: player.look }, player.id)
       } else if (msg.t === 'roster') {
         // The phone's contacts: everyone online, in any room.

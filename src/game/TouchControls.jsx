@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EMOTES, emote } from './emotes'
 import { useGame, world } from './state'
 import { phone } from './phoneline'
+import { personalize } from './who'
 
 // On-screen controls for phones and tablets, kept as quiet as Messenger's:
 //  - left half: put a thumb down anywhere and drag to move (the stick only
@@ -220,7 +221,7 @@ export default function TouchControls() {
   // The big button: what's nearby, else punch (on foot) or the horn (driving).
   const main = action ?? (car ? { key: 'KeyQ', icon: '📯', label: 'Horn' } : { key: 'KeyX', icon: '👊', label: '' })
   // Say what the button will do ("talk to Mama Nkechi"), or show a hint.
-  const bare = prompt?.replace(/^Press [EF] to /, '')
+  const bare = personalize(prompt)?.replace(/^Press [EF] to /, '')
   const caption = bare ? bare[0].toUpperCase() + bare.slice(1) : null
   return (
     <div className="touch">

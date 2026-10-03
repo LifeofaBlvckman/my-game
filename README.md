@@ -6,13 +6,16 @@ Rapier physics and Vite.
 
 ## Features
 
+- **You:** pick a boy or a girl and type your name on the title screen; the
+  story calls you by it.
 - **Lagos:** Mainland (Ikeja, Yaba, Surulere, Ebute Metta) and Island (Lagos
   Island, Ikoyi, VI, Lekki), joined by Third Mainland and Carter Bridge.
 - **Places:** markets, Lekki Grand Mall, clubs, bus stops, and buildings you
   can enter: Tunde's house, Club Eko, Kwilox, a gym, a church, a bank, the
   General Hospital (you wake up here when wasted) and a police station (you
   walk out of here when busted).
-- **Your room:** change clothes at the wardrobe and decorate from the laptop.
+- **Your room:** change clothes at the wardrobe and decorate from the laptop
+  on the desk.
 - **Traffic:** danfos, kekes, sedans and jeeps, with luxury cars on the
   Island; traffic lights, stop signs, horns and engine sounds. Danfos and
   kekes pick up passengers at bus stops. LASTMA wardens give you a star if
@@ -69,15 +72,24 @@ One service runs the game, multiplayer and saved games. Free servers sleep
 when unused, so the first visit after that takes about a minute.
 
 **Keep saved games (free database):** without a database, saves are wiped
-each time Render restarts the server.
+each time Render restarts the server. Any Postgres database works; the game
+makes its tables by itself.
 
-1. Sign up at [neon.tech](https://neon.tech) and create a project.
-2. Copy its connection string (it starts with `postgresql://`).
+*Supabase:*
+
+1. Sign up at [supabase.com](https://supabase.com) and create a project (note
+   the database password you set).
+2. Click **Connect** at the top of the project. Under **Session pooler**, copy
+   the connection string (`postgresql://postgres.xxxx:[YOUR-PASSWORD]@aws-...pooler.supabase.com:5432/postgres`)
+   and put your password in place of `[YOUR-PASSWORD]`. Use the pooler one:
+   Render can't reach Supabase's "Direct connection" address.
 3. In Render, open the **eko-streets** service, go to **Environment**, add
    `DATABASE_URL` with that string, and save. The service redeploys.
 
-The game makes its tables by itself. Render's own free database works too,
-but it expires after 30 days.
+Free Supabase projects pause after a week nobody plays; restore it from the
+Supabase dashboard (saves are kept). *Neon* ([neon.tech](https://neon.tech))
+works the same way (copy its connection string into `DATABASE_URL`) and
+doesn't need restoring. Render's own free database expires after 30 days.
 
 ## Controls
 

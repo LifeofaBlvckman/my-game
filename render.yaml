@@ -11,8 +11,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
-      # Saved games: a Postgres connection string (e.g. a free neon.tech
-      # database). Render asks for it; leave it empty to save to a file that
+      # Saved games: a Postgres connection string (Supabase's session
+      # pooler, or Neon). Render asks for it; leave it empty to save to a file that
       # is wiped on each restart.
       - key: DATABASE_URL
         sync: false

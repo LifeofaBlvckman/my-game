@@ -527,7 +527,7 @@ function interact() {
       best.role === 'bouncer'
         ? 'You no dey the list. Comot.'
         : best.role === 'cop'
-          ? 'Oga, you dey under arrest!'
+          ? '{Oga|Madam}, you dey under arrest!'
           : best.role === 'trader' || best.role === 'seller'
             ? 'Customer! Come buy, I go do you good price.'
             : STRANGER_LINES[Math.floor(Math.random() * STRANGER_LINES.length)]

@@ -402,6 +402,35 @@
   outline: none;
 }
 
+.gender-pick {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.gender-pick button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 104px;
+  padding: 10px 0 8px;
+  border: 3px solid #2a1a2e;
+  border-radius: 12px;
+  background: rgba(251, 246, 234, 0.75);
+  color: #2a1a2e;
+  font: bold 15px Arial, Helvetica, sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: none;
+}
+.gender-pick button span {
+  font-size: 34px;
+}
+.gender-pick button.active {
+  background: #ffd23a;
+  box-shadow: 3px 3px 0 #2a1a2e;
+}
 .sign-in {
   display: flex;
   justify-content: center;

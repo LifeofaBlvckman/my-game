@@ -58,6 +58,7 @@ export function collectSave() {
     health: g.health,
     // A job half done starts again from its first conversation.
     quest: g.quest,
+    gender: g.gender,
     outfit: g.outfit,
     decor: g.decor,
     owned: g.owned,
@@ -74,7 +75,8 @@ export function applySave(save) {
     health: n(save.health, 1, 100, 100),
     quest: n(save.quest, 0, 100, 0),
     step: -1,
-    outfit: cleanOutfit(save.outfit),
+    gender: save.gender === 'girl' ? 'girl' : 'boy',
+    outfit: cleanOutfit(save.outfit, save.gender),
     decor: cleanDecor(save.decor),
     owned: Array.isArray(save.owned) ? save.owned.filter((id) => typeof id === 'string').slice(0, 100) : [],
     music: ['calm', 'afro', 'off'].includes(save.music) ? save.music : 'calm',

@@ -485,7 +485,7 @@ export function generateCity(seed = 2026) {
           fg: '#ffffff',
           glow: e.small ? undefined : '#ffffff',
         })
-        addDoor(e.id, e.id === 'home' ? "TUNDE'S HOUSE" : e.name, x, front - 3)
+        addDoor(e.id, e.id === 'home' ? "{NAME}'S HOUSE" : e.name, x, front - 3)
         continue
       }
 

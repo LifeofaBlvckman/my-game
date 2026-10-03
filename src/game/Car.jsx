@@ -8,8 +8,7 @@ import { useGame, world } from './state'
 import { partColor, partKind, VEHICLES } from './vehicleTypes'
 import Driver from './Driver'
 import { seatMatrix, steeringWheel } from './drivers'
-import { PLAYER_FACE } from './Player'
-import { lookFromOutfit } from './wardrobe'
+import { lookFromOutfit, playerFace } from './wardrobe'
 import { setEngine } from './audio'
 import { Blob } from './Shadows'
 import { fx } from './particles'
@@ -78,7 +77,9 @@ export default function Car() {
   const riders = useGame((s) => s.riders)
   const color = useGame((s) => s.carColor)
   const outfit = useGame((s) => s.outfit)
-  const driverLook = useMemo(() => lookFromOutfit(outfit), [outfit])
+  const gender = useGame((s) => s.gender)
+  const driverLook = useMemo(() => lookFromOutfit(outfit, null, gender), [outfit, gender])
+  const driverFace = useMemo(() => playerFace(gender), [gender])
   const def = VEHICLES[type]
   const wheels = useMemo(() => def.wheels.at.map((w, i) => ({ w, front: w[2] > 0, i })), [def])
 
@@ -201,7 +202,7 @@ export default function Car() {
   return (
     <RigidBody ref={body} colliders={false} position={city.carSpawn} rotation={[0, city.carSpawnYaw, 0]} enabledRotations={[false, true, false]} canSleep={false}>
       <CuboidCollider key={type} args={def.half} mass={1200} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
-      <Body type={type} color={color} driver={inCar ? driverLook : null} driverFace={PLAYER_FACE} riders={riders} />
+      <Body type={type} color={color} driver={inCar ? driverLook : null} driverFace={driverFace} riders={riders} />
       {wheels.map(({ w, front, i }) => (
         <group key={`${type}${i}`} position={w} ref={(el) => (wheelSteer.current[i] = front ? el : null)}>
           <mesh ref={(el) => (wheelSpin.current[i] = el)}>

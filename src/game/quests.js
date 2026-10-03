@@ -119,7 +119,7 @@ city.parkedCars.push({ x: ojuelegba.x + 10, z: ojuelegba.z - 1.4, yaw: Math.PI /
 const HIDEOUT = { x: blockX(0), z: front(0) - 1.5 }
 city.signs.push({ text: 'SKIDO MOTORS', x: HIDEOUT.x, y: 4.6, z: front(0) - 0.6, rot: 0, w: 7, h: 1.2, bg: '#2a2633', fg: '#f2b705', posts: true })
 
-const P = 'Tunde'
+const P = '{name}' // the player (who.js fills in their name)
 const line = (speaker, text) => ({ speaker, text })
 
 // Each quest: a giver, the lines that start it, and steps. Step kinds:
@@ -137,7 +137,7 @@ export const QUESTS = [
     giver: 'nkechi',
     reward: 5000,
     start: [
-      line('Mama Nkechi', 'Tunde! My pikin! You don come back from abroad finally. See as you fresh!'),
+      line('Mama Nkechi', '{name}! My pikin! You don come back from abroad finally. See as you fresh!'),
       line(P, 'Mama, I dey o. Lagos never change, the go-slow still dey there.'),
       line('Mama Nkechi', 'Eh hen, since you dey free, carry this bag of tatashe go give Iya Basira for her buka for Yaba.'),
       line('Mama Nkechi', 'Her customers dey wait for stew. No let am spoil o!'),
@@ -149,7 +149,7 @@ export const QUESTS = [
         carry: 'nylon', // a black nylon bag full of tatashe
         handed: 'MAMA NKECHI HANDS YOU A NYLON OF PEPPER',
         talk: [
-          line('Iya Basira', 'Ah, Mama Nkechi pepper! God bless you my son.'),
+          line('Iya Basira', 'Ah, Mama Nkechi pepper! God bless you {my son|my daughter}.'),
           line('Iya Basira', 'Take this small change. And come chop amala any time you hungry.'),
         ],
       },
@@ -160,7 +160,7 @@ export const QUESTS = [
     giver: 'mama',
     reward: 3000,
     start: [
-      line('Mama', 'Tunde! Since you land, you never step foot inside church. You don forget God?'),
+      line('Mama', '{name}! Since you land, you never step foot inside church. You don forget God?'),
       line(P, 'Mama, I just dey settle down small...'),
       line('Mama', 'Settle down for where? Oya, go Mountain of Grace Chapel. Pastor Adewale dey wait to pray for you.'),
     ],
@@ -170,7 +170,7 @@ export const QUESTS = [
         npc: 'pastor',
         objective: 'SEE PASTOR ADEWALE AT THE ALTAR',
         talk: [
-          line('Pastor Adewale', 'Brother Tunde! The prodigal son has returned to Lagos. Praise the Lord!'),
+          line('Pastor Adewale', '{Brother|Sister} {name}! The prodigal {son|daughter} has returned to Lagos. Praise the Lord!'),
           line('Pastor Adewale', 'This city will test you. Traffic, agberos, temptation... but you will not fall.'),
           line(P, 'Amen, Pastor.'),
           line('Pastor Adewale', 'Go in peace. And tell your mother I said she should bring the jollof on Sunday.'),
@@ -184,7 +184,7 @@ export const QUESTS = [
     giver: 'tobi',
     reward: 10000,
     start: [
-      line('DJ Tobi', 'Bros! Tonight na my biggest show for Club Eko and wahala don burst.'),
+      line('DJ Tobi', '{Bros|Sis}! Tonight na my biggest show for Club Eko and wahala don burst.'),
       line('DJ Tobi', 'I forget my flash drive with Chidi, the phone guy for Lekki Grand Mall. All my mixes dey inside!'),
       line('DJ Tobi', 'Lekki dey Island side. Take Third Mainland Bridge, e go fast if no go-slow.'),
     ],
@@ -203,7 +203,7 @@ export const QUESTS = [
         carry: 'drive',
         handed: 'CHIDI HANDS YOU THE FLASH DRIVE',
         talk: [
-          line('DJ Tobi', 'My guy! You don save my life. Tonight go loud!'),
+          line('DJ Tobi', '{My guy|My babe}! You don save my life. Tonight go loud!'),
           line('DJ Tobi', 'Take this. And you fit enter Club Eko any time, just tell the bouncer say na me send you.'),
         ],
       },
@@ -214,7 +214,7 @@ export const QUESTS = [
     giver: 'funke',
     reward: 8000,
     start: [
-      line('Aunty Funke', 'Tunde, see you! You go come my sister owambe this Saturday abi?'),
+      line('Aunty Funke', '{name}, see you! You go come my sister owambe this Saturday abi?'),
       line('Aunty Funke', 'Tailor Emeka for Surulere never bring our aso-ebi. Party na tomorrow!'),
       line('Aunty Funke', 'Go check am for me. If e no ready, sit there till e finish!'),
     ],
@@ -244,7 +244,7 @@ export const QUESTS = [
     giver: 'femi',
     reward: 12000,
     start: [
-      line('Baba Femi', 'Young man, you fit drive? My conductor no show today and passengers full Ojuelegba.'),
+      line('Baba Femi', '{Young man|Young lady}, you fit drive? My conductor no show today and passengers full Ojuelegba.'),
       line('Baba Femi', 'See my danfo for front. Load three passengers here, carry them go CMS for Island.'),
       line('Baba Femi', 'Pass Third Mainland. Abeg no jam police, dem don dey find reason since morning.'),
     ],
@@ -266,7 +266,7 @@ export const QUESTS = [
     giver: 'skido',
     reward: 50000,
     start: [
-      line('Skido', 'Tunde. I hear say you get liver. I get one runs wey go change your life.'),
+      line('Skido', '{name}. I hear say you get liver. I get one runs wey go change your life.'),
       line('Skido', 'No Wahala Bank for Marina. Inside job: the cashier na my person. You go in, stand for the counter, she go fill the bag.'),
       line(P, 'Skido, this thing no be small o...'),
       line('Skido', 'Once alarm sound, police go come. Shake them, then bring the bag come my garage for Ikeja. Fifty thousand for you.'),
@@ -290,7 +290,7 @@ export const QUESTS = [
 
 // Waking up at home: Mama sends Tunde out for the day.
 export const INTRO_CALL = [
-  line('Mama', 'Tunde! Tunde! You still dey sleep? Sun don reach afternoon!'),
+  line('Mama', '{name}! {name}! You still dey sleep? Sun don reach afternoon!'),
   line(P, 'Mama, jet lag dey worry me...'),
   line('Mama', 'Jet lag ko, jet lag ni. Mama Nkechi say make you come see am for Oja Oba Market. She get small work for you.'),
 ]
@@ -384,13 +384,13 @@ SIDE_JOBS.push({
       vehicle: true,
       time: 60,
       objective: 'RUSH HIM TO THE GENERAL HOSPITAL',
-      talk: [line('Nurse Ngozi', 'You do well! The doctors don carry am inside. God bless you, my brother.')],
+      talk: [line('Nurse Ngozi', 'You do well! The doctors don carry am inside. God bless you, {my brother|my sister}.')],
     },
   ],
 })
 
 export const CHATTER = ['How far?', 'Lagos no easy o.', 'No wahala.', 'I dey my lane.', 'Shey you dey alright?', 'Traffic don too much today.', 'Abeg I dey hurry.']
-export const STRANGER_LINES = ['How far, bros?', 'Oga, wetin you dey find?', 'Fine boy, no pimples!', 'E go better.', 'Abeg shift.', 'Sharp guy!', 'You get change for N1000?']
+export const STRANGER_LINES = ['How far, {bros|my sister}?', 'Oga, wetin you dey find?', 'Fine {boy|girl}, no pimples!', 'E go better.', 'Abeg shift.', 'Sharp {guy|babe}!', 'You get change for N1000?']
 
 // Where to send the player for something that may be indoors: the room
 // itself if they're in it, otherwise its front door.

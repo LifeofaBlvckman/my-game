@@ -4,8 +4,8 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // Saved games. Players sign in with a name and a PIN; the server keeps one
-// save per name. With DATABASE_URL set (a Postgres database, e.g. a free one
-// from neon.tech) saves live there; without it they go in a JSON file, which
+// save per name. With DATABASE_URL set (any Postgres database: Supabase,
+// Neon, Render...) saves live there; without it they go in a JSON file, which
 // is fine on your own computer but is wiped whenever Render restarts.
 //
 // API (JSON in, JSON out):
@@ -35,10 +35,32 @@ async function checkPin(pin, stored) {
 
 // --- Storage: Postgres, or a JSON file ---
 
+// How to connect securely. Supabase signs its database certificates with its
+// own authority, which Node doesn't know, so for Supabase the connection is
+// encrypted without checking the certificate. Elsewhere (Neon, Render...) it
+// is checked as usual. An `sslmode` in the URL is left to pg.
+function connection(url) {
+  const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url)
+  if (local) return { connectionString: url }
+  let host = ''
+  try {
+    host = new URL(url).hostname
+  } catch {
+    // not a URL pg can use either; let it report the problem
+  }
+  if (/supabase\.(co|com)$/.test(host)) {
+    const u = new URL(url)
+    u.searchParams.delete('sslmode') // it would override the ssl setting below
+    return { connectionString: u.toString(), ssl: { rejectUnauthorized: false } }
+  }
+  return /sslmode=/.test(url) ? { connectionString: url } : { connectionString: url, ssl: { rejectUnauthorized: true } }
+}
+
 async function postgresStore(url) {
   const { default: pg } = await import('pg')
-  const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url)
-  const pool = new pg.Pool({ connectionString: url, ssl: local || /sslmode=/.test(url) ? undefined : { rejectUnauthorized: true }, max: 4 })
+  const pool = new pg.Pool({ ...connection(url), max: 4 })
+  // A free Supabase project pauses after a quiet week; don't crash on that.
+  pool.on('error', (err) => console.error('Database connection problem:', err.message))
   await pool.query(`
     create table if not exists eko_players (
       name_key text primary key,

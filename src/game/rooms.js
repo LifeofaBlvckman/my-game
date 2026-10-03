@@ -28,7 +28,7 @@ const pew = (x, z) => [
 
 export const INTERIORS = {
   home: {
-    name: "TUNDE'S HOUSE",
+    name: "{NAME}'S HOUSE", // who.js fills in the player's name
     size: [14, 3.4, 10],
     floor: '#a8784c',
     wall: '#f2e2c4',

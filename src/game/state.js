@@ -42,6 +42,7 @@ export const useGame = create((set) => ({
   timer: null, // seconds left on a timed step
   music: 'calm', // 'calm' | 'afro' | 'off' (M cycles)
   // What Tunde wears and how his room looks (saved), and what he owns.
+  gender: 'boy', // 'boy' | 'girl', picked on the title screen
   outfit: DEFAULT_OUTFIT,
   decor: DEFAULT_DECOR,
   owned: [], // ids of clothes and furniture bought

@@ -9,7 +9,7 @@ import Person from './Person'
 import { computePose } from './people'
 import { Blob } from './Shadows'
 import EmoteBubble from './EmoteBubble'
-import { hasPattern, lookFromOutfit } from './wardrobe'
+import { hasPattern, lookFromOutfit, playerFace } from './wardrobe'
 import { useGame, world } from './state'
 
 // Like in Messenger, the everyday pace is a jog; Shift is a flat-out sprint.
@@ -18,8 +18,7 @@ const SPRINT = 9.5
 const JUMP = 6
 const FOOT_OFFSET = 0.9 // capsule center to the soles of the feet
 
-// Tunde: by default an Ankara shirt, jeans and a low cut (wardrobe.js), and a beard.
-export const PLAYER_FACE = { female: false, beard: true, mouth: 'grin', brows: true }
+// The player: a boy or a girl, dressed from the wardrobe (wardrobe.js).
 const PUNCH_TIME = 0.32
 
 const pose = {}
@@ -39,7 +38,9 @@ export default function Player() {
   const carry = useGame((s) => s.carry)
   const carryColor = useGame((s) => s.carryColor)
   const outfit = useGame((s) => s.outfit)
-  const look = useMemo(() => lookFromOutfit(outfit), [outfit])
+  const gender = useGame((s) => s.gender)
+  const look = useMemo(() => lookFromOutfit(outfit, null, gender), [outfit, gender])
+  const face = useMemo(() => playerFace(gender), [gender])
   const shirt = useMemo(makeAnkaraTexture, [])
 
   useEffect(() => {
@@ -157,7 +158,7 @@ export default function Player() {
     <RigidBody ref={body} colliders={false} position={city.spawn} enabledRotations={[false, false, false]} canSleep={false}>
       <CapsuleCollider args={[0.55, 0.35]} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
       <group ref={visual} position-y={-FOOT_OFFSET} visible={mode === 'foot'}>
-        <Person ref={person} look={look} shirtMap={hasPattern(outfit) ? shirt : null} faceOverride={PLAYER_FACE} carry={carry} carryColor={carryColor} />
+        <Person ref={person} look={look} shirtMap={hasPattern(outfit) ? shirt : null} faceOverride={face} carry={carry} carryColor={carryColor} />
         <Blob position-y={0.03} scale={[0.9, 1, 0.9]} />
       </group>
       {mode === 'foot' && <EmoteBubble get={() => world.emote} y={1.4} />}

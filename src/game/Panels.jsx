@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { FLOORS, ITEMS, PAINTS, SOFAS } from './decor'
 import { blip, jingle } from './audio'
 import { useGame } from './state'
-import { WARDROBE } from './wardrobe'
+import { itemsFor, WARDROBE } from './wardrobe'
 
 // Full-screen menus at home: the wardrobe (change clothes, buy new ones) and
 // the laptop (paint the walls, buy furniture). Everything bought is kept.
@@ -73,6 +73,7 @@ export function Wardrobe() {
   const outfit = useGame((s) => s.outfit)
   const owned = useGame((s) => s.owned)
   const money = useGame((s) => s.money)
+  const gender = useGame((s) => s.gender)
   const [tab, setTab] = useState('top')
   return (
     <Sheet title="Wardrobe">
@@ -84,7 +85,7 @@ export function Wardrobe() {
         ))}
       </div>
       <div className="cards">
-        {WARDROBE[tab].map((c) => {
+        {itemsFor(WARDROBE[tab], gender).map((c) => {
           const mine = c.price === 0 || owned.includes(c.id)
           const wearing = outfit[tab] === c.id
           const color = c.top ?? c.bottom ?? (c.hair === 'bald' ? '#6e4430' : c.hairColor)

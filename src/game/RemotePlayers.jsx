@@ -49,8 +49,11 @@ function RemotePlayer({ id }) {
   // What they chose in their wardrobe, or (an older game) a look from their name.
   const outfit = useGame((st) => st.remoteLooks[id])
   const look = useMemo(() => {
-    const seeded = lookFromSeed(hashName(r?.name ?? 'player'), { robe: false, female: false })
-    return outfit ? lookFromOutfit(outfit, seeded) : seeded
+    // Their own face and skin (a girl's face for a girl), their own clothes.
+    const h = hashName(r?.name ?? 'player')
+    const seeded = lookFromSeed(h, { robe: false, female: false })
+    if (!outfit) return seeded
+    return lookFromOutfit(outfit, { face: (outfit.g === 'girl' ? 8 : 0) + (h % 8), skin: seeded.skin }, outfit.g)
   }, [outfit, r?.name])
   const shirt = useMemo(makeAnkaraTexture, [])
   const tag = useMemo(() => nameTag(r?.name ?? 'Player'), [r?.name])
