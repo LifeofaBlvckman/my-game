@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { city, CELL, GRID, ROAD } from './cityData'
-import { vehicles } from './traffic'
+import { vehicles } from './trafficSim'
 import { useGame, world } from './state'
 
 const SIZE = 170 // px on screen

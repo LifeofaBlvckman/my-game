@@ -81,11 +81,11 @@ src/
     cityData.js          Procedural map: blocks, districts, landmarks, lanes
     City.jsx             Ground, buildings, trees, lamps, tanks; static colliders
     Landmarks.jsx        Market stalls, mall, clubs and neon, signs, billboards
-    TrafficLights.jsx    Lights, crossings, stop lines (timing in trafficLights.js)
-    traffic.js           Traffic and police simulation on the lane grid
+    TrafficLights.jsx    Lights, crossings, stop lines (timing in signals.js)
+    trafficSim.js        Traffic and police simulation on the lane grid
     Traffic.jsx          Draws all traffic with 3 instanced meshes; kinematic bodies
     vehicleTypes.js      Danfo, keke, sedan, jeep, police: parts, handling
-    pedestrians.js       Crowd simulation: walkers, idlers, wanderers, knockdowns
+    crowd.js             Crowd simulation: walkers, idlers, wanderers, knockdowns
     Pedestrians.jsx      Draws the whole crowd with 2 instanced meshes
     people.js            Body parts and outfits shared by the crowd and <Person>
     faces.js             Canvas-drawn faces, Ankara print, sign textures
@@ -186,8 +186,8 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 
 - Render sharpness: `RENDER_SCALE` in `src/App.jsx` (0.6 by default; 1 is native).
 - Car handling: `src/game/vehicleTypes.js` (per vehicle) and the constants in `src/game/Car.jsx`.
-- Traffic density: `TRAFFIC` and `POLICE` in `src/game/traffic.js`. Light timing: `src/game/trafficLights.js`.
-- Crowd size: `WALKERS` in `src/game/pedestrians.js`.
+- Traffic density: `TRAFFIC` and `POLICE` in `src/game/trafficSim.js`. Light timing: `src/game/signals.js`.
+- Crowd size: `WALKERS` in `src/game/crowd.js`.
 - City layout: `GRID`, `BLOCK`, `ROAD` and the landmark lists in `src/game/cityData.js`.
 - Time of day: `world.time` in `src/game/state.js` (minutes since midnight; the game starts at 17:00).
 

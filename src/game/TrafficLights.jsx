@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { BoxGeometry, Color } from 'three'
 import { CylinderCollider, RigidBody } from '@react-three/rapier'
 import { ROAD } from './cityData'
-import { approaches, lightFor, signals } from './trafficLights'
+import { approaches, lightFor, signals } from './signals'
 import { Instances, baseBox, unitBox } from './Instances'
 import { unlit } from './materials'
 

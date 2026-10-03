@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Color, InstancedBufferAttribute, Matrix4, PlaneGeometry, Quaternion, Vector3 } from 'three'
-import { npcs, updatePedestrians } from './pedestrians'
+import { npcs, updatePedestrians } from './crowd'
 import { FACE, personParts, SLOTS } from './people'
 import { FACE_COLS, getFaceAtlas } from './faces'
 import { toon, toonRamp } from './materials'

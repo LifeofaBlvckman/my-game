@@ -1,5 +1,5 @@
 import { city, GRID, hasLight, lanePoint, roadLine, ROAD, HALF, CELL, mulberry32 } from './cityData'
-import { lightFor } from './trafficLights'
+import { lightFor } from './signals'
 import { VEHICLES } from './vehicleTypes'
 
 // Traffic simulation on the road grid. Vehicles follow lanes, pick a random
