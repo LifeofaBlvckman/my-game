@@ -16,8 +16,8 @@ const JUMP = 6
 const FOOT_OFFSET = 0.9 // capsule center to the soles of the feet
 
 // Tunde: Ankara shirt, jeans, low cut and a beard.
-export const PLAYER_LOOK = { face: 1, skin: '#6e4430', female: false, top: '#ffffff', bottom: '#3a63a8', hair: 'short', hairColor: '#1f1410', robe: false, height: 1 }
-const PLAYER_FACE = { female: false, beard: true, mouth: 'grin', brows: true }
+export const PLAYER_LOOK = { face: 1, skin: '#6e4430', female: false, top: '#e07b1a', bottom: '#3a63a8', hair: 'short', hairColor: '#1f1410', robe: false, height: 1 }
+export const PLAYER_FACE = { female: false, beard: true, mouth: 'grin', brows: true }
 const PUNCH_TIME = 0.32
 
 const pose = {}

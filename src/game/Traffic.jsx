@@ -1,32 +1,33 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useRapier } from '@react-three/rapier'
-import { Color, CylinderGeometry, Matrix4, Quaternion, Vector3 } from 'three'
-import { city } from './cityData'
+import { BoxGeometry, Color, CylinderGeometry, InstancedBufferAttribute, Matrix4, PlaneGeometry, Quaternion, Vector3 } from 'three'
+import { city, mulberry32 } from './cityData'
 import { initTraffic, updateTraffic, vehicles } from './trafficSim'
-import { MAX_PARTS, MAX_WHEELS, partColor, VEHICLES } from './vehicleTypes'
-import { carBox } from './shapes'
+import { MAX_PARTS, MAX_WHEELS, partColor, partKind, VEHICLES } from './vehicleTypes'
+import { carBox, SHAPES } from './shapes'
 import { explode, hurtPlayer, TRAFFIC_HP, vehicleSmoke, wreckVehicle } from './damage'
 import { honk } from './audio'
-import { toonRamp, unlit } from './materials'
+import { toon, toonRamp, unlit } from './materials'
 import { useGame, world } from './state'
 import { blobGeometry, blobMaterial } from './Shadows'
+import { driverFace, driverParts, seatMatrix } from './drivers'
+import { COP_LOOK, randomLook } from './people'
+import { FACE_COLS, getFaceAtlas } from './faces'
 
 const wheelGeometry = new CylinderGeometry(1, 1, 0.28, 10).rotateZ(Math.PI / 2)
+const KINDS = ['lit', 'trim', 'glow', 'glass']
+const plainBox = new BoxGeometry(1, 1, 1)
+const DRIVER_SLOTS = { sphere: 2, rbox: 2, capsule: 2 }
 
-// Local matrices for every part of every vehicle type, computed once.
+// Local matrices for every part of every vehicle type, split by kind
+// (solid, glowing lights, see-through glass), computed once.
 const rigs = Object.fromEntries(
-  Object.entries(VEHICLES).map(([type, def]) => [
-    type,
-    {
-      parts: def.parts.map((p) => ({
-        p,
-        glow: !!p[7],
-        siren: p[6] === 'sirenA' || p[6] === 'sirenB',
-        m: new Matrix4().makeTranslation(p[0], p[1], p[2]).multiply(new Matrix4().makeScale(p[3], p[4], p[5])),
-      })),
-    },
-  ]),
+  Object.entries(VEHICLES).map(([type, def]) => {
+    const byKind = { lit: [], trim: [], glow: [], glass: [] }
+    def.parts.forEach((p) => byKind[partKind(p)].push({ p, m: new Matrix4().makeTranslation(p[0], p[1], p[2]).multiply(new Matrix4().makeScale(p[3], p[4], p[5])) }))
+    return [type, { byKind, seat: seatMatrix(def.seat) }]
+  }),
 )
 
 const zero = new Matrix4().makeScale(0, 0, 0)
@@ -39,16 +40,60 @@ const v3 = new Vector3()
 const one = new Vector3(1, 1, 1)
 const v3b = new Vector3()
 const c = new Color()
+const seatBase = new Matrix4()
 
 if (!vehicles.length) initTraffic(city.spawn)
+const lookRand = mulberry32(5150)
+vehicles.forEach((v) => (v.civilian = randomLook(lookRand, { robe: false })))
+
+const driverLook = (v) => (v.police ? COP_LOOK : v.civilian)
+// Somebody is at the wheel unless the car is parked, wrecked, burning, or its
+// driver just got out (a cop chasing you on foot, or a driver you dragged out).
+const hasDriver = (v) => v.state !== 'parked' && !v.wrecked && !(v.burning > 0) && !v.officerOut
+
+function createFaceMaterial() {
+  const material = toon({ map: getFaceAtlas(), transparent: true, alphaTest: 0.05, depthWrite: false })
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aFace;')
+      .replace(
+        '#include <uv_vertex>',
+        `#include <uv_vertex>
+        vMapUv = (uv + vec2(mod(aFace, ${FACE_COLS}.0), ${FACE_COLS - 1}.0 - floor(aFace / ${FACE_COLS}.0))) / ${FACE_COLS}.0;`,
+      )
+  }
+  return material
+}
 
 export default function Traffic() {
-  const lit = useRef()
-  const glow = useRef()
+  const meshes = { lit: useRef(), trim: useRef(), glow: useRef(), glass: useRef() }
+  const people = { sphere: useRef(), rbox: useRef(), capsule: useRef() }
+  const faces = useRef()
   const wheels = useRef()
   const shadows = useRef()
   const { rapier, world: physics } = useRapier()
-  const glowMaterial = useMemo(() => unlit(), [])
+  const materials = useMemo(
+    () => ({
+      lit: toon(),
+      trim: toon(),
+      glow: unlit(),
+      glass: toon({ transparent: true, opacity: 0.35, depthWrite: false }),
+    }),
+    [],
+  )
+  const faceMaterial = useMemo(createFaceMaterial, [])
+  const faceGeometry = useMemo(() => {
+    const g = new PlaneGeometry(1, 1)
+    g.setAttribute('aFace', new InstancedBufferAttribute(new Float32Array(vehicles.length), 1))
+    return g
+  }, [])
+
+  useLayoutEffect(() => {
+    for (const mesh of [...Object.values(meshes), ...Object.values(people), faces, wheels]) {
+      for (let i = 0; i < mesh.current.count; i++) mesh.current.setMatrixAt(i, zero)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Kinematic bodies so traffic pushes the player around but follows its own path.
   useEffect(() => {
@@ -82,6 +127,7 @@ export default function Traffic() {
 
     const flip = Math.floor(performance.now() / 160) % 2 === 0
     const onFoot = game.mode === 'foot' && game.phase === 'playing' && !world.playerDown
+    const faceAttr = faceGeometry.getAttribute('aFace')
     vehicles.forEach((v, i) => {
       const def = VEHICLES[v.type]
       const rig = rigs[v.type]
@@ -103,9 +149,9 @@ export default function Traffic() {
       if (onFoot && v.speed > 4 && !v.chasing && (v.hitCooldown ?? 0) <= performance.now()) {
         const rx = world.focus.x - v.x
         const rz = world.focus.z - v.z
-        const c = Math.cos(v.yaw)
-        const s = Math.sin(v.yaw)
-        if (Math.abs(rx * c - rz * s) < def.half[0] + 0.35 && Math.abs(rx * s + rz * c) < def.half[2] + 0.35) {
+        const cos = Math.cos(v.yaw)
+        const sin = Math.sin(v.yaw)
+        if (Math.abs(rx * cos - rz * sin) < def.half[0] + 0.35 && Math.abs(rx * sin + rz * cos) < def.half[2] + 0.35) {
           hurtPlayer(Math.round(v.speed * 2.2), v.x, v.z, true)
           v.stall = 3
           v.hitCooldown = performance.now() + 1500
@@ -131,25 +177,52 @@ export default function Traffic() {
       base.compose(v3.set(x, def.half[1], z), q, one)
 
       const recolor = v.dirty || v.colored === undefined || (v.police && (v.chasing || v.sirenWasOn))
-      for (let k = 0; k < MAX_PARTS; k++) {
-        const slot = i * MAX_PARTS + k
-        const part = rig.parts[k]
-        if (!part) {
-          lit.current.setMatrixAt(slot, zero)
-          glow.current.setMatrixAt(slot, zero)
-          continue
+      for (const kind of KINDS) {
+        const mesh = meshes[kind].current
+        const list = rig.byKind[kind]
+        for (let k = 0; k < MAX_PARTS[kind]; k++) {
+          const slot = i * MAX_PARTS[kind] + k
+          const part = list[k]
+          if (!part) {
+            mesh.setMatrixAt(slot, zero)
+            continue
+          }
+          mesh.setMatrixAt(slot, tmp.multiplyMatrices(base, part.m))
+          if (recolor) mesh.setColorAt(slot, c.set(partColor(part.p, v.color, v.chasing, flip)))
         }
-        tmp.multiplyMatrices(base, part.m)
-        lit.current.setMatrixAt(slot, part.glow ? zero : tmp)
-        glow.current.setMatrixAt(slot, part.glow ? tmp : zero)
-        if (recolor) (part.glow ? glow : lit).current.setColorAt(slot, c.set(partColor(part.p, v.color, v.chasing, flip)))
       }
-      if (recolor) {
+
+      // The driver.
+      const look = driverLook(v)
+      if (v.driverRigFor !== look) {
+        v.driverRigFor = look
+        v.driverRig = driverParts(look)
+        v.driverRecolor = true
+        faceAttr.setX(i, look.face)
+        faceAttr.needsUpdate = true
+      }
+      const seated = hasDriver(v)
+      const used = { sphere: 0, rbox: 0, capsule: 0 }
+      seatBase.multiplyMatrices(base, rig.seat)
+      for (const p of v.driverRig) {
+        const slot = i * DRIVER_SLOTS[p.shape] + used[p.shape]++
+        const mesh = people[p.shape].current
+        mesh.setMatrixAt(slot, seated ? tmp.multiplyMatrices(seatBase, p.m) : zero)
+        if (v.driverRecolor) mesh.setColorAt(slot, c.set(p.color))
+      }
+      for (const shape of Object.keys(DRIVER_SLOTS)) {
+        for (let k = used[shape]; k < DRIVER_SLOTS[shape]; k++) people[shape].current.setMatrixAt(i * DRIVER_SLOTS[shape] + k, zero)
+      }
+      faces.current.setMatrixAt(i, seated ? tmp.multiplyMatrices(seatBase, driverFace) : zero)
+
+      if (recolor || v.driverRecolor) {
         v.dirty = false
+        v.driverRecolor = false
         v.colored = true
         v.sirenWasOn = v.chasing
-        if (lit.current.instanceColor) lit.current.instanceColor.needsUpdate = true
-        if (glow.current.instanceColor) glow.current.instanceColor.needsUpdate = true
+        for (const mesh of [...Object.values(meshes), ...Object.values(people)]) {
+          if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true
+        }
       }
 
       tmp.compose(v3.set(x, 0.03, z), q, v3b.set(def.half[0] * 2.6, 1, def.half[2] * 2.4))
@@ -168,19 +241,21 @@ export default function Traffic() {
         wheels.current.setMatrixAt(slot, tmp)
       }
     })
-    lit.current.instanceMatrix.needsUpdate = true
-    glow.current.instanceMatrix.needsUpdate = true
-    wheels.current.instanceMatrix.needsUpdate = true
-    shadows.current.instanceMatrix.needsUpdate = true
+    for (const mesh of [...Object.values(meshes), ...Object.values(people), faces, wheels, shadows]) mesh.current.instanceMatrix.needsUpdate = true
   })
 
   const count = vehicles.length
   return (
     <group>
-      <instancedMesh ref={lit} args={[carBox, undefined, count * MAX_PARTS]} frustumCulled={false}>
-        <meshToonMaterial gradientMap={toonRamp} />
-      </instancedMesh>
-      <instancedMesh ref={glow} args={[carBox, glowMaterial, count * MAX_PARTS]} frustumCulled={false} />
+      {KINDS.map((kind) => (
+        <instancedMesh key={kind} ref={meshes[kind]} args={[kind === 'lit' ? carBox : plainBox, materials[kind], count * MAX_PARTS[kind]]} frustumCulled={false} />
+      ))}
+      {Object.entries(DRIVER_SLOTS).map(([shape, n]) => (
+        <instancedMesh key={shape} ref={people[shape]} args={[SHAPES[shape], undefined, count * n]} frustumCulled={false}>
+          <meshToonMaterial gradientMap={toonRamp} />
+        </instancedMesh>
+      ))}
+      <instancedMesh ref={faces} args={[faceGeometry, faceMaterial, count]} frustumCulled={false} />
       <instancedMesh ref={wheels} args={[wheelGeometry, undefined, count * MAX_WHEELS]} frustumCulled={false}>
         <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
       </instancedMesh>

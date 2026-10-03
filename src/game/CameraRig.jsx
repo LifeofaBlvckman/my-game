@@ -68,7 +68,7 @@ export default function CameraRig() {
     const ray = new rapier.Ray(lookAt, desired)
     const exclude = driving ? world.car : world.player
     const hit = physics.castRay(ray, distance, true, undefined, undefined, undefined, exclude, (c) => !world.trafficColliders.has(c.handle))
-    const d = hit ? Math.max(1, hit.timeOfImpact - 0.3) : distance
+    const d = hit ? Math.max(1.6, hit.timeOfImpact - 0.3) : distance
     desired.multiplyScalar(d).add(lookAt)
 
     if (game.phase === 'intro') {

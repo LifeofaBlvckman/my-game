@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { CoefficientCombineRule, CuboidCollider, RigidBody } from '@react-three/rapier'
-import { Quaternion, Vector3 } from 'three'
+import { BoxGeometry, Quaternion, Vector3 } from 'three'
 import { city } from './cityData'
 import { useGame, world } from './state'
-import { partColor, VEHICLES } from './vehicleTypes'
+import { partColor, partKind, VEHICLES } from './vehicleTypes'
+import Driver from './Driver'
+import { PLAYER_FACE, PLAYER_LOOK } from './Player'
 import { setEngine } from './audio'
 import { Blob } from './Shadows'
 import { fx } from './particles'
@@ -25,16 +27,30 @@ const DRIFT_GRIP = 1.5 // handbrake grip
 const q = new Quaternion()
 const fwd = new Vector3()
 
-export function Body({ type, color }) {
+function partMaterial(p, color) {
+  const kind = partKind(p)
+  if (kind === 'glow') return <meshBasicMaterial color={partColor(p, color)} toneMapped={false} />
+  if (kind === 'glass') return <meshToonMaterial gradientMap={toonRamp} color={partColor(p, color)} transparent opacity={0.35} depthWrite={false} />
+  return <meshToonMaterial gradientMap={toonRamp} color={partColor(p, color)} />
+}
+
+// The vehicle's bodywork, and optionally whoever is at the wheel.
+export function Body({ type, color, driver, driverFace }) {
   const def = VEHICLES[type]
-  return def.parts.map((p, i) => (
-    <mesh key={i} geometry={carBox} position={[p[0], p[1], p[2]]} scale={[p[3], p[4], p[5]]}>
-      {p[7] ? <meshBasicMaterial color={partColor(p, color)} toneMapped={false} /> : <meshToonMaterial gradientMap={toonRamp} color={partColor(p, color)} />}
-    </mesh>
-  ))
+  return (
+    <>
+      {def.parts.map((p, i) => (
+        <mesh key={i} geometry={partKind(p) === 'lit' ? carBox : plainBox} position={[p[0], p[1], p[2]]} scale={[p[3], p[4], p[5]]}>
+          {partMaterial(p, color)}
+        </mesh>
+      ))}
+      {driver && <Driver look={driver} seat={def.seat} faceOverride={driverFace} />}
+    </>
+  )
 }
 
 const CRASH_THRESHOLD = 6
+const plainBox = new BoxGeometry(1, 1, 1)
 
 export default function Car() {
   const body = useRef()
@@ -44,6 +60,7 @@ export default function Car() {
   const lastVel = useRef({ x: 0, z: 0 })
   const [, getKeys] = useKeyboardControls()
   const type = useGame((s) => s.carType)
+  const inCar = useGame((s) => s.mode === 'car')
   const color = useGame((s) => s.carColor)
   const def = VEHICLES[type]
   const wheels = useMemo(() => def.wheels.at.map((w, i) => ({ w, front: w[2] > 0, i })), [def])
@@ -149,7 +166,7 @@ export default function Car() {
   return (
     <RigidBody ref={body} colliders={false} position={city.carSpawn} rotation={[0, Math.PI, 0]} enabledRotations={[false, true, false]} canSleep={false}>
       <CuboidCollider key={type} args={def.half} mass={1200} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
-      <Body type={type} color={color} />
+      <Body type={type} color={color} driver={inCar ? PLAYER_LOOK : null} driverFace={PLAYER_FACE} />
       {wheels.map(({ w, front, i }) => (
         <group key={`${type}${i}`} position={w} ref={(el) => (wheelSteer.current[i] = front ? el : null)}>
           <mesh ref={(el) => (wheelSpin.current[i] = el)}>

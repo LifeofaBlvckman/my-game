@@ -18,14 +18,17 @@ Bar Beach wraps around the edge.
 - Mama put umbrellas on the sidewalks.
 
 **Traffic.**
-- Danfos, kekes, sedans and jeeps drive on the right and turn at junctions.
+- Danfos, kekes, sedans and jeeps drive on the right and turn at junctions,
+  each with a driver you can see through the glass.
 - They queue behind each other, stop at red lights, and stop for you.
 - Every four-way junction has working traffic lights, zebra crossings and stop lines.
 
-**Police.** Patrol cars drive in traffic. Knocking people down or ramming a
-police car gives you wanted stars. Police then leave their lanes to chase you,
-sirens on. Stop near them and you get **BUSTED** (₦1,000 fine). Lose them for a
-while and your stars drop.
+**Police.** Patrol cars drive in traffic. Knocking people down, fighting near
+them or ramming a police car gives you wanted stars. Police then leave their
+lanes to chase you, sirens on. If you're on foot, officers pull up, get out,
+run you down and grab you: **BUSTED** (₦1,000 fine). In a car, they box you
+in. Get back in a car and they return to theirs; lose them for a while and
+your stars drop.
 
 **People.** About 160 pedestrians, each with a drawn face, plus outfits like
 gele, agbada, iro, braids and caps. Walkers circle the blocks, traders tend
@@ -36,8 +39,9 @@ panic when someone nearby gets hit. Talk to anyone with **E**.
 whoever you need next, typewriter dialogue in Pidgin, a "NEXT UP" objective and a
 radar blip. Rewards are paid in naira.
 
-**Driving.** Any car can be jacked with **F**. Each vehicle type handles
-differently, and Space is a handbrake drift.
+**Driving.** Any car can be jacked with **F**: the driver gets dragged out,
+and sometimes comes back to fight you. Each vehicle type handles differently,
+and Space is a handbrake drift.
 
 **Day and night.** One game minute passes per real second. At night, windows,
 street lamps and club neon light up.
@@ -56,12 +60,16 @@ driving, can punch or run each other over, and chat. Everyone shares the same
 time of day. Traffic and crowds are simulated on each player's own machine,
 so they won't match between players.
 
-**Look and sound.**
-- A Messenger-inspired cartoon style:
-  - Chibi characters with round heads, dot eyes and bouncy squash-and-stretch animation.
-  - Pastel houses with pitched roofs, framed windows and doors, and puffy trees.
-  - Soft cel shading with purple-tinted shadows and plum ink outlines.
-  - A gradient sky.
+**Look and sound.** An illustrated style inspired by Abeto's *Messenger*:
+- Two-tone shading: each surface is either lit (warm) or in shadow (one cool
+  tone), with a hard edge between.
+- Real cast shadows from the sun, with pencil-like hatching in shaded areas.
+- Hand-drawn-style ink lines that wobble and vary in weight, with a light
+  paper grain.
+- A flat teal sky with painted clouds.
+- Characters in natural proportions with illustrated faces, and Lagos
+  clothes: Ankara, agbada, iro, gele.
+- Pastel houses with pitched roofs, framed windows and doors, puffy trees.
 - A title screen and an opening fly-in.
 - A synthesized Afrobeats loop, siren, horn, engine, punches and explosions. No audio files.
 
@@ -146,7 +154,11 @@ src/
     audio.js             Synthesized music and sound effects
     Hud.jsx, Radar.jsx   2D overlay
     state.js             Zustand store for the HUD, plus a plain object for per-frame data
-    shapes.js            Soft shapes for the cartoon style: rounded boxes, capsules, puffs, roofs
+    shapes.js            Low-poly shapes for characters and cars: rounded boxes, capsules, puffs, roofs
+    stylize.js           Patches Three's toon shader for hatching in shadow (imported first)
+    ShadowCasters.jsx    Opts toon meshes into real shadows
+    drivers.js           Seated driver model, shared by traffic and Driver.jsx
+    Driver.jsx           Mesh driver for your car and other players' cars
     damage.js            Health and damage for the player, cars and traffic; explosions
     particles.js         Particle pools and spawn functions (sparks, smoke, fire, POW!)
     Effects.jsx          Draws every particle with four instanced meshes
@@ -169,8 +181,13 @@ Three rules keep this fast on older hardware:
    materials instead of real lights at night, and outlines from one
    full-screen pass instead of drawing every mesh twice.
 
-If it's slow on your machine, press **O** to turn off the outlines first, then
-lower the values in `RENDER_SCALE` in `src/App.jsx`.
+If it's slow on your machine, it lowers resolution and turns off real shadows
+by itself after a few seconds. You can also press **O** to turn off the ink
+outlines, or lower the values in `RENDER_SCALE` in `src/App.jsx`.
+
+About 290,000 triangles are drawn per frame (twice that with shadows on):
+people are low-poly, only those within 150 m are drawn, and anyone beyond
+60 m is re-posed every third frame.
 
 ## Adding a job
 
@@ -190,7 +207,8 @@ Jobs unlock in order.
 While running `npm run dev`, `window.__game` exposes state and shortcuts for
 automated browser tests: `state()`, `focus()`, `teleport(x, z)`, `setTime(hours)`,
 `setWanted(n)`, `vehicles()`, `npcs()`, `enterOrExit()`, `interact()`, `punch()`,
-`faceTo(x, z)`, `carHp()` and `damageCar(n)`. It is left out of production builds.
+`faceTo(x, z)`, `carHp()`, `damageCar(n)`, `cops()` and `renderInfo()` (draw
+calls, triangles, shadow setup). It is left out of production builds.
 
 ## Credits
 
@@ -238,7 +256,10 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 ## Tuning
 
 - Render sharpness: `RENDER_SCALE` in `src/App.jsx`. It starts at 1 and drops to
-  0.65 automatically when the frame rate struggles.
+  0.65 automatically when the frame rate struggles; real shadows switch off at
+  the same time (blob shadows stay).
+- Shadow quality: `SHADOW_SIZE` and `SHADOW_RANGE` in `src/game/DayNight.jsx`.
+- Hatching density and strength: the numbers in `src/game/stylize.js`.
 - Car handling: `src/game/vehicleTypes.js` (per vehicle) and the constants in `src/game/Car.jsx`.
 - Traffic density: `TRAFFIC` and `POLICE` in `src/game/trafficSim.js`. Light timing: `src/game/signals.js`.
 - Crowd size: `WALKERS` in `src/game/crowd.js`.

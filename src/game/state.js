@@ -23,6 +23,7 @@ export const useGame = create((set) => ({
   wasted: false,
   busted: false,
   outlines: true,
+  shadows: true, // real cast shadows; turned off automatically on slow machines
   music: true,
   // Multiplayer
   playerName: '',

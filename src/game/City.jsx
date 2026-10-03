@@ -5,7 +5,7 @@ import { gableRoof, puff } from './shapes'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
 import { city, CELL, GRID, HALF, ROAD, roadLine } from './cityData'
 import { createBuildingMaterial, nightUniform, toon, unlit } from './materials'
-import { Instances } from './Instances'
+import { Instances, groundQuad } from './Instances'
 
 const BORDER = 40 // beach between the city and the ocean
 const SIZE = GRID * CELL + ROAD
@@ -69,6 +69,7 @@ export default function City() {
       {/* Sidewalks and lots, parks, lane markings */}
       <Instances
         items={city.blocks}
+        castShadow={false}
         transform={(o, b) => {
           o.position.set(b.x, b.y ?? 0, b.z)
           o.scale.set(b.w, 0.12, b.d)
@@ -77,6 +78,7 @@ export default function City() {
       />
       <Instances
         items={city.parks}
+        castShadow={false}
         transform={(o, p) => {
           o.position.set(p.x, 0, p.z)
           o.scale.set(p.w, 0.16, p.d)
@@ -85,10 +87,12 @@ export default function City() {
       />
       <Instances
         items={dashes}
+        geometry={groundQuad}
+        castShadow={false}
         transform={(o, d) => {
-          o.position.set(d.x, 0, d.z)
+          o.position.set(d.x, 0.02, d.z)
           o.rotation.y = d.rot
-          o.scale.set(2, 0.03, 0.25)
+          o.scale.set(2, 1, 0.25)
         }}
         colors={() => '#e8c547'}
       />

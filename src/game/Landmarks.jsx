@@ -4,7 +4,7 @@ import { AdditiveBlending, BoxGeometry, CanvasTexture, Color, DoubleSide } from 
 import { city } from './cityData'
 import { makeSignTexture } from './faces'
 import { nightUniform, toon, toonRamp, unlit } from './materials'
-import { Instances, baseBox } from './Instances'
+import { Instances, groundQuad } from './Instances'
 
 const poleGeometry = new BoxGeometry(0.08, 1, 0.08).translate(0, 0.5, 0)
 const emissiveMaterial = unlit()
@@ -182,10 +182,11 @@ export default function Landmarks() {
       />
       <Instances
         items={city.parkingLines}
-        geometry={baseBox}
+        geometry={groundQuad}
+        castShadow={false}
         transform={(o, p) => {
-          o.position.set(p.x, 0.12, p.z)
-          o.scale.set(0.15, 0.02, 5)
+          o.position.set(p.x, 0.135, p.z)
+          o.scale.set(0.15, 1, 5)
         }}
         colors={() => '#f2f2f2'}
       />

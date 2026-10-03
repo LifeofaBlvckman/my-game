@@ -55,6 +55,10 @@ function fireColor(t) {
 }
 
 function updatePool(list, mesh, dt, colorFor) {
+  // Nothing alive: draw nothing at all rather than hundreds of empty instances.
+  const anyAlive = list.some((p) => p.life > 0 || p.wasAlive)
+  mesh.count = anyAlive ? list.length : 0
+  if (!anyAlive) return
   list.forEach((p, i) => {
     if (p.life <= 0) {
       if (p.wasAlive) {
@@ -150,8 +154,8 @@ export default function Effects() {
   return (
     <group>
       <instancedMesh ref={sparks} args={[box, materials.spark, pools.spark.length]} frustumCulled={false} />
-      <instancedMesh ref={debris} args={[box, materials.debris, pools.debris.length]} frustumCulled={false} />
-      <instancedMesh ref={smoke} args={[puff, materials.smoke, pools.smoke.length]} frustumCulled={false} />
+      <instancedMesh ref={debris} args={[box, materials.debris, pools.debris.length]} frustumCulled={false} userData={{ noShadow: true }} />
+      <instancedMesh ref={smoke} args={[puff, materials.smoke, pools.smoke.length]} frustumCulled={false} userData={{ noShadow: true }} />
       <instancedMesh ref={glow} args={[puff, materials.glow, pools.glow.length]} frustumCulled={false} />
       {Array.from({ length: MAX_POWS }, (_, k) => (
         <sprite key={k} ref={(el) => (sprites.current[k] = el)} visible={false} renderOrder={10} />

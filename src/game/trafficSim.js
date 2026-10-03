@@ -235,7 +235,8 @@ export function updateTraffic(dt, ctx) {
       if (!v.decor && dist > 230) respawnNear(v, focus)
       continue
     }
-    if (v.burning > 0) {
+    // Burning, or the officer is out on foot: the car stays where it is.
+    if (v.burning > 0 || v.officerOut) {
       v.speed = Math.max(0, v.speed - 20 * dt)
       continue
     }

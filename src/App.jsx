@@ -16,6 +16,7 @@ import DayNight from './game/DayNight'
 import InkOutlines from './game/InkOutlines'
 import Effects from './game/Effects'
 import RemotePlayers from './game/RemotePlayers'
+import ShadowCasters from './game/ShadowCasters'
 import Hud from './game/Hud'
 import { keyMap } from './game/controls'
 import { useGame } from './game/state'
@@ -31,11 +32,20 @@ export default function App() {
     <KeyboardControls map={keyMap}>
       <Canvas
         flat
+        shadows="percentage"
         dpr={dpr}
         gl={{ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         camera={{ fov: 65, near: 0.1, far: 300, position: [150, 70, 150] }}
       >
-        <PerformanceMonitor onDecline={() => setDpr(RENDER_SCALE.low)} onIncline={() => setDpr(RENDER_SCALE.high)} />
+        <PerformanceMonitor
+          onDecline={() => {
+            // Struggling: drop resolution and real shadows (blob shadows stay).
+            setDpr(RENDER_SCALE.low)
+            useGame.setState({ shadows: false })
+          }}
+          onIncline={() => setDpr(RENDER_SCALE.high)}
+        />
+        <ShadowCasters />
         <DayNight />
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]}>

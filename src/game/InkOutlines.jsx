@@ -2,7 +2,8 @@ import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { DepthTexture, HalfFloatType, Mesh, OrthographicCamera, PlaneGeometry, Scene, ShaderMaterial, WebGLRenderTarget } from 'three'
 
-// Cel-style ink lines from depth edges, as a single full-screen pass.
+// Hand-drawn-style ink lines from depth edges, plus a light grade and paper
+// grain, as a single full-screen pass.
 // (Three's OutlineEffect redraws every mesh and doesn't support instancing,
 // which the whole city relies on.) Mounting this takes over rendering.
 const vertexShader = `
@@ -22,21 +23,31 @@ varying vec2 vUv;
 float viewZ(vec2 uv) {
   return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far);
 }
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
 
 void main() {
+  // Jitter where we sample from in small cells, so lines wobble and break
+  // a little like they were inked by hand.
+  vec2 cell = floor(vUv / texel / 4.0);
+  vec2 jitter = (vec2(hash(cell), hash(cell + 17.0)) - 0.5) * texel * 0.8;
+  vec2 uv = vUv + jitter;
+
   vec4 color = texture2D(tColor, vUv);
-  float d = viewZ(vUv);
+  float d = viewZ(uv);
   vec2 tx = vec2(texel.x, 0.0);
   vec2 ty = vec2(0.0, texel.y);
-  float l = viewZ(vUv - tx);
-  float r = viewZ(vUv + tx);
-  float u = viewZ(vUv + ty);
-  float b = viewZ(vUv - ty);
+  float l = viewZ(uv - tx);
+  float r = viewZ(uv + tx);
+  float u = viewZ(uv + ty);
+  float b = viewZ(uv - ty);
 
-  // Silhouettes: a neighbor is much farther away than this pixel. Checking
-  // two texels out as well makes the lines thick enough to read.
+  // Silhouettes: a neighbor is much farther away than this pixel. Line
+  // weight varies along the stroke.
+  float weight = 1.0 + step(0.55, hash(cell * 0.37));
   float gap = max(max(l, r), max(u, b));
-  gap = max(gap, max(max(viewZ(vUv - 2.0 * tx), viewZ(vUv + 2.0 * tx)), max(viewZ(vUv + 2.0 * ty), viewZ(vUv - 2.0 * ty))));
+  gap = max(gap, max(max(viewZ(uv - weight * tx), viewZ(uv + weight * tx)), max(viewZ(uv + weight * ty), viewZ(uv - weight * ty))));
   gap -= d;
   float silhouette = smoothstep(0.03, 0.08, gap / d);
 
@@ -44,12 +55,18 @@ void main() {
   // derivative is zero except where two faces meet at an angle.
   float id = 1.0 / d;
   float lap = abs(1.0 / l + 1.0 / r - 2.0 * id) + abs(1.0 / u + 1.0 / b - 2.0 * id);
-  float crease = smoothstep(0.012, 0.03, lap / id);
+  float crease = smoothstep(0.01, 0.025, lap / id);
 
   float fade = 1.0 - smoothstep(fadeEnd * 0.35, fadeEnd, d);
-  float ink = max(silhouette, crease * 0.7) * fade;
-  // Soft plum ink rather than pure black, like a cartoon.
-  gl_FragColor = vec4(mix(color.rgb, vec3(0.13, 0.08, 0.16), ink * 0.85), 1.0);
+  float ink = max(silhouette, crease * 0.75) * fade;
+  vec3 c = mix(color.rgb, vec3(0.1, 0.12, 0.16), ink * 0.85);
+
+  // Light grade toward an illustrated palette: slightly muted, with a
+  // little paper grain.
+  float luma = dot(c, vec3(0.299, 0.587, 0.114));
+  c = mix(c, vec3(luma), 0.08);
+  c *= 0.97 + 0.05 * hash(floor(gl_FragCoord.xy));
+  gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }
 `

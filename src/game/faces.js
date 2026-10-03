@@ -19,74 +19,83 @@ export function faceStyle(index) {
   }
 }
 
-// Cartoon face on a transparent background: dot eyes with a highlight, rosy
-// cheeks and a small mouth. The head's own color shows through.
+// Illustrated face on a transparent background, so the head's own color
+// shows through: almond eyes under a heavier upper lid, short brows, a hint of
+// a nose and a small mouth.
 export function drawFace(ctx, ox, oy, s, { female, beard, mouth = 'smile', brows }) {
   const X = (v) => ox + v * s
   const Y = (v) => oy + v * s
-  const ellipse = (x, y, rx, ry, color) => {
-    ctx.fillStyle = color
-    ctx.beginPath()
-    ctx.ellipse(X(x), Y(y), rx * s, ry * s, 0, 0, Math.PI * 2)
-    ctx.fill()
-  }
+  const ink = '#1d1310'
   ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
 
   if (beard) {
-    ctx.fillStyle = 'rgba(25, 12, 6, 0.6)'
+    ctx.fillStyle = 'rgba(25, 12, 6, 0.45)'
     ctx.beginPath()
-    ctx.ellipse(X(0.5), Y(0.78), 0.3 * s, 0.2 * s, 0, 0, Math.PI)
+    ctx.moveTo(X(0.12), Y(0.62))
+    ctx.quadraticCurveTo(X(0.5), Y(1.12), X(0.88), Y(0.62))
+    ctx.quadraticCurveTo(X(0.5), Y(0.86), X(0.12), Y(0.62))
     ctx.fill()
-    ellipse(0.5, 0.66, 0.12, 0.035, 'rgba(25, 12, 6, 0.75)')
+    ctx.strokeStyle = 'rgba(25, 12, 6, 0.7)'
+    ctx.lineWidth = s * 0.035
+    ctx.beginPath()
+    ctx.moveTo(X(0.4), Y(0.7))
+    ctx.quadraticCurveTo(X(0.5), Y(0.67), X(0.6), Y(0.7))
+    ctx.stroke()
   }
-  // Rosy cheeks
-  ellipse(0.24, 0.62, 0.08, 0.05, 'rgba(235, 100, 110, 0.35)')
-  ellipse(0.76, 0.62, 0.08, 0.05, 'rgba(235, 100, 110, 0.35)')
-  // Eyes
-  ellipse(0.34, 0.46, 0.065, 0.085, '#1b100c')
-  ellipse(0.66, 0.46, 0.065, 0.085, '#1b100c')
-  ellipse(0.355, 0.43, 0.022, 0.022, '#ffffff')
-  ellipse(0.675, 0.43, 0.022, 0.022, '#ffffff')
-  ctx.strokeStyle = '#1b100c'
-  ctx.lineWidth = Math.max(1, s * 0.035)
-  if (female) {
-    // Lashes
-    for (const [x, d] of [[0.27, -1], [0.73, 1]]) {
-      ctx.beginPath()
-      ctx.moveTo(X(x), Y(0.41))
-      ctx.lineTo(X(x + d * 0.05), Y(0.36))
-      ctx.stroke()
-    }
+
+  for (const [cx, dir] of [[0.31, -1], [0.69, 1]]) {
+    // Eye
+    ctx.fillStyle = '#f4efe6'
+    ctx.beginPath()
+    ctx.ellipse(X(cx), Y(0.47), 0.085 * s, 0.045 * s, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#2a1810'
+    ctx.beginPath()
+    ctx.ellipse(X(cx + dir * 0.005), Y(0.47), 0.045 * s, 0.05 * s, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(X(cx + 0.015), Y(0.455), 0.012 * s, 0, Math.PI * 2)
+    ctx.fill()
+    // Upper lid, heavier toward the outside
+    ctx.strokeStyle = ink
+    ctx.lineWidth = s * (female ? 0.04 : 0.032)
+    ctx.beginPath()
+    ctx.moveTo(X(cx - dir * 0.09), Y(0.47))
+    ctx.quadraticCurveTo(X(cx), Y(0.405), X(cx + dir * 0.1), Y(female ? 0.43 : 0.45))
+    ctx.stroke()
+    // Brow
+    ctx.lineWidth = s * (brows ? 0.045 : female ? 0.022 : 0.032)
+    ctx.beginPath()
+    ctx.moveTo(X(cx - dir * 0.08), Y(brows ? 0.35 : 0.34))
+    ctx.quadraticCurveTo(X(cx), Y(female ? 0.3 : 0.32), X(cx + dir * 0.09), Y(brows ? 0.33 : 0.35))
+    ctx.stroke()
   }
-  if (brows) {
-    ctx.lineWidth = Math.max(1, s * 0.04)
-    for (const [x0, y0, x1, y1] of [[0.27, 0.32, 0.41, 0.3], [0.59, 0.3, 0.73, 0.32]]) {
-      ctx.beginPath()
-      ctx.moveTo(X(x0), Y(y0))
-      ctx.lineTo(X(x1), Y(y1))
-      ctx.stroke()
-    }
-  }
+
+  // Nose: just a soft shadow line
+  ctx.strokeStyle = 'rgba(40, 18, 10, 0.4)'
+  ctx.lineWidth = s * 0.03
+  ctx.beginPath()
+  ctx.moveTo(X(0.47), Y(0.62))
+  ctx.quadraticCurveTo(X(0.5), Y(0.66), X(0.54), Y(0.62))
+  ctx.stroke()
+
   // Mouth
-  const lips = female ? '#a8323f' : '#4a2018'
-  ctx.strokeStyle = lips
-  ctx.fillStyle = lips
-  ctx.lineWidth = Math.max(1, s * 0.04)
+  ctx.strokeStyle = female ? '#7a2a30' : 'rgba(45, 20, 14, 0.85)'
+  ctx.lineWidth = s * (female ? 0.045 : 0.03)
   ctx.beginPath()
   if (mouth === 'grin') {
-    ctx.moveTo(X(0.4), Y(0.66))
-    ctx.quadraticCurveTo(X(0.5), Y(0.8), X(0.6), Y(0.66))
-    ctx.closePath()
-    ctx.fill()
+    ctx.moveTo(X(0.42), Y(0.76))
+    ctx.quadraticCurveTo(X(0.5), Y(0.82), X(0.58), Y(0.76))
   } else if (mouth === 'flat') {
-    ctx.moveTo(X(0.44), Y(0.7))
-    ctx.lineTo(X(0.56), Y(0.7))
-    ctx.stroke()
+    ctx.moveTo(X(0.44), Y(0.78))
+    ctx.lineTo(X(0.56), Y(0.78))
   } else {
-    ctx.moveTo(X(0.42), Y(0.67))
-    ctx.quadraticCurveTo(X(0.5), Y(0.75), X(0.58), Y(0.67))
-    ctx.stroke()
+    ctx.moveTo(X(0.43), Y(0.77))
+    ctx.quadraticCurveTo(X(0.5), Y(0.8), X(0.57), Y(0.77))
   }
+  ctx.stroke()
 }
 
 function finish(canvas) {

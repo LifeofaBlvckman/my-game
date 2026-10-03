@@ -95,7 +95,7 @@ function RemotePlayer({ id }) {
       {shape.m === 'c' ? (
         <>
           <CuboidCollider args={def.half} />
-          <Body type={shape.c} color={shape.k} />
+          <Body type={shape.c} color={shape.k} driver={look} />
           {def.wheels.at.map((w, i) => (
             <mesh key={i} position={w} rotation-z={Math.PI / 2}>
               <cylinderGeometry args={[def.wheels.r, def.wheels.r, 0.28, 10]} />
@@ -113,7 +113,7 @@ function RemotePlayer({ id }) {
           <Blob position-y={-0.88} scale={[0.9, 1, 0.9]} />
         </>
       )}
-      <Billboard position-y={shape.m === 'c' ? def.half[1] + 1.4 : 1.7}>
+      <Billboard position-y={shape.m === 'c' ? def.half[1] + 1.4 : 1.45}>
         <mesh>
           <planeGeometry args={[1.6, 0.4]} />
           <meshBasicMaterial map={tag} transparent toneMapped={false} depthTest={false} />

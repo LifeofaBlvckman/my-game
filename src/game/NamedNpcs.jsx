@@ -60,13 +60,13 @@ function Npc({ id, n, active }) {
     <group position={[n.pos[0], n.y, n.pos[1]]}>
       <Person ref={person} look={look} rotation-y={n.yaw} />
       <Blob position-y={0.02} scale={[0.9, 1, 0.9]} />
-      <Billboard position-y={2.45 * look.height}>
+      <Billboard position-y={2.25 * look.height}>
         <mesh>
           <planeGeometry args={[1.6, 0.4]} />
           <meshBasicMaterial map={tag} transparent toneMapped={false} />
         </mesh>
       </Billboard>
-      {active && <Marker y={2.95 * look.height} />}
+      {active && <Marker y={2.7 * look.height} />}
     </group>
   )
 }

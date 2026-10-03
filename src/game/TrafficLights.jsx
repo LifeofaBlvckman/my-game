@@ -4,7 +4,7 @@ import { BoxGeometry, Color } from 'three'
 import { CylinderCollider, RigidBody } from '@react-three/rapier'
 import { ROAD } from './cityData'
 import { approaches, lightFor, signals } from './signals'
-import { Instances, baseBox, unitBox } from './Instances'
+import { Instances, groundQuad, unitBox } from './Instances'
 import { unlit } from './materials'
 
 const poleGeometry = new BoxGeometry(0.18, 4.8, 0.18).translate(0, 2.4, 0)
@@ -49,10 +49,11 @@ export default function TrafficLights() {
     <group>
       <Instances
         items={crossings}
-        geometry={baseBox}
+        geometry={groundQuad}
+        castShadow={false}
         transform={(o, s) => {
-          o.position.set(s.x, 0.005, s.z)
-          o.scale.set(s.along === 'x' ? s.len : s.wid, 0.02, s.along === 'x' ? s.wid : s.len)
+          o.position.set(s.x, 0.015, s.z)
+          o.scale.set(s.along === 'x' ? s.len : s.wid, 1, s.along === 'x' ? s.wid : s.len)
         }}
         colors={() => '#eeeeea'}
       />

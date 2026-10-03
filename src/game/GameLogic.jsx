@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { Quaternion, Vector3 } from 'three'
 import { city, zoneAt } from './cityData'
 import { swapWithPlayerCar, vehicles } from './trafficSim'
-import { npcNear, npcs, punchNpc } from './crowd'
+import { copsGrabbing, deployCop, ejectDriver, npcNear, npcs, punchNpc, recallCops } from './crowd'
 import { CHATTER, currentTarget, NPCS, QUESTS, STRANGER_LINES } from './quests'
 import { VEHICLES } from './vehicleTypes'
 import { bust, clang, honk, jingle, punchSound, setHorn, setMusic, setSiren, swoosh, thud } from './audio'
@@ -97,7 +97,13 @@ function enterOrExit() {
   const target = nearestVehicle(world.focus)
   if (!target || (target.own && target.wrecked) || world.playerDown > 0) return
   if (!target.own) {
-    // Carjacking: the traffic vehicle and the player's car swap places.
+    // Carjacking: drag whoever is driving out, then the traffic vehicle and
+    // the player's car swap places.
+    const v = target.v
+    if (v.state !== 'parked' && !v.officerOut) {
+      ejectDriver(v.x, v.z, v.yaw, world.focus)
+      fx.pow(v.x, 2, v.z, 'OI!')
+    }
     const t = world.car.translation()
     const taken = swapWithPlayerCar(target.v, { type: game.carType, color: game.carColor, x: t.x, z: t.z, yaw: world.carHeading ?? 0, hp: world.carHp ?? CAR_HP })
     if (world.carWrecked) {
@@ -144,15 +150,22 @@ function interact() {
   let bestD = 2.2
   for (const n of npcs) {
     const d = Math.hypot(n.x - world.focus.x, n.z - world.focus.z)
-    if (d < bestD && n.down <= 0) {
+    if (d < bestD && n.down <= 0 && n.active !== false) {
       best = n
       bestD = d
     }
   }
   if (best) {
     if (best.kind !== 'walk') best.yaw = Math.atan2(world.focus.x - best.x, world.focus.z - best.z)
-    const who = best.role === 'trader' || best.role === 'seller' ? 'Trader' : best.role === 'bouncer' ? 'Bouncer' : 'Passer-by'
-    const text = best.role === 'bouncer' ? 'You no dey the list. Comot.' : best.role === 'trader' || best.role === 'seller' ? 'Customer! Come buy, I go do you good price.' : STRANGER_LINES[Math.floor(Math.random() * STRANGER_LINES.length)]
+    const who = best.role === 'trader' || best.role === 'seller' ? 'Trader' : best.role === 'bouncer' ? 'Bouncer' : best.role === 'cop' ? 'Officer' : 'Passer-by'
+    const text =
+      best.role === 'bouncer'
+        ? 'You no dey the list. Comot.'
+        : best.role === 'cop'
+          ? 'Oga, you dey under arrest!'
+          : best.role === 'trader' || best.role === 'seller'
+            ? 'Customer! Come buy, I go do you good price.'
+            : STRANGER_LINES[Math.floor(Math.random() * STRANGER_LINES.length)]
     useGame.setState({ subtitle: { speaker: who, text, key: ++bannerKey } })
     const key = bannerKey
     setTimeout(() => useGame.getState().subtitle?.key === key && useGame.setState({ subtitle: null }), 2500)
@@ -380,10 +393,19 @@ export default function GameLogic() {
     let nearestCop = Infinity
     for (const v of vehicles) if (v.chasing) nearestCop = Math.min(nearestCop, flat(v, world.focus))
     setSiren(game.wanted > 0 ? Math.max(0, 1 - nearestCop / 120) : 0)
+    const onFoot = game.mode === 'foot'
+    if (game.wanted > 0 && onFoot) {
+      // Patrol cars that have pulled up near you let an officer out.
+      for (const v of vehicles) {
+        if (v.chasing && v.state === 'direct' && !v.officerOut && v.speed < 2 && flat(v, world.focus) < 16) deployCop(v, world.focus)
+      }
+    }
+    if (game.wanted === 0 || !onFoot) recallCops()
     if (game.wanted > 0) {
-      const slow = game.mode === 'foot' || Math.abs(world.carSpeed) < 3
-      t.busting = nearestCop < 5.5 && slow ? t.busting + dt : Math.max(0, t.busting - dt)
-      if (t.busting > 1.5) {
+      // On foot, an officer has to get hold of you; in a car, they box you in.
+      const caught = onFoot ? copsGrabbing() : nearestCop < 5.5 && Math.abs(world.carSpeed) < 3
+      t.busting = caught ? t.busting + dt : Math.max(0, t.busting - dt)
+      if (t.busting > 1.2) {
         t.busting = 0
         getBusted()
       }
@@ -428,9 +450,19 @@ export default function GameLogic() {
   })
 
   // Debug hooks for automated testing (dev server only).
+  const three = useThree()
   useEffect(() => {
     if (!import.meta.env.DEV) return
     window.__game = {
+      renderInfo: () => {
+        let casters = 0
+        let lights = []
+        three.scene.traverse((o) => {
+          if (o.castShadow && o.isMesh) casters++
+          if (o.isDirectionalLight) lights.push({ cast: o.castShadow, pos: o.position.toArray().map(Math.round), target: o.target.position.toArray().map(Math.round), intensity: o.intensity })
+        })
+        return { shadowMap: three.gl.shadowMap.enabled, type: three.gl.shadowMap.type, casters, lights, calls: three.gl.info.render.calls, triangles: three.gl.info.render.triangles }
+      },
       state: () => useGame.getState(),
       focus: () => ({ x: world.focus.x, y: world.focus.y, z: world.focus.z }),
       teleport: (x, z) => {
@@ -440,7 +472,8 @@ export default function GameLogic() {
       },
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
-      vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing })),
+      vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut })),
+      cops: () => npcs.filter((n) => n.kind === 'cop' && n.active).map((n) => ({ x: n.x, z: n.z, grab: n.grab, returning: n.returning })),
       npcs: () => NPCS,
       enterOrExit,
       interact,

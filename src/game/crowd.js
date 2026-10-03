@@ -1,5 +1,5 @@
 import { BLOCK, city, mulberry32, SIDEWALK_Y } from './cityData'
-import { lookFromSeed, randomLook } from './people'
+import { COP_LOOK, lookFromSeed, randomLook } from './people'
 
 // Crowd simulation. Plain objects updated every frame; Pedestrians.jsx draws them.
 const WALKERS = 70
@@ -52,6 +52,12 @@ city.wanderAreas.forEach((area) => {
   }
 })
 
+// Police officers on foot. Hidden until a patrol car pulls up during a chase.
+const COPS = 6
+for (let k = 0; k < COPS; k++) {
+  npcs.push({ kind: 'cop', role: 'cop', look: { ...COP_LOOK, height: 0.98 + k * 0.015 }, active: false, x: 0, z: 0, y: 0 })
+}
+
 // Common per-NPC state.
 npcs.forEach((n) => {
   n.yaw ??= 0
@@ -63,9 +69,9 @@ npcs.forEach((n) => {
   n.fight = 0 // seconds left fighting the player
   n.punchT = -1
   n.punchCooldown = 0
-  n.hp = n.role === 'bouncer' ? 4 : 2
+  n.hp = n.role === 'bouncer' ? 4 : n.role === 'cop' ? 3 : 2
   // Bouncers always fight back; about one in four others will too.
-  n.tough = n.role === 'bouncer' || (n.role !== 'trader' && rand() < 0.25)
+  n.tough = n.role === 'bouncer' || (n.role !== 'trader' && n.role !== 'cop' && rand() < 0.25)
   n.vx = 0
   n.vz = 0
   n.ox = 0 // push offset (from the player bumping into them)
@@ -110,7 +116,7 @@ export function knockDown(n, dx, dz, force) {
   n.down = 5
   n.fight = 0
   n.punchT = -1
-  n.hp = n.role === 'bouncer' ? 4 : 2
+  n.hp = n.role === 'bouncer' ? 4 : n.role === 'cop' ? 3 : 2
   n.yaw = Math.atan2(-dx, -dz) // fall away from the hit
   panicAround(n)
 }
@@ -141,7 +147,7 @@ export function npcNear(x, z, radius) {
   let best = null
   let bestD = radius
   for (const n of npcs) {
-    if (n.x === undefined) continue
+    if (n.x === undefined || n.active === false) continue
     const d = Math.hypot(n.x + n.ox - x, n.z + n.oz - z)
     if (d < bestD) {
       best = n
@@ -149,6 +155,60 @@ export function npcNear(x, z, radius) {
     }
   }
   return best
+}
+
+// A patrol car has pulled up: an officer gets out on the driver's side.
+export function deployCop(car, focus) {
+  const n = npcs.find((o) => o.kind === 'cop' && !o.active)
+  if (!n) return null
+  const left = car.yaw + Math.PI / 2
+  n.active = true
+  n.returning = false
+  n.grab = false
+  n.car = car
+  n.x = car.x + Math.sin(left) * 1.4
+  n.z = car.z + Math.cos(left) * 1.4
+  n.yaw = Math.atan2(focus.x - n.x, focus.z - n.z)
+  n.down = n.fight = n.panic = 0
+  n.hp = 3
+  car.officerOut = true
+  return n
+}
+
+// Officers head back to their cars (chase over, or you got in a car).
+export function recallCops() {
+  for (const n of npcs) if (n.kind === 'cop' && n.active) n.returning = true
+}
+
+export const copsGrabbing = () => npcs.some((n) => n.kind === 'cop' && n.active && n.grab && n.down <= 0)
+
+function standDownCop(n) {
+  n.active = false
+  n.grab = false
+  if (n.car) n.car.officerOut = false
+  n.car = null
+}
+
+// Dragged out of a car you're jacking: they hit the ground, then either run
+// off or come back swinging. A passer-by from far away takes the part.
+export function ejectDriver(x, z, yaw, focus) {
+  let pick = null
+  let far = -1
+  for (const n of npcs) {
+    if (n.kind !== 'walk' || n.down > 0) continue
+    const d = Math.hypot(n.x - focus.x, n.z - focus.z)
+    if (d > far) {
+      far = d
+      pick = n
+    }
+  }
+  if (!pick) return
+  const left = yaw + Math.PI / 2
+  pick.x = x + Math.sin(left) * 1.6
+  pick.z = z + Math.cos(left) * 1.6
+  knockDown(pick, Math.sin(left), Math.cos(left), 3)
+  pick.down = 1.4
+  pick.afterDown = rand() < 0.35 ? 'fight' : 'flee'
 }
 
 function walkToward(n, tx, tz, speed, dt) {
@@ -173,9 +233,10 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
     const dx = (n.x ?? 0) - focus.x
     const dz = (n.z ?? 0) - focus.z
     const far = dx * dx + dz * dz > 160 * 160
-    if (far && n.kind !== 'walk') continue
+    if (far && n.kind !== 'walk' && n.kind !== 'cop') continue
     n.flinch = Math.max(0, n.flinch - dt)
 
+    if (n.active === false) continue
     if (n.down > 0) {
       n.down -= dt
       n.x += n.vx * dt
@@ -183,12 +244,36 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
       const drag = Math.exp(-3 * dt)
       n.vx *= drag
       n.vz *= drag
+      if (n.down <= 0 && n.afterDown) {
+        if (n.afterDown === 'fight') n.fight = 12
+        else n.panic = 8
+        n.afterDown = null
+      }
       continue
     }
     n.panic = Math.max(0, n.panic - dt)
     n.moving = false
 
-    if (n.fight > 0 && playerOnFoot) {
+    if (n.kind === 'cop') {
+      // Chase the player down and grab them; or walk back to the car.
+      const toPlayer = Math.hypot(focus.x - n.x, focus.z - n.z)
+      // Once they have hold of you they keep it until you get properly away.
+      const holding = n.grab ? toPlayer < 1.6 : toPlayer <= 1.05
+      n.grab = false
+      if (toPlayer > 150) {
+        standDownCop(n)
+        continue
+      }
+      if (n.returning || !playerOnFoot) {
+        const car = n.car
+        if (!car || walkToward(n, car.x, car.z, 2.2, dt) < 1.6) standDownCop(n)
+      } else if (!holding) {
+        walkToward(n, focus.x, focus.z, 6.2, dt)
+      } else {
+        n.yaw += wrap(Math.atan2(focus.x - n.x, focus.z - n.z) - n.yaw) * Math.min(1, dt * 10)
+        n.grab = true
+      }
+    } else if (n.fight > 0 && playerOnFoot) {
       // Square up to the player and throw punches.
       n.fight -= dt
       n.punchCooldown -= dt

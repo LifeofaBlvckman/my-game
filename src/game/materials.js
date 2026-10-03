@@ -1,9 +1,9 @@
 import { DataTexture, MeshBasicMaterial, MeshToonMaterial, NearestFilter, RedFormat } from 'three'
 
-// Cel shading: MeshToonMaterial quantizes light into the bands of this ramp.
-// The bands are close together for a soft, pastel look; shadows get their
-// color from the hemisphere light's ground color rather than going grey.
-const ramp = new DataTexture(new Uint8Array([150, 205, 255]), 3, 1, RedFormat)
+// Two-tone cel shading: surfaces are either lit or in shadow, with a hard
+// edge just past side-on (the first three of five steps are dark). The
+// shadow tone comes from a flat, cool fill light rather than going grey.
+const ramp = new DataTexture(new Uint8Array([0, 0, 0, 255, 255]), 5, 1, RedFormat)
 ramp.magFilter = ramp.minFilter = NearestFilter
 ramp.generateMipmaps = false
 ramp.needsUpdate = true
