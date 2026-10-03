@@ -167,6 +167,8 @@ export function createSaves() {
     return f && f.count >= 5 && Date.now() - f.at < 10 * 60 * 1000
   }
   const failed = (id) => {
+    // Forget old entries now and then so the map can't grow forever.
+    if (fails.size > 5000) for (const [k, f] of fails) if (Date.now() - f.at > 10 * 60 * 1000) fails.delete(k)
     const f = fails.get(id)
     fails.set(id, { count: f && Date.now() - f.at < 10 * 60 * 1000 ? f.count + 1 : 1, at: Date.now() })
   }

@@ -116,7 +116,7 @@ function Title() {
               Left thumb: move (push all the way to sprint) · Right thumb: look around
             </li>
             <li>
-              👊 punch · <b>JUMP</b> · <b>CAR</b> get in or out · <b>E</b> talk or go through a door · 😀 emoji · 👥 go to a friend
+              The big button does what's nearby (talk, enter, drive, eat) or punches · In a car: GAS and BRAKE · ☰ menu · 😀 emoji · 📱 phone
             </li>
           </ul>
         ) : (

@@ -53,11 +53,13 @@ export const INTERIORS = {
       [6.9, 1.8, 0, 0.05, 1.2, 1.6, '#9fd6e8', G],
       [2.7, 1.1, 4.45, 1.6, 2.2, 0.8, '#7a5444', S], // wardrobe (change clothes)
       [2.7, 1.1, 4.04, 0.03, 2.0, 0.02, '#4a3428'],
-      [2.5, 0.46, -2.5, 0.5, 0.03, 0.35, '#2a2d33'], // laptop (decorate)
-      [2.5, 0.62, -2.68, 0.5, 0.3, 0.02, '#7fd0ff', G],
+      [6.35, 0.38, -0.2, 0.9, 0.76, 1.4, '#7a5444', S], // desk under the window
+      [6.3, 0.78, -0.2, 0.35, 0.03, 0.5, '#2a2d33'], // laptop (decorate)
+      [6.47, 0.93, -0.2, 0.02, 0.3, 0.5, '#7fd0ff', G],
     ],
+    // Where you stand to use them (Mama waits by the dining table).
     wardrobe: [2.7, 3.4],
-    laptop: [2.5, -1.6],
+    laptop: [5.3, -0.2],
     npcs: [],
   },
   club: {

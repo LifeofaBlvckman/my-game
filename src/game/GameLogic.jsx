@@ -584,8 +584,6 @@ function resolvePunch() {
   }
 
   if (world.net?.punchPlayers(px, pz)) return landed(px, pz)
-  // A dog: it yelps and runs (no damage).
-  if (punchDogs(px, pz, world.focus)) return landed(px, pz)
 
   const npc = npcNear(px, pz, 0.9)
   if (npc) {
@@ -607,6 +605,10 @@ function resolvePunch() {
     setTimeout(() => useGame.getState().subtitle?.key === key && useGame.setState({ subtitle: null }), 2500)
     return
   }
+
+  // A dog: it yelps and runs (no damage). People come first, since dogs
+  // share the pavement with them.
+  if (punchDogs(px, pz, world.focus)) return landed(px, pz)
 
   // Punching cars: a dent, sparks and an angry horn.
   const inBox = (cx, cz, yaw, half) => {

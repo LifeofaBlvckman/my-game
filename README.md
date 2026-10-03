@@ -9,10 +9,14 @@ Rapier physics and Vite.
 - **Lagos:** Mainland (Ikeja, Yaba, Surulere, Ebute Metta) and Island (Lagos
   Island, Ikoyi, VI, Lekki), joined by Third Mainland and Carter Bridge.
 - **Places:** markets, Lekki Grand Mall, clubs, bus stops, and buildings you
-  can enter: Tunde's house, Club Eko, Kwilox, a gym, a church and a bank.
-- **Traffic:** danfos, kekes, sedans and jeeps with drivers, traffic lights,
-  stop signs, horns and engine sounds. Danfos and kekes pick up passengers at
-  bus stops. LASTMA wardens give you a star if they see you run a red light.
+  can enter: Tunde's house, Club Eko, Kwilox, a gym, a church, a bank, the
+  General Hospital (you wake up here when wasted) and a police station (you
+  walk out of here when busted).
+- **Your room:** change clothes at the wardrobe and decorate from the laptop.
+- **Traffic:** danfos, kekes, sedans and jeeps, with luxury cars on the
+  Island; traffic lights, stop signs, horns and engine sounds. Danfos and
+  kekes pick up passengers at bus stops. LASTMA wardens give you a star if
+  they see you run a red light.
 - **Police:** wanted stars, chases, and officers who get out to arrest you.
   Get out of sight (far away or behind buildings) and the stars blink, then
   drop one at a time.
@@ -21,20 +25,24 @@ Rapier physics and Vite.
 - **Six story jobs:** pepper delivery (with your nylon bag), church, a flash drive across the bridge,
   aso-ebi, driving a danfo, and a bank robbery.
 - **Side jobs on the Island** (blue markers), any time: a timed suya run, a
-  checkpoint drive round Lekki, and a Bar Beach clean-up.
+  checkpoint drive round Lekki, a Bar Beach clean-up, and an ambulance run
+  for Nurse Ngozi at the hospital.
 - **Races with friends:** press E at a start flag on the Island (the Island
   Street Race by car, or the Bar Beach Sprint on foot). Everyone online gets
   20 seconds to join; first across the line wins. Alone, you race the clock.
 - **Fighting and damage:** punch people and cars, carjack with F; cars smoke,
   burn and explode.
 - **Multiplayer:** see friends, chat, punch, and send emoji, in rooms of 16.
-  Friends are pink dots on the radar; press **G** to go to them.
+  Friends are pink dots on the radar; press **G** to go to them. Your phone
+  (**P**) texts, calls or sends your location to anyone online.
+- **Saved games:** add a 4-digit PIN on the title screen and your game saves
+  online, so you can carry on from any device.
 - **Phones:** simple touch controls appear automatically. Drag on the left
   to move and on the right to look. One button does whatever is nearby, and
   ☰ holds the rest.
 - **Look and sound:** two-tone shading, ink outlines, painted sky, birds, clear
-  water with fish, flower gardens, day and night, and synthesized music (calm theme or
-  Afrobeats) with no audio files.
+  water with fish, flower gardens, street dogs, rain after a while, day and
+  night, and synthesized music (calm theme or Afrobeats) with no audio files.
 
 ## Run it
 
@@ -57,9 +65,19 @@ Open http://localhost:5173.
 2. Click **New > Blueprint** and pick this repository. It uses `render.yaml`.
 3. Share the `onrender.com` link when it says **Live**.
 
-One service runs both the game and multiplayer, and no database is needed.
-Free servers sleep when unused, so the first visit after that takes about a
-minute.
+One service runs the game, multiplayer and saved games. Free servers sleep
+when unused, so the first visit after that takes about a minute.
+
+**Keep saved games (free database):** without a database, saves are wiped
+each time Render restarts the server.
+
+1. Sign up at [neon.tech](https://neon.tech) and create a project.
+2. Copy its connection string (it starts with `postgresql://`).
+3. In Render, open the **eko-streets** service, go to **Environment**, add
+   `DATABASE_URL` with that string, and save. The service redeploys.
+
+The game makes its tables by itself. Render's own free database works too,
+but it expires after 30 days.
 
 ## Controls
 
@@ -75,6 +93,7 @@ minute.
 | Q | | Horn |
 | 1 – 8 | Emoji | Emoji |
 | G | Go to a friend (online) | |
+| P | Phone: text, call, send your location | Phone |
 | Y | Chat (online) | Chat |
 | M / O / T / H | Music (calm, Afrobeats, off) · outlines · skip an hour · help | |
 
@@ -87,7 +106,8 @@ minute.
 - `src/game/people.js`: how characters look and move
 - `src/game/vehicleTypes.js`: vehicles and their handling
 - `src/game/audio.js`: music and sounds (`MUSIC_VOLUME` sets the music level)
-- `server/`: the multiplayer server and the production server (`npm start`)
+- `src/game/wardrobe.js`, `src/game/decor.js`: clothes and furniture
+- `server/`: multiplayer, saved games (`saves.js`) and the production server (`npm start`)
 
 ## Adding a job
 

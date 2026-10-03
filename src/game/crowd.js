@@ -372,39 +372,41 @@ function refillStops(focus) {
       }
       return
     }
-    if (counts[stop.id] >= WAITING_PER_STOP) return
-    let pick = null
-    for (const n of npcs) {
-      if (n.kind !== 'walk' || n.down > 0 || n.panic > 0 || n.x === undefined) continue
-      const d = Math.hypot(n.x - stop.x, n.z - stop.z)
-      if (d < 25 || (hidden && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)) {
-        pick = n
-        if (d < 25) break
+    // Top the stop back up to a full queue.
+    for (let c = counts[stop.id]; c < WAITING_PER_STOP; c++) {
+      let pick = null
+      for (const n of npcs) {
+        if (n.kind !== 'walk' || n.down > 0 || n.panic > 0 || n.x === undefined) continue
+        const d = Math.hypot(n.x - stop.x, n.z - stop.z)
+        if (d < 25 || (hidden && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)) {
+          pick = n
+          if (d < 25) break
+        }
       }
+      // You're at the stop and nobody's nearby: someone from out of sight
+      // walks up along the sidewalk instead.
+      let walkUp = false
+      if (!pick && !hidden) {
+        pick = npcs.find((n) => n.kind === 'walk' && n.down <= 0 && !(n.panic > 0) && n.x !== undefined && Math.hypot(n.x - focus.x, n.z - focus.z) > 45)
+        walkUp = !!pick
+      }
+      if (!pick) break
+      const spot = stopSpot(stop, c % WAITING_PER_STOP)
+      if (walkUp) {
+        const side = rand() < 0.5 ? 1 : -1
+        pick.x = stop.x + (stop.axis === 'x' ? side * 10 : 0)
+        pick.z = stop.z + (stop.axis === 'z' ? side * 10 : 0)
+      } else if (Math.hypot(pick.x - stop.x, pick.z - stop.z) >= 25) {
+        pick.x = spot.x
+        pick.z = spot.z
+      }
+      pick.kind = 'idle'
+      pick.role = 'waiting'
+      pick.stop = stop.id
+      pick.y = SIDEWALK_Y
+      pick.home = { ...spot, yaw: stop.yaw }
+      pick.posed = false
     }
-    // You're at the stop and nobody's nearby: someone from out of sight
-    // walks up along the sidewalk instead.
-    let walkUp = false
-    if (!pick && !hidden) {
-      pick = npcs.find((n) => n.kind === 'walk' && n.down <= 0 && !(n.panic > 0) && n.x !== undefined && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)
-      walkUp = !!pick
-    }
-    if (!pick) return
-    const spot = stopSpot(stop, counts[stop.id] % WAITING_PER_STOP)
-    if (walkUp) {
-      const side = rand() < 0.5 ? 1 : -1
-      pick.x = stop.x + (stop.axis === 'x' ? side * 14 : 0)
-      pick.z = stop.z + (stop.axis === 'z' ? side * 14 : 0)
-    } else if (Math.hypot(pick.x - stop.x, pick.z - stop.z) >= 25) {
-      pick.x = spot.x
-      pick.z = spot.z
-    }
-    pick.kind = 'idle'
-    pick.role = 'waiting'
-    pick.stop = stop.id
-    pick.y = SIDEWALK_Y
-    pick.home = { ...spot, yaw: stop.yaw }
-    pick.posed = false
   })
 }
 
@@ -486,7 +488,8 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
       const left = v.yaw + Math.PI / 2
       const doorX = v.x + Math.sin(left) * 1.4
       const doorZ = v.z + Math.cos(left) * 1.4
-      if (Math.hypot(doorX - n.x, doorZ - n.z) > 14 || v.gone) {
+      // (People called over from along the pavement may start ~25 m away.)
+      if (Math.hypot(doorX - n.x, doorZ - n.z) > 30 || v.gone) {
         n.kind = 'idle'
         n.vehicle = null
       } else if (walkToward(n, doorX, doorZ, 2.6, dt) < 0.5) {

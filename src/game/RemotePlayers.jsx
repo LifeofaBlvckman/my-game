@@ -135,7 +135,9 @@ function RemotePlayer({ id }) {
         </>
       ) : (
         <>
-          <CapsuleCollider args={[0.55, 0.35]} />
+          {/* Not solid: friends walking into each other (or arriving on the
+              same spot) would shove one another through walls. */}
+          <CapsuleCollider args={[0.55, 0.35]} sensor />
           <group ref={visual} position-y={-0.9}>
             <Person ref={person} look={look} shirtMap={outfit && hasPattern(outfit) ? shirt : null} />
           </group>
