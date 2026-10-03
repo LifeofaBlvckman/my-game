@@ -23,10 +23,20 @@ Rapier physics and Vite.
 - **Police:** wanted stars, chases, and officers who get out to arrest you.
   Get out of sight (far away or behind buildings) and the stars blink, then
   drop one at a time. Make it home and they're gone.
-- **Food:** buy jollof, suya, amala and more at mama put stalls (E) to get
-  health back.
-- **Six story jobs:** pepper delivery (with your nylon bag), church, a flash drive across the bridge,
-  aso-ebi, driving a danfo, and a bank robbery.
+- **Food and the market:** buy jollof, suya, amala and more at mama put
+  stalls (E) to get health back. Any market trader (E) sells snacks, clothes
+  and things for your house.
+- **Property:** spend mission money on a Yaba flat (₦25,000) or a Lekki
+  penthouse (₦150,000), both safe houses with a bed and wardrobe, or a garage
+  (₦40,000) that keeps up to 4 cars. Drive up to the roller door and press E
+  to park; Alhaji Musa pays for the cars he orders. Look for the red "FOR
+  SALE" boards.
+- **Street trouble:** area boys on some corners want you to "settle" them
+  (pay ₦500, walk off, or fight). Stay out of the army barracks in Ikeja.
+- **Nine story jobs:** pepper delivery, church, a flash drive across the
+  bridge, aso-ebi, driving a danfo, a bank robbery, Skido's double cross (an
+  ambush, a car chase and a fight), clearing area boys out of the market, and
+  buying your own place.
 - **Side jobs on the Island** (blue markers), any time: a timed suya run, a
   checkpoint drive round Lekki, a Bar Beach clean-up, and an ambulance run
   for Nurse Ngozi at the hospital.
@@ -36,6 +46,8 @@ Rapier physics and Vite.
 - **Fighting and damage:** punch people and cars, carjack with F; cars smoke,
   burn and explode.
 - **Multiplayer:** see friends, chat, punch, and send emoji, in rooms of 16.
+  When the police chase a friend, you see their police cars, officers and
+  stars too.
   Friends are pink dots on the radar; press **G** to go to them. Your phone
   (**P**) texts, calls or sends your location to anyone online.
 - **Saved games:** add a 4-digit PIN on the title screen and your game saves
@@ -101,7 +113,7 @@ doesn't need restoring. Render's own free database expires after 30 days.
 | Shift | Sprint | |
 | Space | Jump | Handbrake |
 | Click / X | Punch | |
-| E | Talk, use doors, eat, sleep, work out, start or join a race | Start or join a race |
+| E | Talk, use doors, eat, shop, buy property, sleep, start or join a race | Park in your garage, start or join a race |
 | F | Get in or jack a car | Get out |
 | Q | | Horn |
 | 1 – 8 | Emoji | Emoji |
@@ -120,6 +132,8 @@ doesn't need restoring. Render's own free database expires after 30 days.
 - `src/game/vehicleTypes.js`: vehicles and their handling
 - `src/game/audio.js`: music and sounds (`MUSIC_VOLUME` sets the music level)
 - `src/game/wardrobe.js`, `src/game/decor.js`: clothes and furniture
+- `src/game/property.js`, `src/game/ShopPanels.jsx`: houses, the garage and the market
+- `src/game/streetlife.js`: area boys and the barracks
 - `server/`: multiplayer, saved games (`saves.js`) and the production server (`npm start`)
 
 ## Adding a job
@@ -128,8 +142,9 @@ Add a character to `NPCS` in `src/game/quests.js`, then an entry to `QUESTS`
 with a `giver`, `start` dialogue, a `reward` in naira and a list of `steps`.
 A step can be `{ npc }` (talk to someone), `{ goto }` (go somewhere),
 `{ enter }` (walk into a building), `{ hold }` (wait on a spot), `{ lose }`
-(lose the police) or `{ pickup }` / `{ dropoff }` (carry passengers). Jobs
-unlock in order.
+(lose the police), `{ pickup }` / `{ dropoff }` (carry passengers),
+`{ chase }` (run a car off the road), `{ brawl }` (win a fight) or
+`{ own }` (buy property). Jobs unlock in order.
 
 ## Your own models
 
