@@ -18,7 +18,7 @@ export function startAudio() {
   master.gain.value = 0.55
   master.connect(ctx.destination)
   musicGain = ctx.createGain()
-  musicGain.gain.value = 0.32
+  musicGain.gain.value = 0 // setMusic() fades the chosen track in
   musicGain.connect(master)
   setupLoops()
 }
@@ -137,7 +137,11 @@ function impulse(seconds = 2.4) {
 function setupCalm() {
   calmGain = ctx.createGain()
   calmGain.gain.value = 0
-  calmGain.connect(master)
+  // A gentle low-pass takes the edge off the plucks.
+  const mellow = ctx.createBiquadFilter()
+  mellow.type = 'lowpass'
+  mellow.frequency.value = 2200
+  calmGain.connect(mellow).connect(master)
   reverb = ctx.createConvolver()
   reverb.buffer = impulse()
   const wet = ctx.createGain()
@@ -221,7 +225,7 @@ function setupLoops() {
   let bar = 0
   musicTimer = setInterval(() => {
     while (next < ctx.currentTime + 0.4) {
-      if (musicStyle === 'afro' && musicGain.gain.value > 0.001) scheduleBar(next, bar)
+      if (musicStyle === 'afro') scheduleBar(next, bar)
       if (musicStyle === 'calm') scheduleCalmBar(next, bar)
       next += musicStyle === 'calm' ? 8 * EIGHTH : 16 * STEP
       bar++
@@ -279,10 +283,12 @@ const smooth = (param, value) => ctx && param.setTargetAtTime(value, ctx.current
 
 // style: 'calm' (default), 'afro' (Afrobeats groove) or 'off'.
 export const MUSIC_STYLES = ['calm', 'afro', 'off']
+export const MUSIC_VOLUME = { calm: 0.35, afro: 0.2 } // raise or lower to taste
 export function setMusic(style) {
   musicStyle = style
-  if (musicGain) smooth(musicGain.gain, style === 'afro' ? 0.32 : 0)
-  if (calmGain) smooth(calmGain.gain, style === 'calm' ? 0.9 : 0)
+  // Background levels: quiet enough to sit under horns, engines and dialogue.
+  if (musicGain) smooth(musicGain.gain, style === 'afro' ? MUSIC_VOLUME.afro : 0)
+  if (calmGain) smooth(calmGain.gain, style === 'calm' ? MUSIC_VOLUME.calm : 0)
 }
 export function setSiren(volume) {
   if (siren) smooth(siren.gain, volume * 0.12)

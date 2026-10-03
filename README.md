@@ -375,6 +375,7 @@ export the animations in the same .glb, and play them with drei's `useAnimations
   `BRIDGES`, `BUS_STOPS`, `ENTERABLE` and the landmark lists in `src/game/cityData.js`.
 - Rooms: `src/game/rooms.js` (size, colors, furniture, people).
 - Fog distance: `fog` in `src/game/DayNight.jsx`.
+- Music volume: `MUSIC_VOLUME` in `src/game/audio.js`.
 - Time of day: `world.time` in `src/game/state.js` (minutes since midnight).
   `startGame` in `Hud.jsx` sets the start time.
 
