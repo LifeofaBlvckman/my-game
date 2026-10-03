@@ -91,7 +91,7 @@ function Stalls() {
   )
 }
 
-function Sign({ s }) {
+export function Sign({ s }) {
   const texture = useMemo(() => makeSignTexture(s.text, { bg: s.bg, fg: s.fg, w: 512, h: Math.round((512 * s.h) / s.w), glow: s.glow }), [s])
   const material = useMemo(() => (s.glow ? unlit({ map: texture }) : toon({ map: texture })), [texture, s.glow])
   return (

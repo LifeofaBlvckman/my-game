@@ -8,11 +8,11 @@ import { itemsFor, WARDROBE } from './wardrobe'
 // the laptop (paint the walls, buy furniture). Everything bought is kept.
 
 const naira = (n) => `₦${n.toLocaleString()}`
-const close = () => useGame.setState({ panel: null })
+export const close = () => useGame.setState({ panel: null })
 
 // Buy something once (or it's free), then it's yours. Returns false if you
 // can't afford it.
-function own(id, price) {
+export function own(id, price) {
   const g = useGame.getState()
   if (price === 0 || g.owned.includes(id)) return true
   if (g.money < price) return false
@@ -34,7 +34,7 @@ function useCloseKeys() {
   }, [])
 }
 
-function Sheet({ title, children }) {
+export function Sheet({ title, children }) {
   useCloseKeys()
   const money = useGame((s) => s.money)
   return (
@@ -53,10 +53,12 @@ function Sheet({ title, children }) {
   )
 }
 
-function Card({ swatch, name, note, active, disabled, onPick }) {
+export function Card({ swatch, icon, name, note, active, disabled, onPick }) {
   return (
     <button className={`card ${active ? 'active' : ''}`} disabled={disabled} onClick={onPick}>
-      <span className="swatch" style={{ background: swatch }} />
+      <span className={`swatch ${icon ? 'icon' : ''}`} style={{ background: swatch }}>
+        {icon}
+      </span>
       <span className="card-name">{name}</span>
       <span className="card-note">{note}</span>
     </button>

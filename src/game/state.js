@@ -46,7 +46,11 @@ export const useGame = create((set) => ({
   outfit: DEFAULT_OUTFIT,
   decor: DEFAULT_DECOR,
   owned: [], // ids of clothes and furniture bought
-  panel: null, // 'wardrobe' | 'decor' | 'phone' while a full-screen menu is open
+  properties: [], // houses and the garage bought (property.js)
+  garage: [], // cars kept in the garage: [{ type, color }]
+  chopIndex: 0, // how many of Alhaji Musa's car orders you've filled (chopshop.js)
+  offer: null, // id of the property whose "for sale" sheet is open
+  panel: null, // 'wardrobe' | 'decor' | 'phone' | 'market' | 'property' | 'garage' while a full-screen menu is open
   // Saved games
   account: null, // { name, token } when signed in, null for a guest
   saveStatus: null, // 'saving' | 'saved' | 'offline' for the little cloud icon

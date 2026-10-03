@@ -4,6 +4,7 @@ import { KeyboardControls, PerformanceMonitor } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import City from './game/City'
 import Landmarks from './game/Landmarks'
+import PropertySigns from './game/PropertySigns'
 import TrafficLights from './game/TrafficLights'
 import StreetDetails from './game/StreetDetails'
 import Traffic from './game/Traffic'
@@ -81,6 +82,7 @@ export default function App() {
           <Physics gravity={[0, -20, 0]}>
             <City />
             <Landmarks />
+            <PropertySigns />
             <TrafficLights />
             <StreetDetails />
             <Traffic />

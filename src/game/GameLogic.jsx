@@ -24,6 +24,8 @@ import { phone } from './phoneline'
 import { dogs, punchDogs } from './strays'
 import { updateWeather, weather } from './weather'
 import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks } from './streetlife'
+import { DEFAULT_CAR, garageSpot, owns, propertyNear, storeCar, takeCar } from './property'
+import { deliverOrder } from './chopshop'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -92,13 +94,15 @@ function copCanSee(x, z, focus, far) {
   return d < SEE_NEAR || (d < far && lineOfSight(x, z, focus.x, focus.z))
 }
 
+// Your own houses: the police can't follow you in.
+const SAFE_HOUSES = new Set(['home', 'flat', 'penthouse'])
 function updateEscape(game, dt, focus) {
   // Made it home with the police after you: they can't touch you there.
-  if (game.wanted > 0 && game.inside === 'home' && !game.fade) {
+  if (game.wanted > 0 && SAFE_HOUSES.has(game.inside) && !game.fade) {
     useGame.setState({ wanted: 0, evading: false })
     world.lastSeen = null
     world.escape = 0
-    message('SAFE AT HOME\nYOU LOST THEM', '#7cff9a', 3000)
+    message(game.inside === 'home' ? 'SAFE AT HOME\nYOU LOST THEM' : 'SAFE HOUSE\nYOU LOST THEM', '#7cff9a', 3000)
     return
   }
   if (game.wanted === 0) {
@@ -391,6 +395,15 @@ function nearUsable() {
     if (near(...home.laptop, 1.3)) return 'laptop'
     if (near(5.4, 3, 2.2)) return 'bed'
   }
+  if (id === 'flat' || id === 'penthouse') {
+    const room = INTERIORS[id]
+    const near = (lx, lz, r) => {
+      const [x, , z] = roomPoint(room, lx, lz)
+      return Math.hypot(x - world.focus.x, z - world.focus.z) < r
+    }
+    if (near(...room.wardrobe, 1.3)) return 'wardrobe'
+    if (near(...room.bedSpot, 1.6)) return 'bed'
+  }
   if (id === 'gym') {
     for (const bx of [-6, -2, 2]) {
       const [x, , z] = roomPoint(INTERIORS.gym, bx, -3)
@@ -497,8 +510,78 @@ function enterOrExit() {
   banner(VEHICLES[useGame.getState().carType].name.toUpperCase())
 }
 
+// --- Your garage ---
+
+const nearGarage = (range) => {
+  const g = garageSpot()
+  return g && owns('garage') && Math.hypot(g.x - world.focus.x, g.z - world.focus.z) < range ? g : null
+}
+
+// Drive up to the roller door and press E: the car goes in (or, if it's what
+// Alhaji Musa ordered, his boys take it and pay you).
+function parkInGarage() {
+  const game = useGame.getState()
+  if (!nearGarage(8) || Math.abs(world.carSpeed) > 2) return false
+  if (game.carType === DEFAULT_CAR.type && game.carColor === DEFAULT_CAR.color) {
+    message('THE FAMILY CAR LIVES AT HOME', '#ffd23a', 2200)
+    return true
+  }
+  const pay = !world.carWrecked && deliverOrder(game.carType)
+  const result = pay ? 'sold' : storeCar()
+  if (result !== 'sold' && result !== 'stored') {
+    message(result ?? "CAN'T PARK THAT HERE", '#ff6b6b', 2200)
+    return true
+  }
+  exitCar()
+  resetPlayerCar()
+  if (pay) {
+    jingle()
+    message(`ALHAJI MUSA'S BOYS TOOK IT\n+${naira(pay)}`, '#7ee07e', 3500)
+  } else {
+    message('PARKED IN YOUR GARAGE', '#7ee07e', 2500)
+  }
+  return true
+}
+
+// Called from the garage panel: drive car `index` out onto the apron.
+export function driveOutOfGarage(index) {
+  const game = useGame.getState()
+  const g = garageSpot()
+  if (!g || !world.car || game.mode !== 'foot') return
+  const car = takeCar(index, { type: game.carType, color: game.carColor, wrecked: world.carWrecked })
+  if (!car) return
+  letRidersOff(world.playerVehicle)
+  world.carWrecked = false
+  world.carBurning = 0
+  world.carHp = CAR_HP
+  world.carSkipCrash = performance.now() + 800
+  const half = VEHICLES[car.type].half
+  q.setFromAxisAngle(up, 0)
+  world.car.setTranslation({ x: g.x, y: half[1] + 0.15, z: g.z + 1.6 + half[2] - 2.1 }, true)
+  world.car.setRotation(q, true)
+  world.car.setLinvel({ x: 0, y: 0, z: 0 }, true)
+  world.car.setAngvel({ x: 0, y: 0, z: 0 }, true)
+  world.carHeading = 0
+  world.carSpeed = 0
+  useGame.setState({ carType: car.type, carColor: car.color })
+  world.player.setEnabled(false)
+  world.heading = 0
+  useGame.setState({ mode: 'car', prompt: null })
+  banner(VEHICLES[car.type].name.toUpperCase())
+}
+
+// Market traders and roadside sellers.
+function nearTrader() {
+  if (useGame.getState().inside) return null
+  for (const n of npcs) {
+    if ((n.role === 'trader' || n.role === 'seller') && n.down <= 0 && Math.hypot(n.x - world.focus.x, n.z - world.focus.z) < 2.4) return n
+  }
+  return null
+}
+
 function interact() {
   const game = useGame.getState()
+  if (game.mode === 'car' && game.phase === 'playing' && !game.dialogue && !game.panel && !game.chatOpen) return parkInGarage()
   if (game.phase !== 'playing' || game.dialogue || game.panel || game.mode !== 'foot' || game.chatOpen) return
   // The key press that closed a dialogue shouldn't open a new one.
   if (performance.now() - (world.dialogueClosedAt ?? 0) < 400) return
@@ -507,6 +590,10 @@ function interact() {
   const thing = nearUsable()
   if (thing) return useThing(thing)
   if (!game.inside && gangAsking()) return settleGang()
+  // A house or the garage: for sale (look at it), or yours.
+  const prop = !game.inside && propertyNear(world.focus)
+  if (prop && !owns(prop.id)) return useGame.setState({ panel: 'property', offer: prop.id })
+  if (prop?.kind === 'garage') return useGame.setState({ panel: 'garage' })
   const door = !game.inside && nearDoor(world.focus)
   if (door) return goThrough(() => placeInRoom(door.id))
   const near = nearestNamedNpc(world.focus)
@@ -528,6 +615,11 @@ function interact() {
   // A mama put stall: buy something to eat.
   const food = nearFood()
   if (food) return buyFood(food)
+  const trader = nearTrader()
+  if (trader) {
+    trader.yaw = Math.atan2(world.focus.x - trader.x, world.focus.z - trader.z)
+    return useGame.setState({ panel: 'market' })
+  }
   // Anyone else on the street just says something short.
   let best = null
   let bestD = 2.2
@@ -1009,12 +1101,15 @@ export default function GameLogic() {
       const car = !npc && !game.inside && nearestVehicle(world.focus)
       const door = !game.inside && nearDoor(world.focus)
       const thing = nearUsable()
+      const prop = !game.inside && propertyNear(world.focus)
       if (game.inside && nearExit()) (prompt = 'Press E to go outside'), act('KeyE', '🚪', 'Exit')
       else if (thing === 'wardrobe') (prompt = 'Press E to change clothes'), act('KeyE', '👕', 'Clothes')
       else if (thing === 'laptop') (prompt = 'Press E to decorate your room'), act('KeyE', '🛋️', 'Decorate')
       else if (thing === 'bed') (prompt = 'Press E to sleep until morning'), act('KeyE', '🛏️', 'Sleep')
       else if (thing === 'bench') (prompt = 'Press E to work out'), act('KeyE', '🏋️', 'Lift')
       else if (!game.inside && gangAsking()) (prompt = `Press E to settle the area boys (${naira(SETTLE)})`), act('KeyE', '💸', 'Settle')
+      else if (prop && !owns(prop.id)) (prompt = `${prop.name}: FOR SALE ${naira(prop.price)}. Press E to look`), act('KeyE', '🏷️', 'For sale')
+      else if (prop?.kind === 'garage') (prompt = 'Press E to open your garage'), act('KeyE', '🔑', 'Garage')
       else if (door) (prompt = `Press E to enter ${door.name}`), act('KeyE', '🚪', 'Enter')
       else if (npc) (prompt = `Press E to talk to ${npc.n.name}`), act('KeyE', '💬', 'Talk')
       else if (car?.wrecked) prompt = 'This car is wrecked. Find another one.'
@@ -1022,7 +1117,11 @@ export default function GameLogic() {
       else {
         const food = nearFood()
         if (food) (prompt = `Press E to buy ${food.name} (${naira(food.price)})`), act('KeyE', food.icon, 'Eat')
+        else if (nearTrader()) (prompt = 'Press E to shop at the market'), act('KeyE', '🛍️', 'Shop')
       }
+    } else if (game.mode === 'car' && !game.dialogue && !game.panel && nearGarage(8)) {
+      prompt = Math.abs(world.carSpeed) > 2 ? 'Stop at the roller door to park' : 'Press E to park in your garage'
+      act('KeyE', '🅿️', 'Park')
     }
     if (!prompt && !game.dialogue && !game.inside) {
       prompt = racePrompt()

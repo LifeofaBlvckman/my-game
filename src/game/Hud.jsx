@@ -8,6 +8,7 @@ import { openDialogue, placeInRoom } from './GameLogic'
 import { addChat, connectMultiplayer } from './net'
 import { applySave, signedInName, signIn, startAutosave } from './save'
 import { Decorate, Wardrobe } from './Panels'
+import { Garage, Market, PropertySheet } from './ShopPanels'
 import Phone, { PhoneAlerts } from './Phone'
 import { phone } from './phoneline'
 import { cleanOutfit, starterOutfit } from './wardrobe'
@@ -436,6 +437,9 @@ export default function Hud() {
       {game.panel === 'wardrobe' && <Wardrobe />}
       {game.panel === 'decor' && <Decorate />}
       {game.panel === 'phone' && <Phone />}
+      {game.panel === 'market' && <Market />}
+      {game.panel === 'property' && <PropertySheet />}
+      {game.panel === 'garage' && <Garage />}
       {game.phase === 'playing' && <PhoneAlerts />}
       {game.phase === 'playing' && !isTouch && !game.panel && (
         <button className="phone-btn" onClick={() => phone.open()}>

@@ -282,6 +282,99 @@ export const INTERIORS = {
       { pos: [-5.5, -6.1], yaw: 0, anim: 'sit', seed: 904 }, // someone in the cell
     ],
   },
+  // Bought with mission money: a self-contain in Yaba, and a penthouse in
+  // Lekki. Both are safe houses: the police lose you inside, you can sleep and
+  // change clothes.
+  flat: {
+    name: 'YOUR YABA FLAT',
+    size: [10, 3.2, 8],
+    floor: '#b98a5a',
+    wall: '#e9f0f4',
+    light: '#fff1d0',
+    props: [
+      [3.2, 0.3, -2.3, 2.2, 0.6, 2.8, '#3f6fb8', { solid: true, bed: true }], // bed
+      [3.2, 0.68, -3.35, 1.5, 0.2, 0.5, '#f7f1e3'],
+      [3.2, 0.62, -1.7, 2.1, 0.06, 1.4, '#2f5fb8'],
+      [3.2, 0.75, -3.75, 2.2, 1.5, 0.12, '#6b4a35', S], // headboard
+      [-3.9, 1.1, -3.45, 1.6, 2.2, 0.8, '#7a5444', S], // wardrobe
+      [-3.9, 1.1, -3.04, 0.03, 2.0, 0.02, '#4a3428'],
+      [-4.5, 0.45, 0.9, 0.9, 0.9, 2.6, '#d8d4cc', S], // kitchen counter
+      [-4.5, 0.92, 0.5, 0.7, 0.04, 0.7, '#2a2a2e'], // gas cooker
+      [-4.5, 0.97, 1.6, 0.5, 0.1, 0.5, '#9aa3ab', { shape: 'cylinder' }], // pot
+      [-4.55, 0.35, 2.7, 0.45, 0.7, 0.45, '#2a7bd6', { shape: 'cylinder', solid: true }], // gas cylinder
+      [-1, 0.4, -3.55, 1.6, 0.8, 0.5, '#4a3a30', S], // tv stand
+      [-1, 1.15, -3.6, 1.3, 0.75, 0.06, '#14161a'],
+      [-1, 1.15, -3.56, 1.2, 0.65, 0.02, '#7fd0ff', G],
+      [-0.8, 0.38, 0.2, 1.1, 0.06, 1.1, '#f2f2f2', { shape: 'cylinder' }], // plastic table
+      [-0.8, 0.19, 0.2, 0.1, 0.38, 0.1, '#e6e6e6'],
+      [0.4, 0.25, 0.4, 0.5, 0.5, 0.5, '#e04848', S], // plastic chairs
+      [-2, 0.25, 0.0, 0.5, 0.5, 0.5, '#e04848', S],
+      [-1, 0.01, -1.6, 3, 0.02, 2, '#8a46c0'], // rug
+      [1.8, 0.7, 2.6, 0.1, 1.4, 0.1, '#333333'], // standing fan
+      [1.8, 1.45, 2.6, 0.6, 0.6, 0.12, '#d8d8d8', { shape: 'cylinder' }],
+      [4.95, 1.8, 0.8, 0.05, 1.1, 1.4, '#9fd6e8', G], // window
+      [0, 3.05, 0, 0.3, 0.2, 0.3, '#fff4c8', G], // bulb
+      [-4.95, 1.9, -1.3, 0.04, 0.8, 1.1, '#1f8a3a'], // calendar
+      [-4.93, 2.0, -1.3, 0.03, 0.4, 0.9, '#f7f7f2'],
+    ],
+    wardrobe: [-3.9, -2.5],
+    bedSpot: [3.2, -0.4],
+    npcs: [],
+  },
+  penthouse: {
+    name: 'YOUR LEKKI PENTHOUSE',
+    size: [20, 4, 14],
+    floor: '#e9e6df',
+    wall: '#f4f1ea',
+    light: '#fff6e0',
+    props: [
+      // Floor-to-ceiling glass over the Atlantic.
+      [0, 2, -6.95, 18, 3.6, 0.05, '#7fc4e8', G],
+      [-4.5, 2, -6.9, 0.12, 3.8, 0.1, '#2a2d33'],
+      [4.5, 2, -6.9, 0.12, 3.8, 0.1, '#2a2d33'],
+      [0, 2, -6.9, 0.12, 3.8, 0.1, '#2a2d33'],
+      // L-shaped sofa, glass coffee table and a big TV.
+      [-5.5, 0.32, -3.6, 5, 0.64, 1.2, '#efe6d6', S],
+      [-5.5, 0.85, -4.15, 5, 0.6, 0.3, '#efe6d6', S],
+      [-8.4, 0.32, -1.9, 1.2, 0.64, 4.6, '#efe6d6', S],
+      [-5.5, 0.6, -3.5, 0.5, 0.25, 0.5, '#d4af37'], // cushion
+      [-5.2, 0.22, -1.4, 2.2, 0.06, 1.2, '#bfe3ef'], // glass table
+      [-5.2, 0.1, -1.4, 1.8, 0.2, 0.9, '#2a2d33'],
+      [-5.5, 0.01, -2.1, 6, 0.02, 4.4, '#c9b38a'], // rug
+      [-5.5, 2.0, 1.15, 3.6, 2.0, 0.1, '#0e0f12'], // TV on the wall
+      [-5.5, 2.0, 1.1, 3.4, 1.8, 0.02, '#3f8fd8', G],
+      [-5.5, 0.35, 1.0, 4.2, 0.4, 0.5, '#1d1d22', S],
+      [-5.5, 2, 1.4, 5, 4, 0.2, '#ece6da', S], // the wall it hangs on
+      // Bar with stools.
+      [3.5, 0.55, 4.2, 4, 1.1, 0.8, '#1d1b22', S],
+      [3.5, 1.12, 4.2, 4.2, 0.06, 1.0, '#d4af37'],
+      [3.5, 1.6, 5.9, 4, 0.06, 0.4, '#3a2d26'], // shelf of bottles
+      ...[2, 2.8, 3.6, 4.4, 5].map((x, k) => [x, 1.82, 5.9, 0.16, 0.38, 0.16, ['#2f8a3a', '#7a2a2a', '#d4af37', '#2a6bff', '#f2f2f2'][k], { shape: 'cylinder' }]),
+      ...[2.2, 3.5, 4.8].map((x) => [x, 0.4, 3.3, 0.45, 0.8, 0.45, '#d4af37', { shape: 'cylinder', solid: true }]),
+      // Bedroom corner: king bed, side tables, wardrobe.
+      [6.8, 0.32, -3.6, 3.2, 0.64, 3.6, '#f7f1e3', { solid: true, bed: true }],
+      [6.8, 0.68, -3.4, 3.1, 0.08, 2.6, '#7a2a4a'],
+      [6.8, 0.72, -5.1, 2.6, 0.2, 0.5, '#ffffff'],
+      [6.8, 1.0, -5.5, 3.4, 2, 0.15, '#3a2d26', S], // headboard
+      [4.8, 0.3, -5.1, 0.6, 0.6, 0.6, '#3a2d26', S],
+      [4.8, 0.75, -5.1, 0.3, 0.3, 0.3, '#fff1c8', { glow: true, shape: 'sphere' }],
+      [9.1, 1.2, 0.5, 1.4, 2.4, 2.4, '#3a2d26', S], // wardrobe
+      [8.38, 1.2, 0.5, 0.03, 2.2, 0.02, '#d4af37'],
+      // A built-in fish tank, a painting, plants and a chandelier.
+      [0.5, 0.4, -5.9, 2.4, 0.8, 0.8, '#1d1d22', S],
+      [0.5, 1.22, -5.9, 2.3, 0.8, 0.7, '#5fc8e8', { kind: 'tank' }],
+      [-9.84, 2.1, -2, 0.04, 1.3, 2.0, '#d4af37', { kind: 'painting' }],
+      [-9.2, 0.35, -6.3, 0.7, 0.7, 0.7, '#f2f2f2', S],
+      [-9.2, 1.2, -6.3, 1.0, 1.2, 1.0, '#3f8a3a', { shape: 'sphere' }],
+      [9.2, 0.35, 6.2, 0.7, 0.7, 0.7, '#f2f2f2', S],
+      [9.2, 1.2, 6.2, 1.0, 1.2, 1.0, '#3f8a3a', { shape: 'sphere' }],
+      [0, 3.6, 0, 1.4, 0.5, 1.4, '#fff4c8', { glow: true, shape: 'sphere' }],
+      [0, 3.85, 0, 0.06, 0.4, 0.06, '#d4af37'],
+    ],
+    wardrobe: [7.9, 0.5],
+    bedSpot: [6.8, -1.3],
+    npcs: [],
+  },
 }
 
 // Give each room a spot in the world (in a row, far below the city) and link

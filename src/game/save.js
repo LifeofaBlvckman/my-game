@@ -1,6 +1,7 @@
 import { cleanDecor } from './decor'
 import { useGame, world } from './state'
 import { cleanOutfit } from './wardrobe'
+import { cleanGarage, cleanProperties } from './property'
 
 // Saved games. Signed in (name + PIN), the game saves to the server
 // (server/saves.js) a few seconds after anything worth keeping changes, and
@@ -62,6 +63,9 @@ export function collectSave() {
     outfit: g.outfit,
     decor: g.decor,
     owned: g.owned,
+    properties: g.properties,
+    garage: g.garage,
+    chopIndex: g.chopIndex,
     music: g.music,
     playSeconds: Math.round(world.playSeconds ?? 0),
   }
@@ -79,6 +83,9 @@ export function applySave(save) {
     outfit: cleanOutfit(save.outfit, save.gender),
     decor: cleanDecor(save.decor),
     owned: Array.isArray(save.owned) ? save.owned.filter((id) => typeof id === 'string').slice(0, 100) : [],
+    properties: cleanProperties(save.properties),
+    garage: cleanGarage(save.garage),
+    chopIndex: n(save.chopIndex, 0, 1e6, 0),
     music: ['calm', 'afro', 'off'].includes(save.music) ? save.music : 'calm',
   })
   world.playSeconds = n(save.playSeconds, 0, 1e9, 0)
@@ -161,7 +168,7 @@ export function startAutosave() {
   // Save soon after anything that matters changes.
   useGame.subscribe((s, prev) => {
     if (s.phase === 'title') return
-    if (s.quest !== prev.quest || s.outfit !== prev.outfit || s.decor !== prev.decor || s.owned !== prev.owned || s.money !== prev.money) requestSave()
+    if (s.quest !== prev.quest || s.outfit !== prev.outfit || s.decor !== prev.decor || s.owned !== prev.owned || s.money !== prev.money || s.properties !== prev.properties || s.garage !== prev.garage || s.chopIndex !== prev.chopIndex) requestSave()
   })
   // Closing the tab or switching away on a phone: save right away.
   const flush = () => {

@@ -110,6 +110,8 @@ export default function Radar() {
         vehicles.forEach((v) => v.chasing && blip(v.x, v.z, rot, flash ? '#ff3030' : '#3060ff', 3.5))
       }
       if (objective) blip(objective.x, objective.z, rot, '#ffd23a', 5.5)
+      // Houses and the garage you own: green squares.
+      for (const p of city.properties) if (game.properties.includes(p.id)) blip(p.x, p.z, rot, '#2ad15a', 4.5, true)
       // Race start flags: chequered squares.
       for (const race of Object.values(RACES)) blip(race.start.x, race.start.z, rot, game.race?.phase === 'lobby' && !game.race.joined ? '#ffd23a' : '#ffffff', 3.5, true)
       // Friends online: pink dots, pinned to the rim when far away. Someone

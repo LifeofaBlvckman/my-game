@@ -186,7 +186,13 @@ const FLOWER_COLORS = ['#e8364f', '#ffd23a', '#ff8fc8', '#ffffff', '#9b6bff', '#
 const CIVIC = [
   { id: 'hospital', name: 'GENERAL HOSPITAL', blocks: [[isl(2), 2], [isl(3), 3], [isl(2), 4], [isl(4), 2]], w: 26, d: 16, h: 14, color: '#f2f4f2', sign: '#c8202a' },
   { id: 'police', name: 'POLICE STATION', blocks: [[2, 3], [3, 4], [4, 4], [1, 3]], w: 22, d: 14, h: 10, color: '#cfd8e6', sign: '#1b2a52' },
+  // Property you can buy once you've made some money: a safe house on each
+  // side of the lagoon, and a garage to keep your cars in.
+  { id: 'flat', name: 'YABA FLATS', sale: 25000, kind: 'house', blocks: [[3, 1], [4, 6], [3, 6]], w: 16, d: 12, h: 13, color: '#e8d2b0', sign: '#7a5444', filler: true },
+  { id: 'penthouse', name: 'LEKKI PEARL TOWERS', sale: 150000, kind: 'house', blocks: [[isl(2), 6], [isl(4), 6], [isl(0), 6]], w: 18, d: 14, h: 34, color: '#a9c4d4', sign: '#0d2a4a', filler: true },
+  { id: 'garage', name: 'EBUTE METTA GARAGE', sale: 40000, kind: 'garage', blocks: [[3, 5], [4, 5], [3, 4]], w: 18, d: 12, h: 6, color: '#bdb6a8', sign: '#e0a020', filler: true },
 ]
+export const PROPERTY_IDS = CIVIC.filter((c) => c.sale).map((c) => c.id)
 
 function addCivicBuildings(city) {
   const inBlock = (o, x, z, pad = 0) => Math.abs(o.x - x) < BLOCK / 2 + pad && Math.abs(o.z - z) < BLOCK / 2 + pad
@@ -210,8 +216,31 @@ function addCivicBuildings(city) {
     city.parkedCars = city.parkedCars.filter((p) => !inBlock(p, x, z))
     const front = z + BLOCK / 2
     const bz = front - 3 - c.d / 2
-    const name = c.id === 'police' ? `${zoneAt(x, z)} ${c.name}` : `LAGOS ${c.name}`
+    // Keep the pavement in front of the door clear.
+    const off = (o) => !(Math.abs(o.x - x) < 7.5 && o.z > front - 3.2 && o.z < front + 1.5)
+    city.flowerBeds = city.flowerBeds.filter(off)
+    city.flowers = city.flowers.filter(off)
+    city.stalls = city.stalls.filter(off)
+    city.foodSpots = city.foodSpots.filter(off)
+    city.trees = city.trees.filter(off)
+    city.idlers = city.idlers.filter((o) => o.role !== 'seller' || off(o))
+    city.signs = city.signs.filter((g) => !g.posts || off(g))
+    const name = c.sale ? c.name : c.id === 'police' ? `${zoneAt(x, z)} ${c.name}` : `LAGOS ${c.name}`
     city.buildings.push({ x, z: bz, w: c.w, d: c.d, h: c.h, color: c.color, landmark: true })
+    if (c.filler) {
+      // Neighbours on the back half of the block, so it isn't a bare lot.
+      const r = mulberry32(c.id.length * 97 + x)
+      for (const side of [-1, 1]) city.buildings.push({ x: x + side * 7.5, z: z - 9, w: 13, d: 11, h: 8 + Math.floor(r() * 12), color: ['#e9b8a0', '#cfe0d0', '#f0e2b6', '#c9d4e8'][Math.floor(r() * 4)] })
+    }
+    if (c.kind === 'garage') {
+      // A wide roller door and a concrete apron to drive onto.
+      city.solids.push({ x, z: front - 3 + 0.05, w: 7, d: 0.12, h: 3.6, color: '#7c858c' })
+      for (let k = 0; k < 9; k++) city.solids.push({ x, z: front - 3 + 0.12, w: 7, d: 0.03, h: 0.05, color: '#5d656b', y: 0.3 + k * 0.38 })
+      city.solids.push({ x, z: front - 1.4, w: 8, d: 3.2, h: 0.03, color: '#a19d95', y: 0.13 })
+      city.signs.push({ text: name, x, y: 4.6, z: front - 3 + 0.12, rot: 0, w: 7, h: 1.2, bg: c.sign, fg: '#1b1b24' })
+      city.properties.push({ id: c.id, name, price: c.sale, kind: c.kind, x, z: front - 3 + 2.2 })
+      continue
+    }
     city.solids.push({ x, z: front - 3 + 0.05, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true }) // doors
     city.solids.push({ x, z: front - 3 + 1.2, w: 6, d: 2.4, h: 0.15, color: '#9a9a9a', y: 3.2 }) // canopy
     city.signs.push({ text: name, x, y: Math.min(c.h - 1.5, 6.5), z: front - 3 + 0.12, rot: 0, w: Math.min(c.w - 4, 16), h: 1.8, bg: c.sign, fg: '#ffffff', glow: '#ffffff' })
@@ -220,13 +249,17 @@ function addCivicBuildings(city) {
       city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 2.6, d: 0.15, h: 0.8, color: '#e8202a', y: c.h - 3, emissive: true })
       city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 0.8, d: 0.15, h: 2.6, color: '#e8202a', y: c.h - 3.9, emissive: true })
       city.parkedCars.push({ x: x - 8, z: front + 1.5, yaw: Math.PI / 2, type: 'danfo' })
+    } else if (c.sale) {
+      // A doorman's lamp and a planter either side of the door.
+      for (const k of [-1, 1]) city.solids.push({ x: x + k * 2.6, z: front - 2.4, w: 1, d: 1, h: 0.7, color: '#8a5e3c', y: 0.12 })
     } else {
       // Patrol cars out front and an officer at the door.
       city.parkedCars.push({ x: x - 8, z: front + 1.5, yaw: Math.PI / 2, type: 'police' })
       city.parkedCars.push({ x: x + 9, z: front + 1.5, yaw: -Math.PI / 2, type: 'police' })
       city.idlers.push({ x: x + 2.2, z: front - 1.6, y: SIDEWALK_Y, yaw: 0, role: 'cop-guard' })
     }
-    city.doors.push({ id: c.id, name, x, z: front - 3 + 1.3 })
+    city.doors.push({ id: c.id, name, x, z: front - 3 + 1.3, ...(c.sale && { sale: c.sale }) })
+    if (c.sale) city.properties.push({ id: c.id, name, price: c.sale, kind: c.kind, x, z: front - 3 + 1.3 })
   }
 }
 
@@ -532,6 +565,7 @@ export function generateCity(seed = 2026) {
     doors: [], // enterable buildings: { id, name, x, z } is the spot outside the door
     busStops: [],
     foodSpots: [], // mama put stalls: { x, z, name, price, icon, color }
+    properties: [], // for sale: { id, name, price, kind: 'house' | 'garage', x, z } (the spot out front)
   }
 
   const addBuilding = (b) => {
