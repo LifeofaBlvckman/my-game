@@ -274,6 +274,21 @@ function addFootbridges(city) {
   }
 }
 
+// The walking surface of a footbridge under (x, z), if there is one: the
+// height of the stairs or the deck there (Player.jsx keeps your feet on it).
+export function footbridgeFloor(x, z) {
+  for (const f of city.footbridges ?? []) {
+    const { height: H, ramp: L } = f
+    if (Math.abs(x - f.x) < 0.95 && Math.abs(z - f.z) < ROAD / 2 + 1.9) return H
+    const x0 = f.x - 0.9 - L
+    if (x < x0 - 0.3 || x > f.x - 0.85) continue
+    for (const sz of f.sideZ) {
+      if (Math.abs(z - sz) < 0.8) return SIDEWALK_Y + (H - SIDEWALK_Y) * Math.max(0, Math.min(1, (x - x0) / L))
+    }
+  }
+  return null
+}
+
 // Things added after the main layout, from their own random numbers so the
 // buildings and roads stay exactly where they were: flower beds in the parks
 // and along the sidewalks, stop signs, and LASTMA wardens at busy junctions.

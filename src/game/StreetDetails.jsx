@@ -73,6 +73,9 @@ function Footbridge({ f }) {
       box(`mid${id}`, [rx, H + 0.5, z], [0.05, 0.05, len * 2], steel),
       ...Array.from({ length: Math.floor(len / 1.5) * 2 + 1 }, (_, k) => box(`post${id}${k}`, [rx, H + 0.5, z - Math.floor(len / 1.5) * 1.5 + k * 1.5], [0.07, 1.0, 0.07], steel)),
     ]),
+    // A light roof over the deck, on four posts.
+    box('roof', [x, H + 2.55, z], [2.3, 0.08, half * 2 + 0.4], steel),
+    ...[-1, 1].flatMap((e) => [-1, 1].map((sd) => box(`rpole${e}${sd}`, [x + sd * 0.92, H + 1.8, z + e * (half - 0.2)], [0.08, 1.5, 0.08], steel))),
     ...[-1, 1].flatMap((e) => [
       box(`endTop${e}`, [x, H + 1.0, z + e * (half - 0.03)], [1.8, 0.08, 0.08], steel),
       box(`endMid${e}`, [x, H + 0.5, z + e * (half - 0.03)], [1.8, 0.05, 0.05], steel),
@@ -80,9 +83,23 @@ function Footbridge({ f }) {
   ]
   for (const [k, sz] of f.sideZ.entries()) {
     const mid = [x - 0.9 - L / 2, SIDEWALK_Y + rise / 2 - 0.12, sz]
-    parts.push(box(`ramp${k}`, mid, [run, 0.24, 1.5], concrete, [0, 0, slope]))
+    // A flight of stairs: treads, with a sloping concrete stringer underneath
+    // and a handrail on the open side (the slope underneath is what you
+    // actually walk on; Player.jsx keeps your feet on the steps).
+    const STEPS = 22
+    for (let n = 0; n < STEPS; n++) {
+      const sx = x - 0.9 - L + (L / STEPS) * (n + 0.5)
+      const top = SIDEWALK_Y + (rise / STEPS) * (n + 1)
+      parts.push(box(`step${k}-${n}`, [sx, top - 0.09, sz], [L / STEPS + 0.02, 0.18, 1.5], concrete))
+    }
+    parts.push(box(`stringer${k}`, [mid[0], mid[1] - 0.25, sz], [run, 0.3, 1.4], pillar, [0, 0, slope]))
     const outer = sz + Math.sign(sz - z) * 0.72
-    parts.push(box(`rrail${k}`, [mid[0], mid[1] + 0.6, outer], [run, 0.06, 0.06], steel, [0, 0, slope]))
+    parts.push(box(`rrail${k}`, [mid[0], mid[1] + 0.95, outer], [run, 0.07, 0.07], steel, [0, 0, slope]))
+    for (let n = 1; n < 6; n++) {
+      const px = x - 0.9 - L + (L / 6) * n
+      const py = SIDEWALK_Y + (rise / 6) * n
+      parts.push(box(`rpost${k}-${n}`, [px, py + 0.45, outer], [0.06, 0.9, 0.06], steel))
+    }
     parts.push(box(`pillar${k}`, [x, (H - 0.3) / 2, sz], [0.5, H - 0.3, 0.5], pillar))
     parts.push(box(`rpillar${k}`, [x - 0.9 - L * 0.45, (rise * 0.55) / 2, sz], [0.35, rise * 0.55, 0.35], pillar))
   }

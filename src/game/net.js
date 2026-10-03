@@ -30,6 +30,17 @@ function addRemote(net, id, name, s) {
   net.remotes.set(id, { id, name, samples: s ? [{ time: performance.now(), ...s }] : [], x: s?.p[0] ?? 0, y: s?.p[1] ?? -500, z: s?.p[2] ?? 0 /* parked out of the way until their first update */, yaw: s?.y ?? 0, s })
 }
 
+// One id per browser tab, kept across reconnects (see the server's 'hello').
+function tabId() {
+  try {
+    let id = sessionStorage.getItem('eko-streets-tab')
+    if (!id) sessionStorage.setItem('eko-streets-tab', (id = Math.random().toString(36).slice(2) + Date.now().toString(36)))
+    return id
+  } catch {
+    return (tabId.id ??= Math.random().toString(36).slice(2))
+  }
+}
+
 // If the connection drops (the server restarted after an update, a free
 // server woke up, the phone slept), keep trying to get back online.
 let retryTimer = null
@@ -128,7 +139,7 @@ export function connectMultiplayer(name) {
     },
   }
 
-  ws.onopen = () => net.send({ t: 'hello', name })
+  ws.onopen = () => net.send({ t: 'hello', name, sid: tabId() })
   ws.onmessage = (e) => {
     let msg
     try {

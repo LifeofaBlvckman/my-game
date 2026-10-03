@@ -44,6 +44,10 @@ function placeWalker(n, near) {
   n.r = BLOCK / 2 - 1.6 + (rand() - 0.5) * 1.2
   n.t = rand() * n.r * 8
   n.dir = rand() < 0.5 ? 1 : -1
+  // Start right on the new loop (they're moved while out of sight), not walk
+  // there from wherever they were across the city.
+  n.x = undefined
+  n.posed = false
 }
 
 for (let k = 0; k < WALKERS; k++) {
@@ -566,6 +570,8 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
         // nobody's looking closely.
         n.stuck = n.x === bx && n.z === bz ? (n.stuck ?? 0) + dt : 0
         if (n.stuck > 2 && dx * dx + dz * dz > 25 * 25) n.x = undefined
+        // Far from their pavement for some reason: just put them back on it.
+        if (Math.hypot(p.x - n.x, p.z - n.z) > 30 && dx * dx + dz * dz > 40 * 40) n.x = undefined
       } else {
         n.x = p.x
         n.z = p.z

@@ -326,6 +326,25 @@ export default function Hud() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+  // The controls box tidies itself away once you're moving, or after a while
+  // (H brings it back).
+  const playingNow = game.phase === 'playing'
+  useEffect(() => {
+    if (!playingNow) return
+    // Only once: after that, H alone shows and hides it.
+    const onMove = (e) => ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && hide()
+    const hide = () => {
+      setShowHelp(false)
+      window.removeEventListener('keydown', onMove)
+      clearTimeout(id)
+    }
+    const id = setTimeout(hide, 20000)
+    window.addEventListener('keydown', onMove)
+    return () => {
+      clearTimeout(id)
+      window.removeEventListener('keydown', onMove)
+    }
+  }, [playingNow])
 
   if (game.phase === 'title') return <Title />
 

@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { CapsuleCollider, CoefficientCombineRule, RigidBody, useRapier } from '@react-three/rapier'
 import { Vector3 } from 'three'
-import { city } from './cityData'
+import { city, footbridgeFloor } from './cityData'
 import { makeAnkaraTexture } from './faces'
 import Person from './Person'
 import { computePose } from './people'
@@ -97,7 +97,14 @@ export default function Player() {
           b.setLinvel({ x: 0, y: 0, z: 0 }, true)
         }
       }
-    } else if (!down) b.setLinvel({ x: move.x * speed, y: v.y, z: move.z * speed }, true)
+    } else if (!down) {
+      // On a footbridge's stairs or deck: keep the feet on the steps, so
+      // walking up and down is smooth rather than a scramble up a slope.
+      const floor = footbridgeFloor(p0.x, p0.z)
+      const feet = p0.y - FOOT_OFFSET
+      const onStairs = floor !== null && feet > floor - 0.8 && feet < floor + 0.5 && !(jump && v.y > 1)
+      b.setLinvel({ x: move.x * speed, y: onStairs ? Math.max(-8, Math.min(8, (floor + 0.02 - feet) * 14)) : v.y, z: move.z * speed }, true)
+    }
     // Never let a bad shove (from a teleporting body, say) launch him.
     else if (Math.hypot(v.x, v.y, v.z) > 30) b.setLinvel({ x: 0, y: Math.min(v.y, 0), z: 0 }, true)
     if (v.y > 25) b.setLinvel({ x: v.x, y: 0, z: v.z }, true)

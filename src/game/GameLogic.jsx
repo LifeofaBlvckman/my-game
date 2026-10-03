@@ -201,8 +201,13 @@ function advanceQuest() {
   }
 }
 
+// Up on a footbridge (or a roof) you can't reach a car or a person on the
+// road below: only things at about your own height count.
+const sameLevel = (from, y = 0.5) => from.y === undefined || Math.abs(from.y - 0.9 - y) < 2.2
+
 function nearestVehicle(from) {
   let best = null
+  if (!sameLevel(from)) return null
   if (world.car) {
     const t = world.car.translation()
     const d = flat(t, from)
@@ -219,6 +224,7 @@ function nearestVehicle(from) {
 function nearestNamedNpc(from) {
   let best = null
   for (const [id, n] of Object.entries(NPCS)) {
+    if (!sameLevel(from, n.y ?? 0)) continue
     const d = Math.hypot(n.pos[0] - from.x, n.pos[1] - from.z)
     // Someone behind a counter or a pulpit can be talked to from a bit further.
     if (d < (n.talkRange ?? TALK_DISTANCE) && (!best || d < best.d)) best = { id, n, d }

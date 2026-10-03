@@ -103,6 +103,21 @@ export function attachMultiplayer(httpServer) {
 
       if (msg.t === 'hello' && !player.name) {
         player.name = clean(msg.name, 16) || `Player ${player.id}`
+        // The same browser tab reconnecting (after a dropped connection):
+        // drop its old connection now, or friends (and you) would briefly see
+        // a second copy of you standing where you were.
+        player.sid = typeof msg.sid === 'string' ? msg.sid.slice(0, 40) : null
+        if (player.sid) {
+          for (const old of [...players.values()]) {
+            if (old.sid !== player.sid || old === player) continue
+            players.delete(old.id)
+            old.room.delete(old.id)
+            broadcast(old.room, { t: 'leave', id: old.id, name: old.name })
+            checkRaceOver(old.room)
+            if (!old.room.size) rooms.delete(old.roomNumber)
+            old.ws.terminate()
+          }
+        }
         players.set(player.id, player)
         joinRoom(player)
         send(ws, {
