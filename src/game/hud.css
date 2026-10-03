@@ -646,6 +646,22 @@
   gap: 10px;
   margin-bottom: 4px;
 }
+.steer-pad {
+  position: absolute;
+  left: 18px;
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 14px;
+  pointer-events: auto;
+}
+.touch-btn.steer {
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+}
+.touch-btn.steer .icon {
+  font-size: 34px;
+}
 /* Pedals: tall rounded rectangles you can rest a thumb on. */
 .touch-btn.pedal {
   width: 70px;
@@ -1318,4 +1334,15 @@
 }
 .sq-btn {
   position: relative;
+}
+
+/* Phones: calls and texts drop in below the objective, clear of the radar. */
+.hud.is-touch .call-alert {
+  top: calc(176px + env(safe-area-inset-top));
+}
+.hud.is-touch .call-alert.small {
+  top: calc(176px + env(safe-area-inset-top));
+}
+.hud.is-touch .phone-toast {
+  top: calc(226px + env(safe-area-inset-top));
 }

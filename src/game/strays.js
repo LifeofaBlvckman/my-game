@@ -6,7 +6,7 @@ import { bark, yelp } from './audio'
 // close, and yelp and run if you punch one or clip it with a car. Only a
 // handful exist, kept near the player.
 
-const COUNT = 14
+const COUNT = 5
 const RING = BLOCK / 2 - 1.6 // the pavement loop around a block's edge
 const SIDE = RING * 2
 const LOOP = SIDE * 4

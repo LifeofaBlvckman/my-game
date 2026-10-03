@@ -2,7 +2,7 @@ import { hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
 import { onRaceMessage } from './racing'
-import { phoneMessage } from './phoneline'
+import { contactLeft, phoneMessage } from './phoneline'
 import { cleanOutfit } from './wardrobe'
 
 // Client side of multiplayer. Connects to the server on the same address the
@@ -157,6 +157,7 @@ export function connectMultiplayer(name) {
       net.remotes.delete(msg.id)
       syncRoster(net)
       addChat(null, `${msg.name} left`, true)
+      contactLeft(msg.id)
     } else if (msg.t === 's') {
       const r = net.remotes.get(msg.id)
       if (!r) return

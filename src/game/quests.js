@@ -34,6 +34,7 @@ export const NPCS = {
     name: 'Pastor Adewale',
     // On the altar platform (0.8 m up), behind the pulpit.
     ...inRoom('church', 0, -10.6, 0.8),
+    talkRange: 3.8, // behind the pulpit
     yaw: 0,
     look: { female: false, face: 5, hair: 'short', top: '#1c2333', bottom: '#1c2333', robe: true, height: 1.0 },
   },
@@ -86,6 +87,7 @@ export const NPCS = {
   ngozi: {
     name: 'Nurse Ngozi',
     ...inRoom('hospital', 1.2, -1.9),
+    talkRange: 3.2, // behind the front desk
     yaw: 0,
     look: { female: true, face: 12, hair: 'puff', hairColor: '#1f1410', top: '#f2f2f2', bottom: '#5fa8c8', robe: false, height: 0.95 },
   },

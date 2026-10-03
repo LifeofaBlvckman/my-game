@@ -12,6 +12,15 @@ const PIN_FOR = 3 * 60 * 1000
 let ringTimer = null
 let giveUp = null
 let toastKey = 0
+let captionKey = 0
+
+// What's said on a call shows at the bottom of the screen for a few seconds.
+const caption = (speaker, text) => {
+  const key = `call${++captionKey}`
+  useGame.setState({ subtitle: { speaker, text, key } })
+  setTimeout(() => useGame.getState().subtitle?.key === key && useGame.setState({ subtitle: null }), Math.min(7000, 2500 + text.length * 60))
+}
+const clearCaption = () => String(useGame.getState().subtitle?.key ?? '').startsWith('call') && useGame.setState({ subtitle: null })
 
 const toast = (text) => {
   const key = ++toastKey
@@ -46,7 +55,7 @@ export function phoneMessage(msg) {
   if (msg.t === 'dm') {
     const onCall = g.call?.state === 'on' && g.call.id === msg.from
     addToThread(msg.from, msg.name, { me: false, text: msg.text })
-    if (onCall) useGame.setState({ subtitle: { speaker: msg.name, text: msg.text } })
+    if (onCall) caption(msg.name, msg.text)
     if (openOn() !== msg.from) {
       useGame.setState({ unread: useGame.getState().unread + 1 })
       if (!onCall) toast(`📱 ${msg.name}: ${msg.text}`)
@@ -67,6 +76,7 @@ export function phoneMessage(msg) {
     ringing(false)
     const was = g.call.state
     useGame.setState({ call: null })
+    clearCaption()
     toast(was === 'ringing' ? `📞 ${msg.name} can't talk right now` : `📞 Call with ${msg.name} ended`)
     if (was === 'incoming') addToThread(msg.from, msg.name, { system: true, text: 'Missed call' })
   } else if (msg.t === 'pin') {
@@ -76,6 +86,17 @@ export function phoneMessage(msg) {
     toast(`📍 ${msg.name} sent their location: the flashing pink square on your map`)
     textTone()
   }
+}
+
+// Someone went offline: a call with them ends.
+export function contactLeft(id) {
+  const call = useGame.getState().call
+  if (call?.id !== id) return
+  clearTimeout(giveUp)
+  ringing(false)
+  useGame.setState({ call: null })
+  clearCaption()
+  toast(`📞 ${call.name} went offline`)
 }
 
 export const phone = {
@@ -97,7 +118,7 @@ export const phone = {
     world.net.send({ t: 'dm', to: id, text })
     addToThread(id, name, { me: true, text })
     const call = useGame.getState().call
-    if (call?.state === 'on' && call.id === id) useGame.setState({ subtitle: { speaker: 'You', text } })
+    if (call?.state === 'on' && call.id === id) caption('You', text)
   },
   call(id, name) {
     if (!world.net || useGame.getState().call) return
@@ -126,6 +147,7 @@ export const phone = {
     ringing(false)
     world.net?.send({ t: 'hangup', to: call.id })
     useGame.setState({ call: null })
+    clearCaption()
   },
   pin(id, name) {
     world.net?.send({ t: 'pin', to: id })

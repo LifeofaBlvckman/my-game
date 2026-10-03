@@ -11,7 +11,7 @@ import { personalize } from './who'
 //  - one big action button that becomes whatever makes sense right now
 //    (talk, enter, drive, eat, race... or punch), and a small jump button
 //  - square buttons: ☰ for the rest (friends, chat, music, help), 😀 and 📱
-//  - in a car: the left thumb steers, GAS and BRAKE pedals on the right
+//  - in a car: ◀ ▶ under the left thumb to steer, GAS and BRAKE on the right
 // They press the same keys the keyboard would, so the game doesn't need to know.
 export const isTouch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window)
 
@@ -60,6 +60,12 @@ function MoveZone() {
     ;['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft'].forEach((c) => key(c, false))
     setKnob(null)
   }
+  // Getting into a car swaps the stick for steering buttons: let go of
+  // everything the stick was holding, or the car would set off by itself.
+  useEffect(() => () => {
+    world.stick = null
+    ;['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft'].forEach((c) => key(c, false))
+  }, [])
   return (
     <div
       className="move-zone"
@@ -226,7 +232,15 @@ export default function TouchControls() {
   return (
     <div className="touch">
       <LookZone />
-      <MoveZone />
+      {car ? (
+        // Driving: hold ◀ or ▶ to steer (left thumb), pedals on the right.
+        <div className="steer-pad">
+          <HoldButton code="KeyA" icon="◀" className="steer" />
+          <HoldButton code="KeyD" icon="▶" className="steer" />
+        </div>
+      ) : (
+        <MoveZone />
+      )}
       <div className="touch-side">
         <Square icon="☰" active={panel === 'menu'} onPress={() => setPanel((p) => (p === 'menu' ? null : 'menu'))} />
         <Square icon="😀" active={panel === 'emoji'} onPress={() => setPanel((p) => (p === 'emoji' ? null : 'emoji'))} />

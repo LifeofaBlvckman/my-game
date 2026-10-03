@@ -230,6 +230,50 @@ function addCivicBuildings(city) {
   }
 }
 
+// Raised footbridges over busy roads: a deck high enough for a danfo to pass
+// under, with a ramp up from the pavement on each side. One on the Mainland,
+// two on the Island. Each crosses an "x" road (one running along x), part
+// way along a block, away from bus stops and doors.
+export const FOOTBRIDGE = { height: 5.4, ramp: 11, width: 1.8 }
+const FOOTBRIDGE_SPOTS = [
+  [[2, 5], [3, 3], [1, 3], [2, 2]], // Mainland: Surulere / Yaba
+  [[isl(1), 4], [isl(2), 3], [isl(1), 3]], // Victoria Island
+  [[isl(3), 6], [isl(2), 6], [isl(3), 5]], // Lekki
+]
+function addFootbridges(city) {
+  city.footbridges = []
+  const { height: H, ramp: L } = FOOTBRIDGE
+  for (const options of FOOTBRIDGE_SPOTS) {
+    for (const [i, j] of options) {
+      const x = blockX(i) + 7 // deck; the ramps run back towards -x
+      const z = roadZ(j)
+      // Both sides of the road must be land with pavement, and the ramps
+      // must stay clear of bus stops, doors and the road ends.
+      const sideZ = [z - ROAD / 2 - 0.75, z + ROAD / 2 + 0.75]
+      const x0 = x - 0.9 - L - 1
+      const clear = (o, pad) => o.x > x0 - pad && o.x < x + 1 + pad && Math.abs(o.z - z) < ROAD / 2 + 2.5 + pad
+      if (j < 1 || j >= GZ || !isLandColumn(i)) continue
+      if (city.busStops.some((b) => clear(b, 4)) || city.doors.some((d) => clear(d, 2))) continue
+      if (city.footbridges.some((f) => Math.hypot(f.x - x, f.z - z) < 60)) continue
+      // Make room on the pavement.
+      const off = (o) => !clear(o, 0.6)
+      city.trees = city.trees.filter(off)
+      city.lamps = city.lamps.filter(off)
+      city.flowerBeds = city.flowerBeds.filter(off)
+      city.flowers = city.flowers.filter(off)
+      city.stopSigns = city.stopSigns.filter(off)
+      city.foodSpots = city.foodSpots.filter(off)
+      city.stalls = city.stalls.filter(off)
+      city.idlers = city.idlers.filter((o) => o.role !== 'seller' || off(o))
+      city.signs = city.signs.filter((g) => !g.posts || off(g))
+      city.footbridges.push({ x, z, sideZ, height: H, ramp: L })
+      // "Eko o ni baje" boards on both faces, where drivers see them.
+      for (const side of [-1, 1]) city.signs.push({ text: 'EKO O NI BAJE', x: x + side * 0.96, y: H - 0.55, z, rot: side * Math.PI / 2, w: 7, h: 0.8, bg: '#2f5f8a', fg: '#ffffff' })
+      break
+    }
+  }
+}
+
 // Things added after the main layout, from their own random numbers so the
 // buildings and roads stay exactly where they were: flower beds in the parks
 // and along the sidewalks, stop signs, and LASTMA wardens at busy junctions.
@@ -316,6 +360,7 @@ function addStreetDetails(city, rand) {
   }
 
   addCivicBuildings(city)
+  addFootbridges(city)
 
   // LASTMA wardens at some of the junctions with lights, on a corner.
   const lit = []

@@ -252,9 +252,12 @@ export function updateTraffic(dt, ctx) {
   const { focus, wanted } = ctx
   const chase = ctx.chase ?? focus
   const chasers = wanted > 0 ? Math.min(POLICE, wanted + 1) : 0
-  // The closest police cars join the chase.
+  // The closest police cars join the chase: closest to you while they can
+  // see you, closest to where they last saw you while you're hidden (patrols
+  // that never saw you don't magically know where you are).
   const police = vehicles.filter((v) => v.police && v.state !== 'parked')
-  police.sort((a, b) => Math.hypot(a.x - focus.x, a.z - focus.z) - Math.hypot(b.x - focus.x, b.z - focus.z))
+  const near = ctx.hidden ? chase : focus
+  police.sort((a, b) => Math.hypot(a.x - near.x, a.z - near.z) - Math.hypot(b.x - near.x, b.z - near.z))
   police.forEach((v, k) => {
     const chase = k < chasers
     if (v.chasing && !chase && v.state === 'direct') snapToLane(v)

@@ -8,7 +8,31 @@ const RECYCLE = 140
 const FIGHT_RANGE = 1.15
 
 const rand = mulberry32(77)
-const regularBlocks = city.blocks.filter((b) => b.w === BLOCK)
+// Blocks with a pavement loop people can walk round (not the mall's, whose
+// building comes right up to the edge).
+const regularBlocks = city.blocks.filter((b) => b.w === BLOCK && !city.solids.some((o) => o.collider && o.w >= 30 && Math.abs(o.x - b.x) < BLOCK / 2 && Math.abs(o.z - b.z) < BLOCK / 2))
+
+// Walls: buildings and solid things, on a coarse grid so a lookup is cheap.
+// People heading somewhere in a straight line (to a bus stop, after the
+// player) slide along walls instead of walking through them.
+const GRID = 24
+const wallGrid = new Map()
+for (const o of [...city.buildings, ...city.solids.filter((o) => o.collider)]) {
+  const box = { x0: o.x - o.w / 2 - 0.3, x1: o.x + o.w / 2 + 0.3, z0: o.z - o.d / 2 - 0.3, z1: o.z + o.d / 2 + 0.3 }
+  for (let gx = Math.floor(box.x0 / GRID); gx <= Math.floor(box.x1 / GRID); gx++) {
+    for (let gz = Math.floor(box.z0 / GRID); gz <= Math.floor(box.z1 / GRID); gz++) {
+      const key = gx * 10007 + gz
+      if (!wallGrid.has(key)) wallGrid.set(key, [])
+      wallGrid.get(key).push(box)
+    }
+  }
+}
+export function insideWall(x, z) {
+  const list = wallGrid.get(Math.floor(x / GRID) * 10007 + Math.floor(z / GRID))
+  return !!list && list.some((b) => x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1)
+}
+// Passengers use the curb side of a vehicle: its right, since we drive on the right.
+const curbSide = (yaw) => yaw - Math.PI / 2
 
 export const npcs = []
 
@@ -218,19 +242,37 @@ export function callBoarders(stop, vehicle, max) {
   return called
 }
 
+// Riders get off away from any stop (the car changed hands): they step out
+// onto the pavement nearby and go about their day.
+export function dismissRiders(vehicle) {
+  const out = vehicle.riders.splice(0)
+  for (const n of out) {
+    n.active = true
+    n.kind = 'walk'
+    n.role = null
+    n.home = null
+    n.vehicle = null
+    n.speed ??= 1.1 + rand() * 0.6
+    placeWalker(n, vehicle)
+    n.x = undefined // drawn once the walk loop places them
+    n.posed = false
+  }
+  return out.length
+}
+
 // Riders get out at `stop` and wait there for the next ride.
 export function alightRiders(stop, vehicle, count = vehicle.riders.length) {
   const out = vehicle.riders.splice(0, count)
   out.forEach((n, k) => {
     const spot = stopSpot(stop, k % WAITING_PER_STOP)
-    const left = vehicle.yaw + Math.PI / 2
+    const side = curbSide(vehicle.yaw)
     n.active = true
     n.kind = 'idle'
     n.role = 'waiting'
     n.stop = stop.id
     n.vehicle = null
-    n.x = vehicle.x + Math.sin(left) * 1.5
-    n.z = vehicle.z + Math.cos(left) * 1.5
+    n.x = vehicle.x + Math.sin(side) * 1.6
+    n.z = vehicle.z + Math.cos(side) * 1.6
     n.home = { ...spot, yaw: stop.yaw }
     n.posed = false
   })
@@ -322,11 +364,12 @@ export function walkable(x, z) {
 // Move to (x, z) if it's solid ground; otherwise slide along the edge, or
 // stay put. Nobody walks on water.
 function stepTo(n, x, z) {
-  if (walkable(x, z)) {
+  const ok = (px, pz) => walkable(px, pz) && (x > 1500 || !insideWall(px, pz) || insideWall(n.x, n.z))
+  if (ok(x, z)) {
     n.x = x
     n.z = z
-  } else if (walkable(x, n.z)) n.x = x
-  else if (walkable(n.x, z)) n.z = z
+  } else if (ok(x, n.z)) n.x = x
+  else if (ok(n.x, z)) n.z = z
   else return false
   return true
 }
@@ -377,10 +420,13 @@ function refillStops(focus) {
       let pick = null
       for (const n of npcs) {
         if (n.kind !== 'walk' || n.down > 0 || n.panic > 0 || n.x === undefined) continue
+        // Close by and on the same stretch of pavement (so they walk along
+        // the curb, not across the road or through a building).
         const d = Math.hypot(n.x - stop.x, n.z - stop.z)
-        if (d < 25 || (hidden && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)) {
+        const sameCurb = stop.axis === 'x' ? Math.abs(n.z - stop.z) < 2.5 : Math.abs(n.x - stop.x) < 2.5
+        if ((d < 25 && sameCurb) || (hidden && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)) {
           pick = n
-          if (d < 25) break
+          if (d < 25 && sameCurb) break
         }
       }
       // You're at the stop and nobody's nearby: someone from out of sight
@@ -396,7 +442,7 @@ function refillStops(focus) {
         const side = rand() < 0.5 ? 1 : -1
         pick.x = stop.x + (stop.axis === 'x' ? side * 10 : 0)
         pick.z = stop.z + (stop.axis === 'z' ? side * 10 : 0)
-      } else if (Math.hypot(pick.x - stop.x, pick.z - stop.z) >= 25) {
+      } else if (Math.hypot(pick.x - stop.x, pick.z - stop.z) >= 25 || hidden) {
         pick.x = spot.x
         pick.z = spot.z
       }
@@ -485,9 +531,9 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
     } else if (n.kind === 'boarding') {
       // Walk to the vehicle's door and climb in; give up if it drives off.
       const v = n.vehicle
-      const left = v.yaw + Math.PI / 2
-      const doorX = v.x + Math.sin(left) * 1.4
-      const doorZ = v.z + Math.cos(left) * 1.4
+      const side = curbSide(v.yaw)
+      const doorX = v.x + Math.sin(side) * 1.6
+      const doorZ = v.z + Math.cos(side) * 1.6
       // (People called over from along the pavement may start ~25 m away.)
       if (Math.hypot(doorX - n.x, doorZ - n.z) > 30 || v.gone) {
         n.kind = 'idle'
@@ -513,7 +559,13 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
       const p = loopPoint(n)
       // Ease back onto the loop after being knocked off it.
       if (n.x !== undefined && Math.hypot(p.x - n.x, p.z - n.z) > 0.5) {
+        const bx = n.x
+        const bz = n.z
         walkToward(n, p.x, p.z, 2.5, dt)
+        // Stuck behind a wall on the way back: pop back onto the loop once
+        // nobody's looking closely.
+        n.stuck = n.x === bx && n.z === bz ? (n.stuck ?? 0) + dt : 0
+        if (n.stuck > 2 && dx * dx + dz * dz > 25 * 25) n.x = undefined
       } else {
         n.x = p.x
         n.z = p.z

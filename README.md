@@ -22,7 +22,7 @@ Rapier physics and Vite.
   they see you run a red light.
 - **Police:** wanted stars, chases, and officers who get out to arrest you.
   Get out of sight (far away or behind buildings) and the stars blink, then
-  drop one at a time.
+  drop one at a time. Make it home and they're gone.
 - **Food:** buy jollof, suya, amala and more at mama put stalls (E) to get
   health back.
 - **Six story jobs:** pepper delivery (with your nylon bag), church, a flash drive across the bridge,
@@ -42,9 +42,10 @@ Rapier physics and Vite.
   online, so you can carry on from any device.
 - **Phones:** simple touch controls appear automatically. Drag on the left
   to move and on the right to look. One button does whatever is nearby, and
-  ☰ holds the rest.
+  ☰ holds the rest. In a car: ◀ ▶ to steer, GAS and BRAKE.
 - **Look and sound:** two-tone shading, ink outlines, painted sky, birds, clear
-  water with fish, flower gardens, street dogs, rain after a while, day and
+  water with fish you can swim in, footbridges over busy roads, flower
+  gardens, street dogs, rain after a while, day and
   night, and synthesized music (calm theme or Afrobeats) with no audio files.
 
 ## Run it

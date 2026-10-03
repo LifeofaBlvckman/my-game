@@ -4,8 +4,9 @@ import { useKeyboardControls } from '@react-three/drei'
 import { Quaternion, Vector3 } from 'three'
 import { city, ISLAND, MAINLAND, ROAD, zoneAt } from './cityData'
 import { setLane, swapWithPlayerCar, vehicles } from './trafficSim'
-import { alightRiders, callBoarders, copsGrabbing, deployCop, ejectDriver, npcNear, npcs, punchNpc, recallCops, resumeCops, setCarArrestReach, waitingCounts } from './crowd'
+import { alightRiders, callBoarders, dismissRiders, copsGrabbing, deployCop, ejectDriver, npcNear, npcs, punchNpc, recallCops, resumeCops, setCarArrestReach, waitingCounts } from './crowd'
 import { WORLD } from './City'
+import { WATER_Y } from './Water'
 import { INTERIORS, mapSpot, roomExit, roomPoint, roomSpawn } from './rooms'
 import { activeJob, activeTarget, CHATTER, NPCS, QUESTS, SIDE_JOBS, STRANGER_LINES } from './quests'
 import { VEHICLES } from './vehicleTypes'
@@ -78,7 +79,8 @@ function checkRedLights(game) {
 
 // Losing the police. They chase where they last saw you, not where you are:
 // get out of sight (far enough away, or behind buildings) and stay hidden,
-// and the stars blink and drop one at a time. Hiding indoors doesn't count.
+// and the stars blink and drop one at a time. Hiding in other buildings
+// doesn't count, but getting home clears them.
 const SEE_FAR = 60 // m: cars with a clear view see you this far
 const SEE_NEAR = 18 // m: this close they hear the engine or see you round a corner
 const escapeTime = (wanted) => 6 + wanted * 1.5 // s out of sight per star
@@ -90,6 +92,14 @@ function copCanSee(x, z, focus, far) {
 }
 
 function updateEscape(game, dt, focus) {
+  // Made it home with the police after you: they can't touch you there.
+  if (game.wanted > 0 && game.inside === 'home' && !game.fade) {
+    useGame.setState({ wanted: 0, evading: false })
+    world.lastSeen = null
+    world.escape = 0
+    message('SAFE AT HOME\nYOU LOST THEM', '#7cff9a', 3000)
+    return
+  }
   if (game.wanted === 0) {
     world.lastSeen = null
     world.escape = 0
@@ -210,7 +220,8 @@ function nearestNamedNpc(from) {
   let best = null
   for (const [id, n] of Object.entries(NPCS)) {
     const d = Math.hypot(n.pos[0] - from.x, n.pos[1] - from.z)
-    if (d < TALK_DISTANCE && (!best || d < best.d)) best = { id, n, d }
+    // Someone behind a counter or a pulpit can be talked to from a bit further.
+    if (d < (n.talkRange ?? TALK_DISTANCE) && (!best || d < best.d)) best = { id, n, d }
   }
   return best
 }
@@ -418,11 +429,10 @@ function nearestStop(from, within) {
   return best
 }
 
-// Passengers get out beside a vehicle and walk back to the nearest bus stop
-// (the car changed hands, or it was towed away).
+// Passengers get out and rejoin the crowd on the pavement (the car changed
+// hands, or it was towed away).
 function letRidersOff(vehicle) {
-  if (!vehicle.riders?.length) return
-  alightRiders(nearestStop(vehicle, Infinity), vehicle)
+  if (vehicle.riders?.length) dismissRiders(vehicle)
 }
 
 function exitCar() {
@@ -941,23 +951,21 @@ export default function GameLogic() {
     }
     if (!target?.hold && game.hold) useGame.setState({ hold: null })
 
-    // Fell into the lagoon or the sea.
+    // Into the lagoon or the sea. On foot you just swim (Player.jsx); a car
+    // sinks, you swim out, and it's towed back home.
     const body = game.mode === 'car' ? world.car : world.player
-    if (body && body.translation().y < -4 && !game.inside) {
+    if (game.mode === 'foot' && world.swimming && !t.wasSwimming) splash()
+    t.wasSwimming = game.mode === 'foot' && world.swimming
+    if (game.mode === 'car' && world.car && world.car.translation().y < WATER_Y - 0.8 && !game.inside) {
       splash()
-      message('SPLASH!', '#7fd0ff', 2200)
-      if (game.mode === 'car') {
-        exitCar()
-        resetPlayerCar()
-      }
-      const home = INTERIORS.home.door
-      placePlayer(home.x, 1.2, home.z + 0.5, 0)
-      hurtPlayer(20)
+      exitCar()
+      resetPlayerCar()
+      message('SPLASH!\nYOUR CAR SANK. IT WAS TOWED HOME', '#7fd0ff', 3000)
     }
     // Safety net: thrown off the map somehow, or through a room's floor.
     if (body && game.mode === 'foot') {
       const p = body.translation()
-      const lost = game.inside ? p.y < INTERIORS[game.inside].origin[1] - 20 : Math.abs(p.x) > WORLD.maxX + 60 || Math.abs(p.z) > WORLD.maxZ + 60 || p.y > 300
+      const lost = game.inside ? p.y < INTERIORS[game.inside].origin[1] - 20 : Math.abs(p.x) > WORLD.maxX + 600 || Math.abs(p.z) > WORLD.maxZ + 600 || p.y > 300 || p.y < -30
       if (lost) {
         if (game.inside) placeInRoom(game.inside)
         else placePlayer(INTERIORS.home.door.x, 1.2, INTERIORS.home.door.z + 0.6, 0)
