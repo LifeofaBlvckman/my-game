@@ -4,9 +4,63 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Eko Streets</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #1a1410;
+      }
+      #boot-error {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        padding: 32px;
+        box-sizing: border-box;
+        overflow: auto;
+        background: #1a1410;
+        color: #f5f0e1;
+        font: 15px/1.5 Arial, Helvetica, sans-serif;
+      }
+      #boot-error h1 {
+        color: #f2b705;
+        font-size: 22px;
+      }
+      #boot-error pre {
+        white-space: pre-wrap;
+        background: #000;
+        padding: 12px;
+        border-radius: 6px;
+      }
+    </style>
+    <script>
+      // Show startup errors on the page instead of leaving it blank.
+      ;(function () {
+        function show(title, detail) {
+          var box = document.getElementById('boot-error')
+          if (!box) return setTimeout(function () { show(title, detail) }, 50)
+          box.style.display = 'block'
+          box.innerHTML = '<h1></h1><p>Copy this message when asking for help.</p><pre></pre>'
+          box.querySelector('h1').textContent = title
+          box.querySelector('pre').textContent += detail + '\n'
+        }
+        window.__showBootError = show
+        window.addEventListener('error', function (e) {
+          show('The game hit an error while starting', (e.error && e.error.stack) || e.message || String(e))
+        })
+        window.addEventListener('unhandledrejection', function (e) {
+          show('The game hit an error while starting', (e.reason && e.reason.stack) || String(e.reason))
+        })
+        var canvas = document.createElement('canvas')
+        if (!canvas.getContext('webgl2')) {
+          show('WebGL 2 is not available', 'This browser or graphics driver cannot run 3D graphics. In Chrome, open chrome://settings/system and turn on "Use graphics acceleration when available", then restart Chrome. You can check chrome://gpu for details.')
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-error"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
