@@ -11,6 +11,7 @@ const TRAFFIC = 34
 const POLICE = 6
 const RECYCLE = 190
 const STOP_BACK = 6 // how far before the junction box cars stop
+export const TRAFFIC_HP = 60
 
 const rand = mulberry32(4242)
 const pick = (list) => list[Math.floor(rand() * list.length)]
@@ -34,6 +35,10 @@ function makeVehicle(type, extra = {}) {
     spin: 0,
     police: type === 'police',
     chasing: false,
+    hp: TRAFFIC_HP,
+    stall: 0, // seconds stopped after a knock
+    burning: 0,
+    wrecked: false,
     ...extra,
   }
 }
@@ -196,6 +201,10 @@ function respawnNear(v, focus) {
     v.dirty = true
   }
   v.decor = false
+  v.hp = TRAFFIC_HP
+  v.wrecked = false
+  v.burning = 0
+  v.stall = 0
   setLane(v, spot.axis, spot.line, spot.dir, spot.p)
   v.offX = v.offZ = 0
   v.speed = VEHICLES[v.type].cruise * 0.6
@@ -226,6 +235,12 @@ export function updateTraffic(dt, ctx) {
       if (!v.decor && dist > 230) respawnNear(v, focus)
       continue
     }
+    if (v.burning > 0) {
+      v.speed = Math.max(0, v.speed - 20 * dt)
+      continue
+    }
+    v.stall = Math.max(0, v.stall - dt)
+    const stalled = v.stall > 0
 
     if (v.chasing) {
       if (dist > 260) respawnNear(v, focus)
@@ -236,7 +251,7 @@ export function updateTraffic(dt, ctx) {
         } else {
           const want = Math.atan2(focus.x - v.x, focus.z - v.z)
           v.yaw += clamp(wrap(want - v.yaw), -2.6 * dt, 2.6 * dt)
-          const target = dist < 6 ? 0 : Math.min(24, dist * 1.4)
+          const target = dist < 6 || stalled ? 0 : Math.min(24, dist * 1.4)
           v.speed += clamp(target - v.speed, -20 * dt, 10 * dt)
           v.x += Math.sin(v.yaw) * v.speed * dt
           v.z += Math.cos(v.yaw) * v.speed * dt
@@ -254,7 +269,7 @@ export function updateTraffic(dt, ctx) {
       const nodeCoord = roadLine(v.node)
       const entry = nodeCoord - v.dir * (ROAD / 2)
       const toEntry = (entry - v.p) * v.dir
-      let desired = cruise
+      let desired = stalled ? 0 : cruise
 
       if (!v.chasing) {
         const I = v.axis === 'x' ? v.node : v.line
@@ -281,7 +296,7 @@ export function updateTraffic(dt, ctx) {
     } else if (v.state === 'turn') {
       const t = v.turn
       const turning = !t.next.straight
-      const target = turning ? Math.min(cruise, v.chasing ? 14 : 7) : cruise
+      const target = stalled ? 0 : turning ? Math.min(cruise, v.chasing ? 14 : 7) : cruise
       v.speed += clamp(target - v.speed, -10 * dt, def.accel * 0.4 * dt)
       t.t = Math.min(1, t.t + (v.speed * dt) / t.len)
       const a = 1 - t.t
@@ -300,9 +315,11 @@ export function updateTraffic(dt, ctx) {
 // Swap the player's car with a traffic vehicle (carjacking). The old player
 // car is left parked where it was, as a regular parked vehicle.
 export function swapWithPlayerCar(v, playerCar) {
-  const taken = { type: v.type, color: v.color, x: v.x, z: v.z, yaw: v.yaw, speed: v.speed, police: v.police }
+  const taken = { type: v.type, color: v.color, x: v.x, z: v.z, yaw: v.yaw, speed: v.speed, police: v.police, hp: v.hp }
   v.type = playerCar.type
   v.color = playerCar.color
+  v.hp = playerCar.hp ?? TRAFFIC_HP
+  v.stall = 0
   v.x = playerCar.x
   v.z = playerCar.z
   v.yaw = playerCar.yaw

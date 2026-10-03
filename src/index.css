@@ -9,8 +9,3 @@ body,
   font-family: 'Arial Black', Impact, sans-serif;
   user-select: none;
 }
-
-/* Render below native resolution and scale up with hard pixels for a PS2-era look. */
-canvas {
-  image-rendering: pixelated;
-}

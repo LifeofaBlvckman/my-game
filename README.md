@@ -42,10 +42,28 @@ differently, and Space is a handbrake drift.
 **Day and night.** One game minute passes per real second. At night, windows,
 street lamps and club neon light up.
 
+**Fighting and damage.**
+- Punch people, cars and other players.
+- Bouncers and some area boys fight back.
+- Crashes dent cars. Damaged cars smoke, then catch fire, then explode. The
+  blast knocks people over and sets off nearby cars.
+- Effects: comic POW! bursts, sparks, debris, smoke, fire and screen shake.
+- Your health drops when you're hit or run over and recovers slowly. At zero,
+  you're **WASTED**.
+
+**Multiplayer.** Friends can join your city: you see each other walking and
+driving, can punch or run each other over, and chat. Everyone shares the same
+time of day. Traffic and crowds are simulated on each player's own machine,
+so they won't match between players.
+
 **Look and sound.**
-- Cel shading with ink outlines.
+- A Messenger-inspired cartoon style:
+  - Chibi characters with round heads, dot eyes and bouncy squash-and-stretch animation.
+  - Pastel houses with pitched roofs, framed windows and doors, and puffy trees.
+  - Soft cel shading with purple-tinted shadows and plum ink outlines.
+  - A gradient sky.
 - A title screen and an opening fly-in.
-- A synthesized Afrobeats loop, siren, horn and engine. No audio files.
+- A synthesized Afrobeats loop, siren, horn, engine, punches and explosions. No audio files.
 
 ## Run it
 
@@ -58,6 +76,30 @@ npm run dev
 
 Open the URL it prints, usually http://localhost:5173.
 
+## Play with friends
+
+**On the same Wi-Fi:**
+
+1. Start the game with `npm run dev -- --host`.
+2. It prints a `Network:` address, such as `http://192.168.1.20:5173`.
+3. Friends open that address on their own computers.
+
+**Over the internet:**
+
+1. Run `npm run build`, then `npm start`. This serves the game and the
+   multiplayer server on port 3000, or on `PORT` if it's set.
+2. Host it on any service that runs Node.js and supports WebSockets, such as
+   Render, Railway or Fly.io. Use `npm run build` as the build command and
+   `npm start` as the start command.
+3. Share the address the host gives you.
+
+For a quick test, a tunnel like `cloudflared tunnel --url http://localhost:3000`
+also works.
+
+The server allows up to 24 players. It checks every message: names and chat
+are trimmed, numbers are bounded, punches only count at close range, and each
+connection is rate-limited.
+
 ## Controls
 
 | Key | On foot | In a car |
@@ -66,6 +108,8 @@ Open the URL it prints, usually http://localhost:5173.
 | W A S D / arrow keys | Move | Throttle, brake/reverse, steer |
 | Shift | Run | |
 | Space | Jump | Handbrake |
+| Click / X | Punch (click needs the mouse captured) | |
+| Y | Chat (when online) | Chat |
 | E | Talk to whoever is nearby | |
 | F | Get in your car, or jack any other | Get out |
 | Q | | Horn |
@@ -102,6 +146,15 @@ src/
     audio.js             Synthesized music and sound effects
     Hud.jsx, Radar.jsx   2D overlay
     state.js             Zustand store for the HUD, plus a plain object for per-frame data
+    shapes.js            Soft shapes for the cartoon style: rounded boxes, capsules, puffs, roofs
+    damage.js            Health and damage for the player, cars and traffic; explosions
+    particles.js         Particle pools and spawn functions (sparks, smoke, fire, POW!)
+    Effects.jsx          Draws every particle with four instanced meshes
+    net.js               Multiplayer client: connection, interpolation, hits, chat
+    RemotePlayers.jsx    Draws other players and sends your position
+server/
+  multiplayer.js         WebSocket relay, attached to the dev server and the production server
+  index.js               Production server: serves dist/ plus multiplayer (`npm start`)
 ```
 
 Three rules keep this fast on older hardware:
@@ -117,7 +170,7 @@ Three rules keep this fast on older hardware:
    full-screen pass instead of drawing every mesh twice.
 
 If it's slow on your machine, press **O** to turn off the outlines first, then
-lower `RENDER_SCALE` in `src/App.jsx`.
+lower the values in `RENDER_SCALE` in `src/App.jsx`.
 
 ## Adding a job
 
@@ -136,15 +189,15 @@ Jobs unlock in order.
 
 While running `npm run dev`, `window.__game` exposes state and shortcuts for
 automated browser tests: `state()`, `focus()`, `teleport(x, z)`, `setTime(hours)`,
-`setWanted(n)`, `vehicles()`, `npcs()`, `enterOrExit()` and `interact()`. It is
-left out of production builds.
+`setWanted(n)`, `vehicles()`, `npcs()`, `enterOrExit()`, `interact()`, `punch()`,
+`faceTo(x, z)`, `carHp()` and `damageCar(n)`. It is left out of production builds.
 
 ## Credits
 
-The cel-shaded look, named NPCs with markers, typewriter dialogue, "NEXT UP"
+The cartoon look, named NPCs with markers, typewriter dialogue, "NEXT UP"
 objectives, title screen with an intro, and the debug hook were inspired by
-[Glowin/messager](https://github.com/Glowin/messager), a Three.js study of
-Abeto's *Messenger*. No code or assets were copied.
+Abeto's *Messenger* and [Glowin/messager](https://github.com/Glowin/messager),
+a Three.js study of it. No code or assets were copied.
 
 ## Bringing in Blender models
 
@@ -184,7 +237,8 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 
 ## Tuning
 
-- Render sharpness: `RENDER_SCALE` in `src/App.jsx` (0.6 by default; 1 is native).
+- Render sharpness: `RENDER_SCALE` in `src/App.jsx`. It starts at 1 and drops to
+  0.65 automatically when the frame rate struggles.
 - Car handling: `src/game/vehicleTypes.js` (per vehicle) and the constants in `src/game/Car.jsx`.
 - Traffic density: `TRAFFIC` and `POLICE` in `src/game/trafficSim.js`. Light timing: `src/game/signals.js`.
 - Crowd size: `WALKERS` in `src/game/crowd.js`.
@@ -194,7 +248,7 @@ export the animations in the same .glb, and play them with drei's `useAnimations
 ## Roadmap
 
 1. Your own Blender models for Tunde, the danfo and the keke (see above)
-2. Health, damage and a "wasted" screen
+2. Pick your own outfit, and show it to other players
 3. Okadas weaving through traffic, and go-slow jams on the main roads
 4. Shops and food you can buy with your naira, plus saving progress
 5. More jobs, with timers and chases

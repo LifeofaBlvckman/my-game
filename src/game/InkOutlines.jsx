@@ -48,7 +48,8 @@ void main() {
 
   float fade = 1.0 - smoothstep(fadeEnd * 0.35, fadeEnd, d);
   float ink = max(silhouette, crease * 0.7) * fade;
-  gl_FragColor = vec4(mix(color.rgb, vec3(0.04, 0.03, 0.05), ink * 0.9), 1.0);
+  // Soft plum ink rather than pure black, like a cartoon.
+  gl_FragColor = vec4(mix(color.rgb, vec3(0.13, 0.08, 0.16), ink * 0.85), 1.0);
   #include <colorspace_fragment>
 }
 `
@@ -67,7 +68,7 @@ export default function InkOutlines() {
         texel: { value: [1, 1] },
         near: { value: 0.1 },
         far: { value: 300 },
-        fadeEnd: { value: 160 },
+        fadeEnd: { value: 190 },
       },
       depthTest: false,
       depthWrite: false,

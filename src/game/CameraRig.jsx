@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useRapier } from '@react-three/rapier'
 import { Vector3 } from 'three'
 import { useGame, world } from './state'
+import { shake } from './particles'
 
 const desired = new Vector3()
 const lookAt = new Vector3()
@@ -82,6 +83,15 @@ export default function CameraRig() {
 
     camera.position.lerp(desired, 1 - Math.exp(-12 * dt))
     camera.lookAt(lookAt)
+
+    // Screen shake from hits, crashes and explosions.
+    if (shake.amount > 0.001) {
+      const k = shake.amount * 0.35
+      camera.position.x += (Math.random() - 0.5) * k
+      camera.position.y += (Math.random() - 0.5) * k
+      camera.position.z += (Math.random() - 0.5) * k
+      shake.amount *= Math.exp(-7 * dt)
+    }
   })
 
   return null

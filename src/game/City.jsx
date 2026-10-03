@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BoxGeometry, Color, CylinderGeometry } from 'three'
+import { gableRoof, puff } from './shapes'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
 import { city, CELL, GRID, HALF, ROAD, roadLine } from './cityData'
 import { createBuildingMaterial, nightUniform, toon, unlit } from './materials'
@@ -15,7 +16,15 @@ const frondGeometryA = new BoxGeometry(3.4, 0.5, 0.7).translate(0, 7, 0)
 const frondGeometryB = new BoxGeometry(0.7, 0.5, 3.4).translate(0, 7, 0)
 const lampGeometry = new BoxGeometry(0.2, 6, 0.2).translate(0, 3, 0)
 const lampHeadGeometry = new BoxGeometry(0.5, 0.2, 1.4).translate(0, 6, 0.5)
-const tankGeometry = new CylinderGeometry(0.7, 0.7, 1.5, 8).translate(0, 0.75, 0)
+const tankGeometry = new CylinderGeometry(0.7, 0.7, 1.5, 10).translate(0, 0.75, 0)
+const roofGeometry = gableRoof()
+const roundTrunk = new CylinderGeometry(0.18, 0.26, 3.4, 6).translate(0, 1.7, 0)
+const LEAVES = ['#5fa64a', '#4e9a48', '#76b552', '#3f8a46']
+
+// Every other tree is a palm; the rest are round, puffy shade trees.
+const palms = city.trees.filter((_, i) => i % 2 === 0)
+const shadeTrees = city.trees.filter((_, i) => i % 2 === 1)
+const roofed = city.buildings.filter((b) => b.roof)
 
 const lampGlow = unlit({ color: '#3a3a36' })
 const dayLamp = new Color('#3a3a36')
@@ -96,33 +105,69 @@ export default function City() {
       />
       <Instances items={city.tanks} geometry={tankGeometry} transform={(o, t) => o.position.set(t.x, t.y, t.z)} colors={() => '#1c1c1c'} />
 
+      <Instances
+        items={roofed}
+        geometry={roofGeometry}
+        transform={(o, b) => {
+          // The ridge runs along the longer side.
+          const alongX = b.w > b.d
+          o.position.set(b.x, b.h, b.z)
+          o.rotation.y = alongX ? Math.PI / 2 : 0
+          o.scale.set((alongX ? b.d : b.w) + 0.5, b.roof.h, (alongX ? b.w : b.d) + 0.5)
+        }}
+        colors={(b) => b.roof.color}
+      />
+
       {/* Palm trees: trunk + crown */}
       <Instances
-        items={city.trees}
+        items={palms}
         geometry={trunkGeometry}
         transform={(o, t, i) => {
           o.position.set(t.x, 0, t.z)
           o.rotation.set(Math.sin(i) * 0.08, i, Math.cos(i) * 0.08)
         }}
-        colors={() => '#7a5a3a'}
+        colors={() => '#8a6440'}
       />
       <Instances
-        items={city.trees}
+        items={palms}
         geometry={frondGeometryA}
         transform={(o, t, i) => {
           o.position.set(t.x, 0, t.z)
           o.rotation.y = i
         }}
-        colors={() => '#3f7a35'}
+        colors={() => '#4f9a45'}
       />
       <Instances
-        items={city.trees}
+        items={palms}
         geometry={frondGeometryB}
         transform={(o, t, i) => {
           o.position.set(t.x, 0, t.z)
           o.rotation.y = i + 0.4
         }}
-        colors={() => '#4d8a3c'}
+        colors={() => '#62ad4f'}
+      />
+
+      {/* Round shade trees: a trunk and two puffs of leaves */}
+      <Instances items={shadeTrees} geometry={roundTrunk} transform={(o, t) => o.position.set(t.x, 0, t.z)} colors={() => '#7a5636'} />
+      <Instances
+        items={shadeTrees}
+        geometry={puff}
+        transform={(o, t, i) => {
+          o.position.set(t.x, 4.3, t.z)
+          o.rotation.set(i, i * 2, 0)
+          o.scale.setScalar(3.6 + (i % 3) * 0.5)
+        }}
+        colors={(_, i) => LEAVES[i % LEAVES.length]}
+      />
+      <Instances
+        items={shadeTrees}
+        geometry={puff}
+        transform={(o, t, i) => {
+          o.position.set(t.x + 0.9, 5.4, t.z - 0.5)
+          o.rotation.set(i * 3, i, 0)
+          o.scale.setScalar(2.4)
+        }}
+        colors={(_, i) => LEAVES[(i + 1) % LEAVES.length]}
       />
 
       {/* Street lamps; the heads glow at night */}

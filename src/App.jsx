@@ -1,6 +1,6 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { KeyboardControls } from '@react-three/drei'
+import { KeyboardControls, PerformanceMonitor } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import City from './game/City'
 import Landmarks from './game/Landmarks'
@@ -14,24 +14,28 @@ import CameraRig from './game/CameraRig'
 import GameLogic from './game/GameLogic'
 import DayNight from './game/DayNight'
 import InkOutlines from './game/InkOutlines'
+import Effects from './game/Effects'
+import RemotePlayers from './game/RemotePlayers'
 import Hud from './game/Hud'
 import { keyMap } from './game/controls'
 import { useGame } from './game/state'
 
-// Lower resolution reads as retro and keeps an older laptop GPU comfortable.
-// Raise toward 1 (or window.devicePixelRatio) for a sharper image.
-const RENDER_SCALE = 0.6
+// Rendering resolution. Starts sharp and drops automatically if the frame
+// rate struggles, which keeps an older laptop GPU comfortable.
+const RENDER_SCALE = { high: 1, low: 0.65 }
 
 export default function App() {
   const outlines = useGame((s) => s.outlines)
+  const [dpr, setDpr] = useState(RENDER_SCALE.high)
   return (
     <KeyboardControls map={keyMap}>
       <Canvas
         flat
-        dpr={RENDER_SCALE}
+        dpr={dpr}
         gl={{ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         camera={{ fov: 65, near: 0.1, far: 300, position: [150, 70, 150] }}
       >
+        <PerformanceMonitor onDecline={() => setDpr(RENDER_SCALE.low)} onIncline={() => setDpr(RENDER_SCALE.high)} />
         <DayNight />
         <Suspense fallback={null}>
           <Physics gravity={[0, -20, 0]}>
@@ -43,6 +47,8 @@ export default function App() {
             <NamedNpcs />
             <Player />
             <Car />
+            <RemotePlayers />
+            <Effects />
             <CameraRig />
             <GameLogic />
           </Physics>

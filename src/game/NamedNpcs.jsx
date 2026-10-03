@@ -5,7 +5,7 @@ import { CanvasTexture, SRGBColorSpace } from 'three'
 import Person from './Person'
 import { Blob } from './Shadows'
 import { NPCS, currentTarget } from './quests'
-import { lookFromSeed } from './people'
+import { computePose, lookFromSeed } from './people'
 import { unlit } from './materials'
 import { useGame } from './state'
 
@@ -48,22 +48,25 @@ function Npc({ id, n, active }) {
   const person = useRef()
   const look = useMemo(() => lookFromSeed(id.length * 31, n.look), [id, n.look])
   const tag = useMemo(() => nameTagTexture(n.name), [n.name])
-  const phase = useRef(Math.random() * 10)
+  const state = useMemo(() => ({ pose: {}, input: { phase: 0, t: Math.random() * 10, moving: false, run: false, punch: -1, flinch: 0 } }), [])
   useFrame((_, dt) => {
-    phase.current += dt * 1.5
-    person.current?.animate(0, Math.sin(phase.current) * 0.08)
+    const s = state.input
+    s.t += dt
+    s.flinch = Math.max(0, s.flinch - dt / 0.4)
+    if (n.flinchAt && performance.now() - n.flinchAt < 50) s.flinch = 1
+    person.current?.animate(computePose(state.pose, s))
   })
   return (
     <group position={[n.pos[0], n.y, n.pos[1]]}>
       <Person ref={person} look={look} rotation-y={n.yaw} />
       <Blob position-y={0.02} scale={[0.9, 1, 0.9]} />
-      <Billboard position-y={2.25 * look.height}>
+      <Billboard position-y={2.45 * look.height}>
         <mesh>
           <planeGeometry args={[1.6, 0.4]} />
           <meshBasicMaterial map={tag} transparent toneMapped={false} />
         </mesh>
       </Billboard>
-      {active && <Marker y={2.75 * look.height} />}
+      {active && <Marker y={2.95 * look.height} />}
     </group>
   )
 }

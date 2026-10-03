@@ -10,8 +10,9 @@ export const HALF = (GRID * CELL) / 2
 export const SIDEWALK_Y = 0.12
 
 // Faded stucco and paint for mainland low-rise; glass and concrete for VI towers.
-const LOWRISE_COLORS = ['#e8d9b0', '#d9c27a', '#9cc3c9', '#b9d6a8', '#e6b39a', '#cfcfc4', '#d8a35f', '#a9b8d0', '#e0cfa5']
-const TOWER_COLORS = ['#6f8ea0', '#8aa3b0', '#5b7180', '#a6b3b8', '#c9ccc6']
+const LOWRISE_COLORS = ['#f6d79b', '#f4b6a6', '#a8d8c8', '#b9cfe8', '#f7e7c4', '#e9a875', '#c8e09a', '#f3c0d4', '#9fc9e0']
+const TOWER_COLORS = ['#8fb3c9', '#a9c4d4', '#b8c9d9', '#d8dde2', '#9bb8c4']
+const ROOF_COLORS = ['#c4553d', '#3f8f9a', '#9a5a3c', '#5d6e8e', '#d0773a', '#7a4f8a']
 
 const BILLBOARDS = [
   'EKO O NI BAJE',
@@ -97,9 +98,16 @@ export function generateCity(seed = 2026) {
   }
 
   const addBuilding = (b) => {
+    // Small houses get a pitched roof; picked from the count so the random
+    // sequence (and so the rest of the layout) stays the same.
+    const n = city.buildings.length
+    if (b.h < 13 && (n * 7919) % 10 < 7) {
+      b.roof = { h: Math.min(b.w, b.d) * 0.38, color: ROOF_COLORS[(n * 31) % ROOF_COLORS.length] }
+    }
     city.buildings.push(b)
     if (b.h < 22 && rand() < 0.45) {
-      city.tanks.push({ x: b.x + (rand() - 0.5) * (b.w - 2), y: b.h, z: b.z + (rand() - 0.5) * (b.d - 2) })
+      const tank = { x: b.x + (rand() - 0.5) * (b.w - 2), y: b.h, z: b.z + (rand() - 0.5) * (b.d - 2) }
+      if (!b.roof) city.tanks.push(tank)
     }
   }
 
@@ -237,7 +245,7 @@ export function generateCity(seed = 2026) {
   }
 
   // Billboards on mid-height rooftops, facing south.
-  const candidates = city.buildings.filter((b) => b.h > 8 && b.h < 24 && b.w > 7)
+  const candidates = city.buildings.filter((b) => b.h > 8 && b.h < 24 && b.w > 7 && !b.roof)
   for (let k = 0; k < BILLBOARDS.length && candidates.length; k++) {
     const b = candidates.splice(Math.floor(rand() * candidates.length), 1)[0]
     city.signs.push({

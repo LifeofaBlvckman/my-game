@@ -1,20 +1,12 @@
-import { CanvasTexture, LinearFilter, NearestFilter, SRGBColorSpace } from 'three'
+import { CanvasTexture, LinearFilter, SRGBColorSpace } from 'three'
 
-// Hand-drawn pixel faces. Everything is generated on a canvas at startup, so
+// Hand-drawn cartoon faces. Everything is generated on a canvas at startup, so
 // there are no image files to manage yet. Swap in painted textures later.
 
-export const SKINS = ['#3b2417', '#4f2f1c', '#663e26', '#86573a']
+export const SKINS = ['#5a3624', '#6e4430', '#87573a', '#a06a45']
 export const FACE_COLS = 4
 export const FACE_COUNT = 16
-const PX = 64
-
-const darken = (hex, f) => {
-  const n = parseInt(hex.slice(1), 16)
-  const r = Math.round(((n >> 16) & 255) * f)
-  const g = Math.round(((n >> 8) & 255) * f)
-  const b = Math.round((n & 255) * f)
-  return `rgb(${r},${g},${b})`
-}
+const PX = 128
 
 // Face options are derived from the index so NPC looks are deterministic.
 export function faceStyle(index) {
@@ -22,51 +14,84 @@ export function faceStyle(index) {
     skin: SKINS[index % 4],
     female: index >= 8,
     beard: index < 8 && index % 3 === 1,
-    smile: index % 2 === 0,
+    mouth: ['smile', 'grin', 'smile', 'flat'][index % 4],
+    brows: index % 4 === 1 || index % 4 === 3,
   }
 }
 
-export function drawFace(ctx, ox, oy, s, { skin, female, beard, smile }) {
-  const r = (x, y, w, h, c) => {
-    ctx.fillStyle = c
-    ctx.fillRect(ox + x * s, oy + y * s, Math.max(1, w * s), Math.max(1, h * s))
+// Cartoon face on a transparent background: dot eyes with a highlight, rosy
+// cheeks and a small mouth. The head's own color shows through.
+export function drawFace(ctx, ox, oy, s, { female, beard, mouth = 'smile', brows }) {
+  const X = (v) => ox + v * s
+  const Y = (v) => oy + v * s
+  const ellipse = (x, y, rx, ry, color) => {
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.ellipse(X(x), Y(y), rx * s, ry * s, 0, 0, Math.PI * 2)
+    ctx.fill()
   }
-  r(0, 0, 1, 1, skin)
-  // Eyebrows
-  r(0.17, 0.3, 0.24, 0.05, '#120a06')
-  r(0.59, 0.3, 0.24, 0.05, '#120a06')
-  // Eyes
-  r(0.18, 0.39, 0.22, 0.1, '#f1ece2')
-  r(0.6, 0.39, 0.22, 0.1, '#f1ece2')
-  r(0.25, 0.39, 0.09, 0.1, '#1a0f08')
-  r(0.67, 0.39, 0.09, 0.1, '#1a0f08')
-  if (female) {
-    r(0.16, 0.36, 0.26, 0.04, '#0a0604')
-    r(0.58, 0.36, 0.26, 0.04, '#0a0604')
-  }
-  // Nose
-  r(0.42, 0.5, 0.16, 0.14, darken(skin, 0.8))
-  r(0.4, 0.61, 0.07, 0.04, darken(skin, 0.5))
-  r(0.53, 0.61, 0.07, 0.04, darken(skin, 0.5))
-  // Mouth
-  const lips = female ? '#7a2434' : darken(skin, 0.65)
-  r(0.33, 0.74, 0.34, 0.08, lips)
-  if (smile) {
-    r(0.3, 0.71, 0.05, 0.05, lips)
-    r(0.65, 0.71, 0.05, 0.05, lips)
-    r(0.37, 0.75, 0.26, 0.03, '#efe9df')
-  }
+  ctx.lineCap = 'round'
+
   if (beard) {
-    r(0.3, 0.68, 0.4, 0.05, '#120a06')
-    r(0.18, 0.82, 0.64, 0.18, '#120a06')
-    r(0.33, 0.74, 0.34, 0.08, lips)
+    ctx.fillStyle = 'rgba(25, 12, 6, 0.6)'
+    ctx.beginPath()
+    ctx.ellipse(X(0.5), Y(0.78), 0.3 * s, 0.2 * s, 0, 0, Math.PI)
+    ctx.fill()
+    ellipse(0.5, 0.66, 0.12, 0.035, 'rgba(25, 12, 6, 0.75)')
+  }
+  // Rosy cheeks
+  ellipse(0.24, 0.62, 0.08, 0.05, 'rgba(235, 100, 110, 0.35)')
+  ellipse(0.76, 0.62, 0.08, 0.05, 'rgba(235, 100, 110, 0.35)')
+  // Eyes
+  ellipse(0.34, 0.46, 0.065, 0.085, '#1b100c')
+  ellipse(0.66, 0.46, 0.065, 0.085, '#1b100c')
+  ellipse(0.355, 0.43, 0.022, 0.022, '#ffffff')
+  ellipse(0.675, 0.43, 0.022, 0.022, '#ffffff')
+  ctx.strokeStyle = '#1b100c'
+  ctx.lineWidth = Math.max(1, s * 0.035)
+  if (female) {
+    // Lashes
+    for (const [x, d] of [[0.27, -1], [0.73, 1]]) {
+      ctx.beginPath()
+      ctx.moveTo(X(x), Y(0.41))
+      ctx.lineTo(X(x + d * 0.05), Y(0.36))
+      ctx.stroke()
+    }
+  }
+  if (brows) {
+    ctx.lineWidth = Math.max(1, s * 0.04)
+    for (const [x0, y0, x1, y1] of [[0.27, 0.32, 0.41, 0.3], [0.59, 0.3, 0.73, 0.32]]) {
+      ctx.beginPath()
+      ctx.moveTo(X(x0), Y(y0))
+      ctx.lineTo(X(x1), Y(y1))
+      ctx.stroke()
+    }
+  }
+  // Mouth
+  const lips = female ? '#a8323f' : '#4a2018'
+  ctx.strokeStyle = lips
+  ctx.fillStyle = lips
+  ctx.lineWidth = Math.max(1, s * 0.04)
+  ctx.beginPath()
+  if (mouth === 'grin') {
+    ctx.moveTo(X(0.4), Y(0.66))
+    ctx.quadraticCurveTo(X(0.5), Y(0.8), X(0.6), Y(0.66))
+    ctx.closePath()
+    ctx.fill()
+  } else if (mouth === 'flat') {
+    ctx.moveTo(X(0.44), Y(0.7))
+    ctx.lineTo(X(0.56), Y(0.7))
+    ctx.stroke()
+  } else {
+    ctx.moveTo(X(0.42), Y(0.67))
+    ctx.quadraticCurveTo(X(0.5), Y(0.75), X(0.58), Y(0.67))
+    ctx.stroke()
   }
 }
 
 function finish(canvas) {
   const tex = new CanvasTexture(canvas)
   tex.colorSpace = SRGBColorSpace
-  tex.magFilter = NearestFilter
   tex.minFilter = LinearFilter
   tex.generateMipmaps = false
   return tex

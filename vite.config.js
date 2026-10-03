@@ -1,6 +1,40 @@
+import { readdirSync } from 'node:fs'
+import { extname, join } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { attachMultiplayer } from './server/multiplayer.js'
+
+// Hosts the multiplayer server on the same address as the dev server, so
+// `npm run dev -- --host` is all it takes to play with friends on your Wi-Fi.
+const multiplayer = {
+  name: 'eko-multiplayer',
+  configureServer(server) {
+    if (server.httpServer) attachMultiplayer(server.httpServer)
+  },
+  configurePreviewServer(server) {
+    if (server.httpServer) attachMultiplayer(server.httpServer)
+  },
+}
+
+// macOS and Windows ignore case in file names, so `./Traffic` can resolve to
+// traffic.js there even when Traffic.jsx was meant. Refuse to start if two
+// script files differ only by case.
+const SCRIPT = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.json'])
+function checkCaseClashes(dir) {
+  const seen = new Map()
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      checkCaseClashes(join(dir, entry.name))
+      continue
+    }
+    if (!SCRIPT.has(extname(entry.name))) continue
+    const key = entry.name.slice(0, -extname(entry.name).length).toLowerCase()
+    if (seen.has(key)) throw new Error(`${join(dir, seen.get(key))} and ${entry.name} share a name once case and extension are ignored, which breaks imports on macOS. Rename one of them.`)
+    seen.set(key, entry.name)
+  }
+}
+const caseCheck = { name: 'case-check', buildStart: () => checkCaseClashes('src') }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), multiplayer, caseCheck],
 })

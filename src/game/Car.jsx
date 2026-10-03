@@ -8,6 +8,10 @@ import { useGame, world } from './state'
 import { partColor, VEHICLES } from './vehicleTypes'
 import { setEngine } from './audio'
 import { Blob } from './Shadows'
+import { fx } from './particles'
+import { carBox } from './shapes'
+import { CAR_HP, crash, damagePlayerCar, damageVehicle, explode, vehicleSmoke } from './damage'
+import { vehicles } from './trafficSim'
 import { toonRamp } from './materials'
 
 // Arcade handling: we drive the body's velocity directly instead of simulating
@@ -21,28 +25,23 @@ const DRIFT_GRIP = 1.5 // handbrake grip
 const q = new Quaternion()
 const fwd = new Vector3()
 
-function Body({ type, color }) {
+export function Body({ type, color }) {
   const def = VEHICLES[type]
-  return def.parts.map((p, i) =>
-    p[7] ? (
-      <mesh key={i} position={[p[0], p[1], p[2]]}>
-        <boxGeometry args={[p[3], p[4], p[5]]} />
-        <meshBasicMaterial color={partColor(p, color)} toneMapped={false} />
-      </mesh>
-    ) : (
-      <mesh key={i} position={[p[0], p[1], p[2]]}>
-        <boxGeometry args={[p[3], p[4], p[5]]} />
-        <meshToonMaterial gradientMap={toonRamp} color={partColor(p, color)} />
-      </mesh>
-    ),
-  )
+  return def.parts.map((p, i) => (
+    <mesh key={i} geometry={carBox} position={[p[0], p[1], p[2]]} scale={[p[3], p[4], p[5]]}>
+      {p[7] ? <meshBasicMaterial color={partColor(p, color)} toneMapped={false} /> : <meshToonMaterial gradientMap={toonRamp} color={partColor(p, color)} />}
+    </mesh>
+  ))
 }
+
+const CRASH_THRESHOLD = 6
 
 export default function Car() {
   const body = useRef()
   const wheelSpin = useRef([])
   const wheelSteer = useRef([])
   const steer = useRef(0)
+  const lastVel = useRef({ x: 0, z: 0 })
   const [, getKeys] = useKeyboardControls()
   const type = useGame((s) => s.carType)
   const color = useGame((s) => s.carColor)
@@ -58,7 +57,7 @@ export default function Car() {
     if (!b) return
     const dt = Math.min(rawDt, 0.1)
     const game = useGame.getState()
-    const driving = game.mode === 'car' && game.phase === 'playing' && !game.dialogue
+    const driving = game.mode === 'car' && game.phase === 'playing' && !game.dialogue && !world.carWrecked && !game.chatOpen && !game.wasted && !game.busted
     const keys = driving ? getKeys() : {}
 
     const r = b.rotation()
@@ -68,6 +67,25 @@ export default function Car() {
     fwd.normalize()
 
     const v = b.linvel()
+    const pos = b.translation()
+
+    // A sudden change in velocity that we didn't cause means we hit something.
+    const impact = Math.hypot(v.x - lastVel.current.x, v.z - lastVel.current.z)
+    if (impact > CRASH_THRESHOLD && performance.now() > (world.carSkipCrash ?? 0)) {
+      const dir = Math.hypot(lastVel.current.x, lastVel.current.z) || 1
+      const hx = pos.x + (lastVel.current.x / dir) * def.half[2]
+      const hz = pos.z + (lastVel.current.z / dir) * def.half[2]
+      crash(hx, pos.y + 0.3, hz, impact, color)
+      damagePlayerCar((impact - 4) * 3)
+      // Whatever we hit takes damage too.
+      for (const o of vehicles) {
+        if (Math.hypot(o.x - hx, o.z - hz) < VEHICLES[o.type].half[2] + 1.5) {
+          damageVehicle(o, impact * 2.5)
+          if (o.police) world.events.push({ type: 'copHit' })
+        }
+      }
+    }
+
     let speed = v.x * fwd.x + v.z * fwd.z
     let latX = v.x - fwd.x * speed
     let latZ = v.z - fwd.z * speed
@@ -87,6 +105,26 @@ export default function Car() {
     latX *= grip
     latZ *= grip
     b.setLinvel({ x: fwd.x * speed + latX, y: v.y, z: fwd.z * speed + latZ }, true)
+    lastVel.current.x = fwd.x * speed + latX
+    lastVel.current.z = fwd.z * speed + latZ
+
+    // Damage: smoke, then fire, then it blows up.
+    const hood = def.half[2] * 0.7
+    vehicleSmoke(pos.x + fwd.x * hood, pos.y + def.half[1] * 0.8, pos.z + fwd.z * hood, world.carHp ?? CAR_HP, CAR_HP, world.carBurning ?? 0, dt)
+    if (world.carBurning > 0) {
+      world.carBurning -= dt
+      if (world.carBurning <= 0) {
+        world.carWrecked = true
+        world.carBurning = 0
+        if (game.mode === 'car') world.events.push({ type: 'eject' })
+        useGame.setState({ carColor: '#2b2626' })
+        explode(pos.x, pos.z, 'playerCar')
+      }
+    }
+    // Tire smoke when drifting.
+    if (keys.jump && Math.abs(speed) > 8 && Math.random() < dt * 25) {
+      fx.dust(pos.x - fwd.x * def.half[2], 0.15, pos.z - fwd.z * def.half[2], 1)
+    }
 
     // Steering only turns the car while it's rolling, and tightens at low speed.
     const steerInput = Number(!!keys.left) - Number(!!keys.right)
@@ -100,7 +138,7 @@ export default function Car() {
 
     world.carHeading = Math.atan2(fwd.x, fwd.z)
     if (game.mode === 'car') {
-      const p = b.translation()
+      const p = pos
       world.focus.set(p.x, p.y, p.z)
       world.heading = world.carHeading
       world.carSpeed = speed

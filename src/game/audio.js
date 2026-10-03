@@ -179,3 +179,37 @@ export function stopAudio() {
   ctx?.close()
   ctx = null
 }
+
+export function punchSound() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  hiss(t, 0.09, 0.5, 'lowpass', 900)
+  tone('sine', 160, t, 0.12, 0.5, master, 60)
+}
+export function clang() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  tone('square', 880, t, 0.18, 0.08)
+  tone('square', 1320, t, 0.12, 0.05)
+  hiss(t, 0.06, 0.3, 'highpass', 3000)
+}
+export function crashSound(strength = 1) {
+  if (!ctx) return
+  const t = ctx.currentTime
+  hiss(t, 0.35, Math.min(0.9, 0.3 + strength * 0.3), 'lowpass', 1200)
+  tone('square', 220, t, 0.12, 0.06)
+}
+export function boom() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  hiss(t, 1.2, 0.9, 'lowpass', 500)
+  tone('sine', 90, t, 0.9, 0.9, master, 30)
+}
+export function honk() {
+  if (!horn) return
+  setHorn(true)
+  setTimeout(() => setHorn(false), 260)
+}
+export function swoosh() {
+  if (ctx) hiss(ctx.currentTime, 0.08, 0.12, 'bandpass', 2400)
+}

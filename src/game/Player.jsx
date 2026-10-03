@@ -6,6 +6,7 @@ import { Vector3 } from 'three'
 import { city } from './cityData'
 import { makeAnkaraTexture } from './faces'
 import Person from './Person'
+import { computePose } from './people'
 import { Blob } from './Shadows'
 import { useGame, world } from './state'
 
@@ -15,8 +16,12 @@ const JUMP = 6
 const FOOT_OFFSET = 0.9 // capsule center to the soles of the feet
 
 // Tunde: Ankara shirt, jeans, low cut and a beard.
-export const PLAYER_LOOK = { face: 1, skin: '#4f2f1c', female: false, top: '#ffffff', bottom: '#2c4f86', hair: 'short', hairColor: '#120c08', robe: false, height: 1 }
-const PLAYER_FACE = { skin: '#4f2f1c', female: false, beard: true, smile: true }
+export const PLAYER_LOOK = { face: 1, skin: '#6e4430', female: false, top: '#ffffff', bottom: '#3a63a8', hair: 'short', hairColor: '#1f1410', robe: false, height: 1 }
+const PLAYER_FACE = { female: false, beard: true, mouth: 'grin', brows: true }
+const PUNCH_TIME = 0.32
+
+const pose = {}
+const poseIn = {}
 
 const move = new Vector3()
 
@@ -33,6 +38,8 @@ export default function Player() {
   useEffect(() => {
     world.player = body.current
     world.focus.set(...city.spawn)
+    // Yaw first, then pitch, so falling over follows the way he's facing.
+    visual.current.rotation.order = 'YXZ'
   }, [])
 
   useFrame((_, rawDt) => {
@@ -40,7 +47,10 @@ export default function Player() {
     const game = useGame.getState()
     if (!b || game.mode !== 'foot') return
     const dt = Math.min(rawDt, 0.1)
-    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted
+    world.playerDown = Math.max(0, (world.playerDown ?? 0) - dt)
+    world.flinch = Math.max(0, (world.flinch ?? 0) - dt)
+    const down = world.playerDown > 0
+    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted || !!game.wasted || down || !!game.chatOpen
 
     const { forward, back, left, right, run, jump } = frozen ? {} : getKeys()
 
@@ -54,7 +64,8 @@ export default function Player() {
 
     const speed = run ? RUN : WALK
     const v = b.linvel()
-    b.setLinvel({ x: move.x * speed, y: v.y, z: move.z * speed }, true)
+    // While knocked down, let physics carry the body instead of the controls.
+    if (!down) b.setLinvel({ x: move.x * speed, y: v.y, z: move.z * speed }, true)
 
     const p = b.translation()
     const ray = new rapier.Ray({ x: p.x, y: p.y, z: p.z }, { x: 0, y: -1, z: 0 })
@@ -63,6 +74,10 @@ export default function Player() {
 
     // Turn to face the direction of travel, taking the short way around.
     const a = anim.current
+    if (world.forceFacing !== undefined) {
+      a.facing = world.forceFacing
+      world.forceFacing = undefined
+    }
     if (moving) {
       const target = Math.atan2(move.x, move.z)
       const diff = Math.atan2(Math.sin(target - a.facing), Math.cos(target - a.facing))
@@ -70,9 +85,31 @@ export default function Player() {
     }
     visual.current.rotation.y = a.facing
 
-    a.phase += dt * (moving ? speed * 1.7 : 1.5)
-    const swing = moving && grounded ? Math.sin(a.phase) * (run ? 0.9 : 0.6) : 0
-    person.current?.animate(swing, moving ? swing : Math.sin(a.phase) * 0.05)
+    a.time = (a.time ?? 0) + dt
+    a.phase += dt * (moving ? speed * 1.8 : 0)
+    const punch = world.punch
+    if (punch) {
+      punch.t += dt / PUNCH_TIME
+      if (punch.t > 1) world.punch = null
+    }
+    poseIn.phase = a.phase
+    poseIn.t = a.time
+    poseIn.moving = moving && grounded
+    poseIn.run = !!run
+    poseIn.punch = punch ? punch.t : -1
+    poseIn.punchSide = punch?.side ?? 1
+    poseIn.flinch = world.flinch / 0.4
+    computePose(pose, poseIn)
+    if (!grounded && !down) {
+      pose.legL = 0.5
+      pose.legR = -0.3
+      pose.armL = pose.armR = -2.4
+      pose.sy = 1.08
+    }
+    person.current?.animate(pose)
+    // Lying flat while knocked down.
+    visual.current.rotation.x += ((down ? -Math.PI / 2 : 0) - visual.current.rotation.x) * Math.min(1, dt * 12)
+    visual.current.position.y = -FOOT_OFFSET + (down ? 0.2 : 0)
 
     world.focus.set(p.x, p.y, p.z)
     world.heading = a.facing

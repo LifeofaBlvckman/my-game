@@ -4,6 +4,7 @@ import { lookFromSeed, randomLook } from './people'
 // Crowd simulation. Plain objects updated every frame; Pedestrians.jsx draws them.
 const WALKERS = 70
 const RECYCLE = 140
+const FIGHT_RANGE = 1.15
 
 const rand = mulberry32(77)
 const regularBlocks = city.blocks.filter((b) => b.w === BLOCK)
@@ -29,11 +30,11 @@ for (let k = 0; k < WALKERS; k++) {
 city.idlers.forEach((spot, k) => {
   const look =
     spot.role === 'bouncer'
-      ? lookFromSeed(900 + k, { female: false, top: '#111111', bottom: '#111111', hair: 'bald', face: 1, skin: '#4f2f1c', robe: false, height: 1.15 })
+      ? lookFromSeed(900 + k, { female: false, face: 1, top: '#2a2633', bottom: '#2a2633', hair: 'bald', skin: '#5a3624', robe: false, height: 1.18 })
       : spot.role === 'trader'
         ? randomLook(rand, { robe: true })
         : randomLook(rand)
-  npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role })
+  npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role, home: { ...spot } })
 })
 
 city.wanderAreas.forEach((area) => {
@@ -56,8 +57,15 @@ npcs.forEach((n) => {
   n.yaw ??= 0
   n.phase = rand() * 10
   n.moving = false
-  n.down = 0 // seconds left lying on the ground after being hit
+  n.down = 0 // seconds left lying on the ground
   n.panic = 0
+  n.flinch = 0
+  n.fight = 0 // seconds left fighting the player
+  n.punchT = -1
+  n.punchCooldown = 0
+  n.hp = n.role === 'bouncer' ? 4 : 2
+  // Bouncers always fight back; about one in four others will too.
+  n.tough = n.role === 'bouncer' || (n.role !== 'trader' && rand() < 0.25)
   n.vx = 0
   n.vz = 0
   n.ox = 0 // push offset (from the player bumping into them)
@@ -81,15 +89,92 @@ function loopPoint(n) {
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 
+function panicAround(n, radius = 20) {
+  for (const o of npcs) {
+    if (o !== n && o.fight <= 0 && o.x !== undefined && Math.hypot(o.x - n.x, o.z - n.z) < radius) o.panic = 6
+  }
+}
+
+function freezeLoop(n) {
+  if (n.kind !== 'walk') return
+  const p = loopPoint(n)
+  n.x = p.x
+  n.z = p.z
+}
+
+export function knockDown(n, dx, dz, force) {
+  freezeLoop(n)
+  const d = Math.hypot(dx, dz) || 1
+  n.vx = (dx / d) * Math.min(10, force)
+  n.vz = (dz / d) * Math.min(10, force)
+  n.down = 5
+  n.fight = 0
+  n.punchT = -1
+  n.hp = n.role === 'bouncer' ? 4 : 2
+  n.yaw = Math.atan2(-dx, -dz) // fall away from the hit
+  panicAround(n)
+}
+
+// The player punched this NPC. Returns 'down' or 'hurt'.
+export function punchNpc(n, fromX, fromZ) {
+  const dx = n.x + n.ox - fromX
+  const dz = n.z + n.oz - fromZ
+  if (n.down > 0) return 'down'
+  n.hp -= 1
+  if (n.hp <= 0) {
+    knockDown(n, dx, dz, 5)
+    return 'down'
+  }
+  freezeLoop(n)
+  n.flinch = 0.4
+  const d = Math.hypot(dx, dz) || 1
+  n.ox += (dx / d) * 0.5
+  n.oz += (dz / d) * 0.5
+  n.yaw = Math.atan2(-dx, -dz)
+  if (n.tough) n.fight = 12
+  else panicAround(n, 12)
+  return 'hurt'
+}
+
+// Nearest standing NPC within `radius` of a point.
+export function npcNear(x, z, radius) {
+  let best = null
+  let bestD = radius
+  for (const n of npcs) {
+    if (n.x === undefined) continue
+    const d = Math.hypot(n.x + n.ox - x, n.z + n.oz - z)
+    if (d < bestD) {
+      best = n
+      bestD = d
+    }
+  }
+  return best
+}
+
+function walkToward(n, tx, tz, speed, dt) {
+  const dx = tx - n.x
+  const dz = tz - n.z
+  const d = Math.hypot(dx, dz)
+  if (d < 0.05) return d
+  const step = Math.min(d, speed * dt)
+  n.x += (dx / d) * step
+  n.z += (dz / d) * step
+  n.yaw += wrap(Math.atan2(dx, dz) - n.yaw) * Math.min(1, dt * 8)
+  n.moving = true
+  return d
+}
+
 // focus: where the player is. car: { x, z, yaw, speed, half } when driving, else null.
-// Returns how many NPCs the car knocked down this frame.
-export function updatePedestrians(dt, focus, car, playerOnFoot) {
-  let hits = 0
+// Returns the positions of NPCs the car knocked down this frame. NPC punches
+// that land on the player are pushed to `events`.
+export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
+  const hits = []
   for (const n of npcs) {
     const dx = (n.x ?? 0) - focus.x
     const dz = (n.z ?? 0) - focus.z
     const far = dx * dx + dz * dz > 160 * 160
     if (far && n.kind !== 'walk') continue
+    n.flinch = Math.max(0, n.flinch - dt)
 
     if (n.down > 0) {
       n.down -= dt
@@ -101,42 +186,58 @@ export function updatePedestrians(dt, focus, car, playerOnFoot) {
       continue
     }
     n.panic = Math.max(0, n.panic - dt)
-    const pace = n.panic > 0 ? 3.2 : 1
+    n.moving = false
 
-    if (n.kind === 'walk') {
-      if (far) {
-        if (dx * dx + dz * dz > RECYCLE * RECYCLE) placeWalker(n, focus)
+    if (n.fight > 0 && playerOnFoot) {
+      // Square up to the player and throw punches.
+      n.fight -= dt
+      n.punchCooldown -= dt
+      const d = Math.hypot(focus.x - n.x, focus.z - n.z)
+      if (d > 18) n.fight = 0
+      if (d > FIGHT_RANGE) walkToward(n, focus.x, focus.z, 3.4, dt)
+      else n.yaw += wrap(Math.atan2(focus.x - n.x, focus.z - n.z) - n.yaw) * Math.min(1, dt * 10)
+      if (n.punchT >= 0) {
+        const before = n.punchT
+        n.punchT += dt * 3
+        if (before < 0.5 && n.punchT >= 0.5 && d < FIGHT_RANGE + 0.4) events.push({ type: 'npcPunch', x: n.x, z: n.z, damage: n.role === 'bouncer' ? 12 : 7 })
+        if (n.punchT > 1) n.punchT = -1
+      } else if (d < FIGHT_RANGE + 0.2 && n.punchCooldown <= 0) {
+        n.punchT = 0
+        n.punchSide = -(n.punchSide ?? 1)
+        n.punchCooldown = n.role === 'bouncer' ? 0.8 : 1.1
       }
-      n.t += n.dir * n.speed * pace * dt
+    } else if (n.fight > 0) {
+      n.fight = 0
+    } else if (n.kind === 'walk') {
+      if (far && dx * dx + dz * dz > RECYCLE * RECYCLE) placeWalker(n, focus)
+      n.t += n.dir * n.speed * (n.panic > 0 ? 3.2 : 1) * dt
       const p = loopPoint(n)
-      n.x = p.x
-      n.z = p.z
-      n.yaw += wrap(p.yaw - n.yaw) * Math.min(1, dt * 8)
-      n.moving = true
+      // Ease back onto the loop after being knocked off it.
+      if (n.x !== undefined && Math.hypot(p.x - n.x, p.z - n.z) > 0.5) {
+        walkToward(n, p.x, p.z, 2.5, dt)
+      } else {
+        n.x = p.x
+        n.z = p.z
+        n.yaw += wrap(p.yaw - n.yaw) * Math.min(1, dt * 8)
+        n.moving = true
+      }
     } else if (n.kind === 'wander') {
+      const pace = n.panic > 0 ? 3.2 : 1
       if (n.pause > 0) {
         n.pause -= dt * pace
-        n.moving = false
         if (n.pause <= 0) {
           n.tx = n.area.x + (Math.random() - 0.5) * n.area.w
           n.tz = n.area.z + (Math.random() - 0.5) * n.area.d
         }
-      } else {
-        const tx = n.tx - n.x
-        const tz = n.tz - n.z
-        const d = Math.hypot(tx, tz)
-        if (d < 0.3) {
-          n.pause = 1 + Math.random() * 4
-        } else {
-          const step = Math.min(d, n.speed * pace * dt)
-          n.x += (tx / d) * step
-          n.z += (tz / d) * step
-          n.yaw += wrap(Math.atan2(tx, tz) - n.yaw) * Math.min(1, dt * 6)
-          n.moving = true
-        }
+      } else if (walkToward(n, n.tx, n.tz, n.speed * pace, dt) < 0.3) {
+        n.pause = 1 + Math.random() * 4
       }
-    } else {
-      n.moving = false
+    } else if (n.home) {
+      // Idlers go back to their spot after any trouble.
+      if (walkToward(n, n.home.x, n.home.z, 1.6, dt) < 0.1) {
+        n.yaw += wrap(n.home.yaw - n.yaw) * Math.min(1, dt * 4)
+        n.moving = false
+      }
     }
 
     // Shrug off bumps from the player.
@@ -162,27 +263,10 @@ export function updatePedestrians(dt, focus, car, playerOnFoot) {
       const lx = rx * c - rz * s
       const lz = rx * s + rz * c
       if (Math.abs(lx) < car.half[0] + 0.3 && Math.abs(lz) < car.half[2] + 0.3) {
-        knockDown(n, rx, rz, Math.abs(car.speed))
-        hits++
+        knockDown(n, rx, rz, Math.abs(car.speed) * 0.5)
+        hits.push({ x: n.x, z: n.z })
       }
     }
   }
   return hits
-}
-
-function knockDown(n, rx, rz, speed) {
-  if (n.kind === 'walk') {
-    // Freeze the loop position into a plain position while lying down.
-    const p = loopPoint(n)
-    n.x = p.x
-    n.z = p.z
-  }
-  const d = Math.hypot(rx, rz) || 1
-  n.vx = (rx / d) * Math.min(10, speed * 0.5)
-  n.vz = (rz / d) * Math.min(10, speed * 0.5)
-  n.down = 5
-  n.yaw = Math.atan2(-rx, -rz) // fall away from the car
-  for (const o of npcs) {
-    if (o !== n && o.x !== undefined && Math.hypot(o.x - n.x, o.z - n.z) < 20) o.panic = 6
-  }
 }

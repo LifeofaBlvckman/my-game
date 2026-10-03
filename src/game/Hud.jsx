@@ -4,6 +4,7 @@ import { INTRO_LENGTH } from './CameraRig'
 import { currentTarget, INTRO_CALL } from './quests'
 import { blip, setMusic, startAudio } from './audio'
 import { openDialogue } from './GameLogic'
+import { addChat, connectMultiplayer } from './net'
 import { useGame, world } from './state'
 import './hud.css'
 
@@ -18,8 +19,25 @@ function useClock() {
   return `${hh}:${mm}`
 }
 
+const NAME_KEY = 'eko-streets-name'
+function savedName() {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 function startGame() {
   if (useGame.getState().phase !== 'title') return
+  const name = (document.getElementById('player-name')?.value ?? '').trim().slice(0, 16) || 'Tunde'
+  try {
+    localStorage.setItem(NAME_KEY, name)
+  } catch {
+    // Private windows can refuse storage; the name just won't be remembered.
+  }
+  useGame.setState({ playerName: name })
+  connectMultiplayer(name)
   startAudio()
   setMusic(useGame.getState().music)
   world.introStart = performance.now() / 1000
@@ -34,19 +52,28 @@ function Title() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   return (
-    <div className="title" onClick={startGame}>
+    <div className="title">
       <div className="title-card">
         <h1>
           EKO <span>STREETS</span>
         </h1>
         <p className="tagline">Lagos, Nigeria. Twenty million people. One city.</p>
-        <button className="start">Press Enter or click to start</button>
+        <label className="name-field">
+          Your name
+          <input id="player-name" maxLength={16} defaultValue={savedName()} placeholder="Tunde" autoComplete="off" />
+        </label>
+        <button className="start" onClick={startGame}>
+          Press Enter to start
+        </button>
         <ul className="keys">
           <li>
             <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump / handbrake
           </li>
           <li>
             <b>E</b> talk · <b>F</b> enter, exit or jack a car · <b>Q</b> horn
+          </li>
+          <li>
+            <b>Click</b> or <b>X</b> punch · <b>Y</b> chat when online
           </li>
           <li>
             <b>M</b> music · <b>O</b> outlines · <b>T</b> skip an hour · <b>H</b> help
@@ -133,6 +160,42 @@ function Dialogue({ dialogue }) {
   )
 }
 
+function Chat({ chat, open }) {
+  const input = useRef()
+  const [, tick] = useState(0)
+  // Re-render now and then so old messages fade away.
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  useEffect(() => {
+    if (open) input.current?.focus()
+  }, [open])
+  const close = () => useGame.setState({ chatOpen: false })
+  const onKey = (e) => {
+    e.stopPropagation()
+    if (e.key === 'Escape') close()
+    if (e.key === 'Enter') {
+      const text = e.currentTarget.value.trim()
+      if (text) world.net?.chat(text)
+      if (text && !world.net) addChat(null, 'You are offline, so nobody can hear you.', true)
+      close()
+    }
+  }
+  const visible = chat.filter((c) => open || Date.now() - c.at < 12000)
+  return (
+    <div className="chat">
+      {visible.map((c) => (
+        <div key={c.key} className={c.system ? 'system' : ''}>
+          {c.name && <b>{c.name}: </b>}
+          {c.text}
+        </div>
+      ))}
+      {open && <input ref={input} maxLength={120} placeholder="Say something, then press Enter" onKeyDown={onKey} onKeyUp={(e) => e.stopPropagation()} />}
+    </div>
+  )
+}
+
 function Stars({ wanted }) {
   return (
     <div className={`stars ${wanted > 0 ? 'active' : ''}`}>
@@ -151,7 +214,7 @@ export default function Hud() {
   const [showHelp, setShowHelp] = useState(true)
 
   useEffect(() => {
-    const onKey = (e) => e.code === 'KeyH' && setShowHelp((s) => !s)
+    const onKey = (e) => e.code === 'KeyH' && !(e.target instanceof HTMLInputElement) && setShowHelp((s) => !s)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
@@ -169,7 +232,9 @@ export default function Hud() {
         <>
           <div className="top-right">
             <div className="clock">{clock}</div>
-            <div className="bar health" />
+            <div className="bar">
+              <div className="fill health" style={{ width: `${game.health}%` }} />
+            </div>
             <div className="money">₦{String(game.money).padStart(8, '0')}</div>
             <Stars wanted={game.wanted} />
           </div>
@@ -185,19 +250,29 @@ export default function Hud() {
             <div className="help">
               {game.prompt ?? (
                 <>
-                  Click to look around. <b>WASD</b> move, <b>Shift</b> run, <b>E</b> talk, <b>F</b> get in or jack a car, <b>Q</b> horn.
-                  Follow the yellow marker on the radar. <b>H</b> hides this.
+                  Click to look around. <b>WASD</b> move, <b>Shift</b> run, <b>Click</b>/<b>X</b> punch, <b>E</b> talk, <b>F</b> get in or jack a car,
+                  <b>Q</b> horn. Follow the yellow marker on the radar. <b>H</b> hides this.
                 </>
               )}
             </div>
           )}
 
           {game.banner && (
-            <div className="banner" key={game.banner.key}>
+            <div className="banner" key={`banner${game.banner.key}`}>
               {game.banner.text}
             </div>
           )}
-          {game.mode === 'car' && <div className="speed">{game.speed} km/h</div>}
+          {game.mode === 'car' && (
+            <div className="speed">
+              {game.speed} km/h
+              <div className="bar car-bar">
+                <div className="fill" style={{ width: `${Math.max(0, game.carHp ?? 100)}%`, background: (game.carHp ?? 100) < 30 ? '#e8343a' : '#f2b705' }} />
+              </div>
+            </div>
+          )}
+          {game.hurt > 0 && <div className="hurt" key={`hurt${game.hurt}`} />}
+          <Chat chat={game.chat} open={game.chatOpen} />
+          {game.online && <div className="online">● ONLINE · {game.players}</div>}
           {game.subtitle && !game.dialogue && (
             <div className="subtitle">
               <b>{game.subtitle.speaker}:</b> {game.subtitle.text}
@@ -208,7 +283,7 @@ export default function Hud() {
       )}
 
       {game.message && (
-        <div className="message" key={game.message.key} style={{ color: game.message.color }}>
+        <div className="message" key={`message${game.message.key}`} style={{ color: game.message.color }}>
           {game.message.text}
         </div>
       )}

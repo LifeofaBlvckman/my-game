@@ -18,8 +18,19 @@ export const useGame = create((set) => ({
   dialogue: null, // { lines: [{ speaker, text }], index, onDone }
   quest: 0, // index of the current quest
   step: -1, // -1 = talk to the quest giver to start it
+  health: 100,
+  hurt: 0, // bumps every time the player takes damage, for the red flash
+  wasted: false,
+  busted: false,
   outlines: true,
   music: true,
+  // Multiplayer
+  playerName: '',
+  online: false,
+  players: 1,
+  remotes: [], // ids of other players
+  chat: [], // [{ id, name, text, key }]
+  chatOpen: false,
   set,
 }))
 
@@ -38,4 +49,10 @@ export const world = {
   trafficColliders: new Set(),
   objective: null, // { x, z } for the radar
   introStart: 0,
+  carHp: 100,
+  carBurning: 0,
+  carWrecked: false,
+  playerDown: 0, // seconds left knocked flat
+  punch: null, // { t: 0..1, side, resolved } while a punch animates
+  net: null, // multiplayer connection, when online
 }

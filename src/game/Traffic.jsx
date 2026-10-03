@@ -5,7 +5,9 @@ import { Color, CylinderGeometry, Matrix4, Quaternion, Vector3 } from 'three'
 import { city } from './cityData'
 import { initTraffic, updateTraffic, vehicles } from './trafficSim'
 import { MAX_PARTS, MAX_WHEELS, partColor, VEHICLES } from './vehicleTypes'
-import { unitBox } from './Instances'
+import { carBox } from './shapes'
+import { explode, hurtPlayer, TRAFFIC_HP, vehicleSmoke, wreckVehicle } from './damage'
+import { honk } from './audio'
 import { toonRamp, unlit } from './materials'
 import { useGame, world } from './state'
 import { blobGeometry, blobMaterial } from './Shadows'
@@ -79,9 +81,37 @@ export default function Traffic() {
     })
 
     const flip = Math.floor(performance.now() / 160) % 2 === 0
+    const onFoot = game.mode === 'foot' && game.phase === 'playing' && !world.playerDown
     vehicles.forEach((v, i) => {
       const def = VEHICLES[v.type]
       const rig = rigs[v.type]
+
+      // Damage: smoke, then fire, then a bang.
+      const hoodX = Math.sin(v.yaw) * def.half[2] * 0.7
+      const hoodZ = Math.cos(v.yaw) * def.half[2] * 0.7
+      vehicleSmoke(v.x + hoodX, def.half[1] * 1.6, v.z + hoodZ, v.hp, TRAFFIC_HP, v.burning, dt)
+      if (v.burning > 0) {
+        v.burning -= dt
+        if (v.burning <= 0) {
+          wreckVehicle(v)
+          explode(v.x, v.z, v)
+        }
+      }
+
+      // Running someone over is bad for both of you. (Police on a chase pull
+      // up to arrest you instead.)
+      if (onFoot && v.speed > 4 && !v.chasing && (v.hitCooldown ?? 0) <= performance.now()) {
+        const rx = world.focus.x - v.x
+        const rz = world.focus.z - v.z
+        const c = Math.cos(v.yaw)
+        const s = Math.sin(v.yaw)
+        if (Math.abs(rx * c - rz * s) < def.half[0] + 0.35 && Math.abs(rx * s + rz * c) < def.half[2] + 0.35) {
+          hurtPlayer(Math.round(v.speed * 2.2), v.x, v.z, true)
+          v.stall = 3
+          v.hitCooldown = performance.now() + 1500
+          honk()
+        }
+      }
 
       if (v.body && v.colliderType !== v.type) {
         world.trafficColliders.delete(v.collider.handle)
@@ -147,10 +177,10 @@ export default function Traffic() {
   const count = vehicles.length
   return (
     <group>
-      <instancedMesh ref={lit} args={[unitBox, undefined, count * MAX_PARTS]} frustumCulled={false}>
+      <instancedMesh ref={lit} args={[carBox, undefined, count * MAX_PARTS]} frustumCulled={false}>
         <meshToonMaterial gradientMap={toonRamp} />
       </instancedMesh>
-      <instancedMesh ref={glow} args={[unitBox, glowMaterial, count * MAX_PARTS]} frustumCulled={false} />
+      <instancedMesh ref={glow} args={[carBox, glowMaterial, count * MAX_PARTS]} frustumCulled={false} />
       <instancedMesh ref={wheels} args={[wheelGeometry, undefined, count * MAX_WHEELS]} frustumCulled={false}>
         <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
       </instancedMesh>

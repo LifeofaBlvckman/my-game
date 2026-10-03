@@ -4,10 +4,12 @@ import { useKeyboardControls } from '@react-three/drei'
 import { Quaternion, Vector3 } from 'three'
 import { city, zoneAt } from './cityData'
 import { swapWithPlayerCar, vehicles } from './trafficSim'
-import { npcs } from './crowd'
+import { npcNear, npcs, punchNpc } from './crowd'
 import { CHATTER, currentTarget, NPCS, QUESTS, STRANGER_LINES } from './quests'
 import { VEHICLES } from './vehicleTypes'
-import { bust, jingle, setHorn, setMusic, setSiren, thud } from './audio'
+import { bust, clang, honk, jingle, punchSound, setHorn, setMusic, setSiren, swoosh, thud } from './audio'
+import { CAR_HP, damagePlayerCar, damageVehicle, hurtPlayer } from './damage'
+import { fx } from './particles'
 import { useGame, world } from './state'
 
 const ENTER_DISTANCE = 4.5
@@ -57,9 +59,10 @@ function nearestVehicle(from) {
   if (world.car) {
     const t = world.car.translation()
     const d = flat(t, from)
-    if (d < ENTER_DISTANCE) best = { own: true, d, type: useGame.getState().carType }
+    if (d < ENTER_DISTANCE) best = { own: true, d, type: useGame.getState().carType, wrecked: world.carWrecked }
   }
   for (const v of vehicles) {
+    if (v.wrecked || v.burning > 0) continue
     const d = flat(v, from)
     if (d < ENTER_DISTANCE + VEHICLES[v.type].half[2] * 0.5 && (!best || d < best.d)) best = { v, d, type: v.type }
   }
@@ -82,20 +85,29 @@ function exitCar() {
   world.player.setLinvel({ x: 0, y: 0, z: 0 }, true)
   world.player.setEnabled(true)
   world.carSpeed = 0
+  world.carSkipCrash = performance.now() + 500
   useGame.setState({ mode: 'foot' })
 }
 
 function enterOrExit() {
   const game = useGame.getState()
-  if (game.phase !== 'playing' || game.dialogue || game.busted || !world.player || !world.car) return
+  if (game.phase !== 'playing' || game.dialogue || game.busted || game.chatOpen || !world.player || !world.car) return
   if (game.mode === 'car') return exitCar()
 
   const target = nearestVehicle(world.focus)
-  if (!target) return
+  if (!target || (target.own && target.wrecked) || world.playerDown > 0) return
   if (!target.own) {
     // Carjacking: the traffic vehicle and the player's car swap places.
     const t = world.car.translation()
-    const taken = swapWithPlayerCar(target.v, { type: game.carType, color: game.carColor, x: t.x, z: t.z, yaw: world.carHeading ?? 0 })
+    const taken = swapWithPlayerCar(target.v, { type: game.carType, color: game.carColor, x: t.x, z: t.z, yaw: world.carHeading ?? 0, hp: world.carHp ?? CAR_HP })
+    if (world.carWrecked) {
+      target.v.wrecked = true
+      target.v.color = '#2b2626'
+    }
+    world.carWrecked = false
+    world.carBurning = 0
+    world.carHp = taken.hp ?? CAR_HP
+    world.carSkipCrash = performance.now() + 500
     const half = VEHICLES[taken.type].half
     q.setFromAxisAngle(up, taken.yaw)
     world.car.setTranslation({ x: taken.x, y: half[1] + 0.05, z: taken.z }, true)
@@ -113,7 +125,7 @@ function enterOrExit() {
 
 function interact() {
   const game = useGame.getState()
-  if (game.phase !== 'playing' || game.dialogue || game.mode !== 'foot') return
+  if (game.phase !== 'playing' || game.dialogue || game.mode !== 'foot' || game.chatOpen) return
   // The key press that closed a dialogue shouldn't open a new one.
   if (performance.now() - (world.dialogueClosedAt ?? 0) < 400) return
   const near = nearestNamedNpc(world.focus)
@@ -147,6 +159,121 @@ function interact() {
   }
 }
 
+function policeNearby(radius = 45) {
+  return vehicles.some((v) => v.police && flat(v, world.focus) < radius)
+}
+
+export function resetPlayerCar() {
+  world.carWrecked = false
+  world.carBurning = 0
+  world.carHp = CAR_HP
+  world.carSkipCrash = performance.now() + 500
+  q.setFromAxisAngle(up, Math.PI)
+  world.car.setTranslation({ x: city.carSpawn[0], y: city.carSpawn[1], z: city.carSpawn[2] }, true)
+  world.car.setRotation(q, true)
+  world.car.setLinvel({ x: 0, y: 0, z: 0 }, true)
+  useGame.setState({ carType: 'sedan', carColor: '#c9ccd1' })
+}
+
+const ANGRY = ['Ah! Wetin I do you?', 'You dey craze?', 'Oya come and fight me!', 'Na wa for you o!']
+
+let punchSide = 1
+let lastPunch = 0
+export function punch() {
+  const game = useGame.getState()
+  if (game.phase !== 'playing' || game.mode !== 'foot' || game.dialogue || game.busted || game.wasted || world.playerDown > 0 || game.chatOpen) return
+  const now = performance.now()
+  if (now - lastPunch < 330) return
+  lastPunch = now
+  punchSide = -punchSide
+  world.punch = { t: 0, side: punchSide, resolved: false }
+  swoosh()
+}
+
+// Called when the punch animation reaches full extension.
+function resolvePunch() {
+  const h = world.heading
+  const px = world.focus.x + Math.sin(h) * 0.9
+  const pz = world.focus.z + Math.cos(h) * 0.9
+  const landed = (x, z, word, strong = false) => {
+    fx.pow(x, 1.7, z, word)
+    fx.sparks(x, 1.3, z, 6, '#ffffff')
+    fx.shake(strong ? 0.3 : 0.15)
+    punchSound()
+  }
+
+  if (world.net?.punchPlayers(px, pz)) return landed(px, pz)
+
+  const npc = npcNear(px, pz, 0.9)
+  if (npc) {
+    const result = punchNpc(npc, world.focus.x, world.focus.z)
+    landed(npc.x + npc.ox, npc.z + npc.oz, result === 'down' ? 'WHAM!' : undefined, result === 'down')
+    if (policeNearby() && timers.copWatch <= 0) {
+      addWanted(1)
+      timers.copWatch = 4
+    }
+    return
+  }
+
+  const named = nearestNamedNpc({ x: px, z: pz })
+  if (named && named.d < 1.4) {
+    named.n.flinchAt = performance.now()
+    landed(named.n.pos[0], named.n.pos[1])
+    useGame.setState({ subtitle: { speaker: named.n.name, text: ANGRY[Math.floor(Math.random() * ANGRY.length)], key: ++bannerKey } })
+    const key = bannerKey
+    setTimeout(() => useGame.getState().subtitle?.key === key && useGame.setState({ subtitle: null }), 2500)
+    return
+  }
+
+  // Punching cars: a dent, sparks and an angry horn.
+  const inBox = (cx, cz, yaw, half) => {
+    const rx = px - cx
+    const rz = pz - cz
+    const c = Math.cos(yaw)
+    const s = Math.sin(yaw)
+    return Math.abs(rx * c - rz * s) < half[0] + 0.45 && Math.abs(rx * s + rz * c) < half[2] + 0.45
+  }
+  for (const v of vehicles) {
+    if (inBox(v.x, v.z, v.yaw, VEHICLES[v.type].half)) {
+      damageVehicle(v, 6)
+      clang()
+      fx.sparks(px, 1, pz, 10)
+      fx.pow(px, 1.8, pz, 'BANG!')
+      if (!v.wrecked && v.state !== 'parked') honk()
+      if (v.police) addWanted(1)
+      return
+    }
+  }
+  if (world.car) {
+    const t = world.car.translation()
+    if (inBox(t.x, t.z, world.carHeading ?? 0, VEHICLES[useGame.getState().carType].half)) {
+      damagePlayerCar(6)
+      clang()
+      fx.sparks(px, 1, pz, 10)
+      fx.pow(px, 1.8, pz, 'BANG!')
+    }
+  }
+}
+
+const timers = { copWatch: 0 }
+
+function getWasted() {
+  const game = useGame.getState()
+  if (game.wasted || game.busted) return
+  useGame.setState({ wasted: true, dialogue: null })
+  bust()
+  message('WASTED', '#e8343a', 3200)
+  setTimeout(() => {
+    if (useGame.getState().mode === 'car') exitCar()
+    world.playerDown = 0
+    world.player.setTranslation({ x: city.spawn[0], y: city.spawn[1], z: city.spawn[2] }, true)
+    world.player.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    if (world.carWrecked) resetPlayerCar()
+    const { money } = useGame.getState()
+    useGame.setState({ wasted: false, wanted: 0, health: 100, money: Math.max(0, money - 500) })
+  }, 3000)
+}
+
 function getBusted() {
   const game = useGame.getState()
   if (game.busted) return
@@ -158,7 +285,8 @@ function getBusted() {
     world.player.setTranslation({ x: city.spawn[0], y: city.spawn[1], z: city.spawn[2] }, true)
     world.player.setLinvel({ x: 0, y: 0, z: 0 }, true)
     const { money } = useGame.getState()
-    useGame.setState({ busted: false, wanted: 0, money: Math.max(0, money - 1000) })
+    if (world.carWrecked) resetPlayerCar()
+    useGame.setState({ busted: false, wanted: 0, health: 100, money: Math.max(0, money - 1000) })
   }, 3000)
 }
 
@@ -170,10 +298,20 @@ export default function GameLogic() {
     const subs = [
       subscribeKeys((s) => s.enter, (p) => p && enterOrExit()),
       subscribeKeys((s) => s.interact, (p) => p && interact()),
-      subscribeKeys((s) => s.horn, (p) => setHorn(p && useGame.getState().mode === 'car')),
+      subscribeKeys((s) => s.horn, (p) => setHorn(p && useGame.getState().mode === 'car' && !useGame.getState().chatOpen)),
     ]
+    const onMouse = (e) => e.button === 0 && document.pointerLockElement && punch()
+    window.addEventListener('mousedown', onMouse)
     const onKey = (e) => {
       const game = useGame.getState()
+      if (game.chatOpen || e.target instanceof HTMLInputElement) return
+      if (e.code === 'KeyY' && game.phase === 'playing') {
+        e.preventDefault()
+        document.exitPointerLock?.()
+        useGame.setState({ chatOpen: true })
+        return
+      }
+      if (e.code === 'KeyX') punch()
       if (e.code === 'KeyM') {
         setMusic(!game.music)
         useGame.setState({ music: !game.music })
@@ -185,6 +323,7 @@ export default function GameLogic() {
     return () => {
       subs.forEach((u) => u())
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onMouse)
     }
   }, [subscribeKeys])
 
@@ -195,6 +334,12 @@ export default function GameLogic() {
     const game = useGame.getState()
     if (game.phase !== 'playing') return
 
+    if (world.punch && !world.punch.resolved && world.punch.t >= 0.45) {
+      world.punch.resolved = true
+      resolvePunch()
+    }
+    timers.copWatch -= dt
+
     // Knocking people down and ramming the police get you wanted.
     t.hitCooldown -= dt
     t.ramCooldown -= dt
@@ -202,19 +347,32 @@ export default function GameLogic() {
       const e = world.events.shift()
       if (e.type === 'pedHit') {
         thud()
+        e.hits.forEach((h) => {
+          fx.pow(h.x, 1.6, h.z, 'BAM!')
+          fx.dust(h.x, 0.3, h.z, 5)
+        })
         if (t.hitCooldown <= 0) {
           addWanted(1)
           t.hitCooldown = 2
         }
-      }
-    }
-    const carPos = world.car.translation()
-    if (game.mode === 'car' && Math.abs(world.carSpeed) > 6 && t.ramCooldown <= 0) {
-      const rammed = vehicles.some((v) => v.police && flat(v, carPos) < 3.4)
-      if (rammed) {
-        thud()
+      } else if (e.type === 'npcPunch') {
+        hurtPlayer(e.damage, e.x, e.z)
+        punchSound()
+      } else if (e.type === 'copHit' && t.ramCooldown <= 0) {
         addWanted(1)
         t.ramCooldown = 3
+      } else if (e.type === 'eject' && useGame.getState().mode === 'car') {
+        exitCar()
+      } else if (e.type === 'wasted') {
+        getWasted()
+      }
+    }
+    // Health slowly comes back once you've stayed out of trouble for a bit.
+    if (game.health < 100 && performance.now() - (world.lastHurt ?? 0) > 6000 && !game.wasted) {
+      t.regen = (t.regen ?? 0) + dt * 3
+      if (t.regen >= 1) {
+        useGame.setState({ health: Math.min(100, game.health + Math.floor(t.regen)) })
+        t.regen %= 1
       }
     }
 
@@ -262,9 +420,11 @@ export default function GameLogic() {
       const npc = nearestNamedNpc(world.focus)
       const car = !npc && nearestVehicle(world.focus)
       if (npc) prompt = `Press E to talk to ${npc.n.name}`
+      else if (car?.wrecked) prompt = 'This car is wrecked. Find another one.'
       else if (car) prompt = `Press F to ${car.own ? 'enter' : 'jack'} the ${VEHICLES[car.type].name}`
     }
-    if (kmh !== game.speed || prompt !== game.prompt) useGame.setState({ speed: kmh, prompt })
+    const carHp = Math.round(world.carHp ?? CAR_HP)
+    if (kmh !== game.speed || prompt !== game.prompt || carHp !== game.carHp) useGame.setState({ speed: kmh, prompt, carHp })
   })
 
   // Debug hooks for automated testing (dev server only).
@@ -274,6 +434,7 @@ export default function GameLogic() {
       state: () => useGame.getState(),
       focus: () => ({ x: world.focus.x, y: world.focus.y, z: world.focus.z }),
       teleport: (x, z) => {
+        world.carSkipCrash = performance.now() + 500
         if (useGame.getState().mode === 'car') world.car.setTranslation({ x, y: 1, z }, true)
         else world.player.setTranslation({ x, y: 1.5, z }, true)
       },
@@ -283,6 +444,17 @@ export default function GameLogic() {
       npcs: () => NPCS,
       enterOrExit,
       interact,
+      punch,
+      // Turn to face the nearest pedestrian, then punch.
+      facePunchNearest: () => {
+        const n = npcNear(world.focus.x, world.focus.z, 6)
+        if (n) world.heading = Math.atan2(n.x + n.ox - world.focus.x, n.z + n.oz - world.focus.z)
+        world.forceFacing = world.heading
+        punch()
+      },
+      faceTo: (x, z) => (world.forceFacing = world.heading = Math.atan2(x - world.focus.x, z - world.focus.z)),
+      carHp: () => world.carHp ?? CAR_HP,
+      damageCar: (n) => damagePlayerCar(n),
       advanceDialogue: () => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter' })),
     }
   }, [])
