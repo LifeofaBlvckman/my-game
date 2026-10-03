@@ -14,6 +14,7 @@ export const useGame = create((set) => ({
   speed: 0, // km/h, refreshed a few times a second
   prompt: null, // context hint, e.g. "Press F to enter the Danfo"
   wanted: 0, // 0-5 stars
+  evading: false, // wanted, but out of the police's sight (stars blink)
   money: 2000,
   zone: '',
   banner: null, // { text, key } big text that fades out: zone names, vehicle names
@@ -29,6 +30,9 @@ export const useGame = create((set) => ({
   outlines: true,
   // Real shadows; off from the start on phones.
   shadows: !(typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches), // real cast shadows; turned off automatically on slow machines
+  carry: null, // item in Tunde's hand (people.js CARRY), and its colour for food
+  carryColor: null,
+  action: null, // what the phone's action button does: { key, icon, label }
   race: null, // the race you're in or invited to (races.js), for the HUD
   sideJob: null, // { index, step } while doing a side job (quests.js SIDE_JOBS)
   jobProgress: 0, // checkpoints reached / items collected in the current step

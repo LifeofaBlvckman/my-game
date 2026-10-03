@@ -36,6 +36,8 @@ export default function Player() {
   const { rapier, world: physics } = useRapier()
   const [, getKeys] = useKeyboardControls()
   const mode = useGame((s) => s.mode)
+  const carry = useGame((s) => s.carry)
+  const carryColor = useGame((s) => s.carryColor)
   const shirt = useMemo(makeAnkaraTexture, [])
 
   useEffect(() => {
@@ -107,6 +109,17 @@ export default function Player() {
     poseIn.punchSide = punch?.side ?? 1
     poseIn.flinch = world.flinch / 0.4
     computePose(pose, poseIn)
+    if (world.eating) {
+      // Spoon to mouth, chew, repeat.
+      const k = (Math.sin(a.time * 5) + 1) / 2
+      pose.armR = -0.9 - k * 0.35
+      pose.foreR = -1.7 - k * 0.45
+      pose.headNod = 0.12 + k * 0.05
+    } else if (world.carry && !world.punch) {
+      // Carrying a bag: that arm hangs straight and just sways a little.
+      pose.armR *= 0.35
+      pose.foreR = -0.18
+    }
     if (world.workout > 0) {
       // Working out at the gym: arms pumping overhead.
       world.workout -= dt
@@ -142,7 +155,7 @@ export default function Player() {
     <RigidBody ref={body} colliders={false} position={city.spawn} enabledRotations={[false, false, false]} canSleep={false}>
       <CapsuleCollider args={[0.55, 0.35]} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
       <group ref={visual} position-y={-FOOT_OFFSET} visible={mode === 'foot'}>
-        <Person ref={person} look={PLAYER_LOOK} shirtMap={shirt} faceOverride={PLAYER_FACE} />
+        <Person ref={person} look={PLAYER_LOOK} shirtMap={shirt} faceOverride={PLAYER_FACE} carry={carry} carryColor={carryColor} />
         <Blob position-y={0.03} scale={[0.9, 1, 0.9]} />
       </group>
       {mode === 'foot' && <EmoteBubble get={() => world.emote} y={1.4} />}

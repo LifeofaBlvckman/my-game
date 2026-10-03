@@ -149,6 +149,9 @@ export default function Traffic() {
       waiting,
       focus: world.simFocus ?? world.focus,
       wanted: game.wanted,
+      // Police go where they last saw you (GameLogic keeps track).
+      chase: world.lastSeen,
+      hidden: game.evading,
       playerCar: carPos ? { x: carPos.x, z: carPos.z } : null,
       pedestrian: game.mode === 'foot' ? { x: world.focus.x, z: world.focus.z } : null,
     })

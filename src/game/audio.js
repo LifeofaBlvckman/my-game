@@ -313,6 +313,14 @@ export function jingle() {
   const t = ctx.currentTime
   ;[523.3, 659.3, 784, 1046.5].forEach((f, i) => tone('triangle', f, t + i * 0.11, 0.35, 0.25))
 }
+// A traffic warden's whistle: two sharp trills.
+export function whistle() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  for (let k = 0; k < 2; k++) {
+    for (let n = 0; n < 5; n++) tone('sine', n % 2 ? 2900 : 3150, t + k * 0.32 + n * 0.045, 0.05, 0.12)
+  }
+}
 export function bust() {
   if (!ctx) return
   const t = ctx.currentTime

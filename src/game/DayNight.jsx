@@ -125,6 +125,7 @@ export default function DayNight() {
   }, [target])
 
   useFrame(({ camera, clock }, dt) => {
+    window.__gameRunning = true // the scene is drawing: see index.html
     if (useGame.getState().phase === 'playing') world.time = (world.time + Math.min(dt, 0.1)) % 1440
     const hour = world.time / 60
     const day = daylightAt(hour)

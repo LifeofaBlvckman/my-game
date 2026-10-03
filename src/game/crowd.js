@@ -1,5 +1,5 @@
 import { BEACH, BLOCK, city, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
-import { COP_LOOK, lookFromSeed, randomLook } from './people'
+import { COP_LOOK, lookFromSeed, randomLook, WARDEN_LOOK } from './people'
 
 // Crowd simulation. Plain objects updated every frame; Pedestrians.jsx draws them.
 const WALKERS = 70
@@ -33,7 +33,9 @@ city.idlers.forEach((spot, k) => {
       ? lookFromSeed(900 + k, { female: false, face: 1, top: '#2a2633', bottom: '#2a2633', hair: 'bald', skin: '#5a3624', robe: false, height: 1.18 })
       : spot.role === 'trader'
         ? randomLook(rand, { robe: true })
-        : randomLook(rand)
+        : spot.role === 'warden'
+          ? { ...WARDEN_LOOK, face: k % 6 }
+          : randomLook(rand)
   npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role, home: { ...spot } })
 })
 

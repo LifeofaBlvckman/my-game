@@ -120,6 +120,15 @@ export default function Pedestrians() {
         poseIn.punchSide = n.punchSide ?? 1
         poseIn.flinch = n.flinch > 0 ? n.flinch / 0.4 : 0
         computePose(pose, poseIn)
+        if (n.role === 'warden' && !poseIn.moving && n.down <= 0 && !(n.panic > 0)) {
+          // Directing traffic: one arm out, the other waving cars through.
+          const wave = Math.sin(time * 3.2 + i)
+          pose.armR = -1.55 + wave * 0.45
+          pose.foreR = -0.5 - Math.max(0, wave) * 0.5
+          pose.armL = -1.4
+          pose.foreL = -0.1
+          pose.twist = Math.sin(time * 0.4 + i) * 0.5
+        }
         if (n.grab) {
           // An officer taking hold of you.
           pose.armL = pose.armR = -1.35

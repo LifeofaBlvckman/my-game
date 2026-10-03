@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 import { Matrix4 } from 'three'
 import { faceStyle, makeFaceTexture } from './faces'
-import { FACE, jointMatrices, makeJoints, personParts } from './people'
+import { CARRY, FACE, jointMatrices, makeJoints, personParts } from './people'
 import { SHAPES } from './shapes'
 import { toonRamp } from './materials'
 import { inkOutline } from './outline'
@@ -11,10 +11,12 @@ const faceLocal = new Matrix4().makeTranslation(...FACE.offset).multiply(new Mat
 // A single character built from meshes: the player, named NPCs and other
 // players. Same body and poses as the crowd (people.js), plus a bold ink
 // outline. The ref exposes `animate(pose)`; poses come from computePose.
-const Person = forwardRef(function Person({ look, shirtMap, faceOverride, outline = true, ...props }, ref) {
-  const parts = useMemo(() => personParts(look), [look])
+const Person = forwardRef(function Person({ look, shirtMap, faceOverride, outline = true, carry = null, carryColor = null, ...props }, ref) {
+  const body = useMemo(() => personParts(look), [look])
+  // Anything in hand rides on the forearm like the hand does.
+  const parts = useMemo(() => [...body, ...(CARRY[carry] ?? []).map((p) => ({ ...p, color: p.color ?? carryColor ?? '#e8622c' }))], [body, carry, carryColor])
   const face = useMemo(() => makeFaceTexture(faceOverride ?? faceStyle(look.face)), [look, faceOverride])
-  const torso = parts.findIndex((p) => p.joint === 'chest' && p.offset[1] === 1.2)
+  const torso = parts.findIndex((p) => p.joint === 'chest' && p.offset?.[1] === 1.2)
   const joints = useMemo(makeJoints, [])
   const meshes = useRef([])
   const faceMesh = useRef()
@@ -46,7 +48,7 @@ const Person = forwardRef(function Person({ look, shirtMap, faceOverride, outlin
   return (
     <group scale={look.height} {...props}>
       {parts.map((p, i) => (
-        <group key={i}>
+        <group key={`${carry ?? ''}${i}`}>
           <mesh ref={keep(i, 'main')} geometry={SHAPES[p.shape]} matrixAutoUpdate={false} matrix={p.local}>
             <meshToonMaterial gradientMap={toonRamp} color={i === torso && shirtMap ? '#ffffff' : p.color} map={i === torso ? (shirtMap ?? null) : null} />
           </mesh>

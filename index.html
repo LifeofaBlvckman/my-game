@@ -50,10 +50,15 @@
           box.querySelector('pre').textContent += detail + '\n'
         }
         window.__showBootError = show
+        // Only errors before the game is up cover the screen. Once it's
+        // running (window.__gameRunning), a stray error is just logged, so a
+        // browser quirk can't stop play.
         window.addEventListener('error', function (e) {
+          if (window.__gameRunning) return console.error(e.error || e.message)
           show('The game hit an error while starting', (e.error && e.error.stack) || e.message || String(e))
         })
         window.addEventListener('unhandledrejection', function (e) {
+          if (window.__gameRunning) return console.error(e.reason)
           show('The game hit an error while starting', (e.reason && e.reason.stack) || String(e.reason))
         })
         var canvas = document.createElement('canvas')

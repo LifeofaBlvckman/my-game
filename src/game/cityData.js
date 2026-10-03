@@ -42,6 +42,15 @@ const BILLBOARDS = [
   'IRON GBENGA GYM\nNO PAIN NO GAIN',
 ]
 
+// What the mama put stalls sell. Eating restores health.
+export const FOODS = [
+  { name: 'jollof rice', price: 500, icon: '🍛', color: '#e8622c', health: 40 },
+  { name: 'amala and ewedu', price: 600, icon: '🥘', color: '#5a3b2a', health: 45 },
+  { name: 'suya', price: 800, icon: '🍢', color: '#8a3b1f', health: 35 },
+  { name: 'puff-puff', price: 300, icon: '🍩', color: '#d9a04a', health: 25 },
+  { name: 'boli and fish', price: 700, icon: '🌽', color: '#f2c230', health: 40 },
+]
+
 // Fixed landmark blocks, by grid index (i = column, j = row).
 const MARKETS = [
   { i: 1, j: 5, name: 'OJA OBA MARKET' },
@@ -160,6 +169,117 @@ export function mulberry32(seed) {
 const pick = (rand, list) => list[Math.floor(rand() * list.length)]
 const at = (list, i, j) => list.find((b) => b.i === i && b.j === j)
 
+// Junctions without lights where three or more roads meet get stop signs.
+const roadsAt = (i, j) => [segmentValid('x', j, i - 1), segmentValid('x', j, i), segmentValid('z', i, j - 1), segmentValid('z', i, j)].filter(Boolean).length
+export const hasStop = (i, j) => !hasLight(i, j) && roadsAt(i, j) >= 3
+
+// On solid ground (not over the lagoon or out at sea)?
+const onLand = (x, z) =>
+  z > MAINLAND.minZ - BEACH + 2 && z < MAINLAND.maxZ + BEACH - 2 && ((x > MAINLAND.minX - BEACH + 2 && x < MAINLAND.maxX) || (x > ISLAND.minX && x < ISLAND.maxX + BEACH - 2))
+
+const FLOWER_COLORS = ['#e8364f', '#ffd23a', '#ff8fc8', '#ffffff', '#9b6bff', '#ff7a2f', '#d6248a']
+
+// Things added after the main layout, from their own random numbers so the
+// buildings and roads stay exactly where they were: flower beds in the parks
+// and along the sidewalks, stop signs, and LASTMA wardens at busy junctions.
+function addStreetDetails(city, rand) {
+  city.flowerBeds = [] // { x, z, w, d, y, round }
+  city.flowers = [] // { x, y, z, color, s }
+  city.stopSigns = [] // { x, z, yaw } facing the oncoming driver
+  city.stopLines = [] // { x, z, along, len }
+  city.wardens = [] // { x, z, nx, nz } the junction each one watches
+
+  const clear = (x, z, r) =>
+    city.trees.every((t) => Math.hypot(t.x - x, t.z - z) > r + 0.9) &&
+    city.lamps.every((l) => Math.hypot(l.x - x, l.z - z) > r + 0.6) &&
+    city.stalls.every((t) => Math.hypot(t.x - x, t.z - z) > r + 2) &&
+    city.doors.every((d) => Math.hypot(d.x - x, d.z - z) > r + 2) &&
+    city.busStops.every((b) => Math.hypot(b.x - x, b.z - z) > r + 3.5) &&
+    city.signs.every((g) => !g.posts || Math.hypot(g.x - x, g.z - z) > r + 1.5) &&
+    city.solids.every((o) => o.w > 12 || o.d > 12 || Math.hypot(o.x - x, o.z - z) > r + Math.max(o.w, o.d) / 2 + 0.5)
+
+  // Plant a bed: soil with a brick kerb, filled with flowers.
+  const bed = (x, z, w, d, y, colors, round = false) => {
+    city.flowerBeds.push({ x, z, w, d, y, round })
+    const step = 0.42
+    for (let a = -w / 2 + step / 2; a < w / 2; a += step) {
+      for (let b = -d / 2 + step / 2; b < d / 2; b += step) {
+        if (round && Math.hypot(a / (w / 2), b / (d / 2)) > 0.86) continue
+        const fx = x + a + (rand() - 0.5) * 0.18
+        const fz = z + b + (rand() - 0.5) * 0.18
+        if (city.trees.some((t) => Math.hypot(t.x - fx, t.z - fz) < 0.7)) continue
+        city.flowers.push({ x: fx, z: fz, y: y + 0.18, color: colors[Math.floor(rand() * colors.length)], s: 0.8 + rand() * 0.5 })
+      }
+    }
+  }
+  const palette = (n) => Array.from({ length: n }, () => FLOWER_COLORS[Math.floor(rand() * FLOWER_COLORS.length)])
+
+  // Parks: a round bed in the middle and four long ones around it.
+  city.parks.forEach((p) => {
+    const y = 0.16
+    bed(p.x, p.z, 5, 5, y, palette(3), true)
+    for (const [dx, dz, w, d] of [
+      [0, -8, 7, 1.6],
+      [0, 8, 7, 1.6],
+      [-8, 0, 1.6, 7],
+      [8, 0, 1.6, 7],
+    ]) {
+      if (clear(p.x + dx, p.z + dz, 0)) bed(p.x + dx, p.z + dz, w, d, y, palette(2))
+    }
+  })
+
+  // Sidewalk planters along the curb of ordinary blocks.
+  const parkSet = new Set(city.parks.map((p) => `${p.x},${p.z}`))
+  city.blocks.forEach((b) => {
+    if (b.w !== BLOCK || b.d !== BLOCK || parkSet.has(`${b.x},${b.z}`)) return
+    for (let side = 0; side < 4; side++) {
+      if (rand() > 0.45) continue
+      const along = (rand() - 0.5) * (BLOCK - 14)
+      const inset = BLOCK / 2 - 1.1
+      const alongX = side % 2 === 0
+      const x = b.x + (alongX ? along : side === 1 ? inset : -inset)
+      const z = b.z + (alongX ? (side === 0 ? -inset : inset) : along)
+      if (!clear(x, z, 1.6)) continue
+      bed(x, z, alongX ? 3.2 : 0.9, alongX ? 0.9 : 3.2, SIDEWALK_Y, palette(1 + Math.floor(rand() * 2)))
+    }
+  })
+
+  // Stop signs on the driver's right before every junction without lights.
+  for (let i = 0; i <= GX; i++) {
+    for (let j = 0; j <= GZ; j++) {
+      if (!hasStop(i, j)) continue
+      for (const [axis, dir] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]]) {
+        // Is there a road coming in from this side?
+        const incoming = axis === 'x' ? segmentValid('x', j, dir > 0 ? i - 1 : i) : segmentValid('z', i, dir > 0 ? j - 1 : j)
+        if (!incoming) continue
+        const ux = axis === 'x' ? dir : 0
+        const uz = axis === 'z' ? dir : 0
+        const k = ROAD / 2 + 0.9
+        const x = roadX(i) - ux * (k + 1.5) - uz * k
+        const z = roadZ(j) - uz * (k + 1.5) + ux * k
+        const sd = ROAD / 2 + 3.4
+        city.stopLines.push({ x: roadX(i) - ux * sd - uz * 3, z: roadZ(j) - uz * sd + ux * 3, along: axis === 'x' ? 'z' : 'x', len: 5.6 })
+        if (onLand(x, z)) city.stopSigns.push({ x, z, yaw: Math.atan2(-ux, -uz) })
+      }
+    }
+  }
+
+  // LASTMA wardens at some of the junctions with lights, on a corner.
+  const lit = []
+  for (let i = 1; i < GX; i++) for (let j = 1; j < GZ; j++) if (hasLight(i, j)) lit.push([i, j])
+  for (let n = 0; n < 9 && lit.length; n++) {
+    const [i, j] = lit.splice(Math.floor(rand() * lit.length), 1)[0]
+    const nx = roadX(i)
+    const nz = roadZ(j)
+    const sx = rand() < 0.5 ? 1 : -1
+    const sz = rand() < 0.5 ? 1 : -1
+    const x = nx + sx * (ROAD / 2 + 2.3)
+    const z = nz + sz * (ROAD / 2 + 1.1)
+    city.wardens.push({ x, z, nx, nz })
+    city.idlers.push({ x, z, y: SIDEWALK_Y, yaw: Math.atan2(nx - x, nz - z), role: 'warden' })
+  }
+}
+
 export function generateCity(seed = 2026) {
   const rand = mulberry32(seed)
   const city = {
@@ -180,6 +300,7 @@ export function generateCity(seed = 2026) {
     wanderAreas: [], // rectangles where shoppers mill about
     doors: [], // enterable buildings: { id, name, x, z } is the spot outside the door
     busStops: [],
+    foodSpots: [], // mama put stalls: { x, z, name, price, icon, color }
   }
 
   const addBuilding = (b) => {
@@ -361,6 +482,8 @@ export function generateCity(seed = 2026) {
         ][side]
         city.stalls.push({ x: sx, z: sz, rot, canopy: pick(rand, ['#d62f2f', '#f2c230', '#2f6fd6']), goods: ['#d43a1f', '#f5f0e1', '#8a5a2b'], size: 0.8 })
         city.idlers.push({ x: sx - Math.sin(rot) * 1.1, z: sz - Math.cos(rot) * 1.1, y: SIDEWALK_Y, yaw: rot, role: 'seller' })
+        // Every mama put sells something hot.
+        city.foodSpots.push({ x: sx, z: sz, ...FOODS[(city.foodSpots.length * 3) % FOODS.length] })
       }
 
       // Street lamp in the middle of the north edge.
@@ -416,6 +539,8 @@ export function generateCity(seed = 2026) {
       city.lamps.push({ x: x + 15, z: b.z + ROAD / 2 + 1.2 })
     }
   })
+
+  addStreetDetails(city, mulberry32(seed + 101))
 
   // Tunde lives in Surulere; his car is parked at the curb outside.
   const home = city.doors.find((d) => d.id === 'home')

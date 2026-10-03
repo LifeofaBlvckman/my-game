@@ -11,9 +11,14 @@ Rapier physics and Vite.
 - **Places:** markets, Lekki Grand Mall, clubs, bus stops, and buildings you
   can enter: Tunde's house, Club Eko, Kwilox, a gym, a church and a bank.
 - **Traffic:** danfos, kekes, sedans and jeeps with drivers, traffic lights,
-  horns and engine sounds. Danfos and kekes pick up passengers at bus stops.
+  stop signs, horns and engine sounds. Danfos and kekes pick up passengers at
+  bus stops. LASTMA wardens give you a star if they see you run a red light.
 - **Police:** wanted stars, chases, and officers who get out to arrest you.
-- **Six story jobs:** pepper delivery, church, a flash drive across the bridge,
+  Get out of sight (far away or behind buildings) and the stars blink, then
+  drop one at a time.
+- **Food:** buy jollof, suya, amala and more at mama put stalls (E) to get
+  health back.
+- **Six story jobs:** pepper delivery (with your nylon bag), church, a flash drive across the bridge,
   aso-ebi, driving a danfo, and a bank robbery.
 - **Side jobs on the Island** (blue markers), any time: a timed suya run, a
   checkpoint drive round Lekki, and a Bar Beach clean-up.
@@ -24,9 +29,11 @@ Rapier physics and Vite.
   burn and explode.
 - **Multiplayer:** see friends, chat, punch, and send emoji, in rooms of 16.
   Friends are pink dots on the radar; press **G** to go to them.
-- **Phones:** touch controls appear automatically.
+- **Phones:** simple touch controls appear automatically. Drag on the left
+  to move and on the right to look. One button does whatever is nearby, and
+  ☰ holds the rest.
 - **Look and sound:** two-tone shading, ink outlines, painted sky, birds, clear
-  water with fish, day and night, and synthesized music (calm theme or
+  water with fish, flower gardens, day and night, and synthesized music (calm theme or
   Afrobeats) with no audio files.
 
 ## Run it
@@ -63,7 +70,7 @@ minute.
 | Shift | Sprint | |
 | Space | Jump | Handbrake |
 | Click / X | Punch | |
-| E | Talk, use doors, sleep, work out, start or join a race | Start or join a race |
+| E | Talk, use doors, eat, sleep, work out, start or join a race | Start or join a race |
 | F | Get in or jack a car | Get out |
 | Q | | Horn |
 | 1 – 8 | Emoji | Emoji |

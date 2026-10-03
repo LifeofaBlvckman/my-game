@@ -1,4 +1,4 @@
-import { CELL, city, halfFor, hasLight, lanePoint, lineCount, mulberry32, nodeCount, nodeCoord, ROAD, roadX, roadZ, segmentValid } from './cityData'
+import { CELL, city, halfFor, hasLight, hasStop, lanePoint, lineCount, mulberry32, nodeCount, nodeCoord, ROAD, roadX, roadZ, segmentValid } from './cityData'
 import { lightFor } from './signals'
 import { VEHICLES } from './vehicleTypes'
 
@@ -57,6 +57,7 @@ export function setLane(v, axis, line, dir, p) {
   v.line = line
   v.dir = dir
   v.p = p
+  v.stoppedAt = null // stop sign already obeyed on this stretch
   // Next junction ahead along this road; turn around if the road ends.
   const f = (p + halfFor(axis)) / CELL
   v.node = dir > 0 ? Math.floor(f) + 1 : Math.ceil(f) - 1
@@ -240,9 +241,11 @@ function respawnNear(v, focus) {
   v.speed = VEHICLES[v.type].cruise * 0.6
 }
 
-// ctx: { focus, playerCar: {x,z} | null (only while driving), pedestrian: {x,z} | null, wanted }
+// ctx: { focus, playerCar: {x,z} | null (only while driving), pedestrian: {x,z} | null, wanted,
+//        chase: {x,z} where the police last saw you, hidden: they can't see you now }
 export function updateTraffic(dt, ctx) {
   const { focus, wanted } = ctx
+  const chase = ctx.chase ?? focus
   const chasers = wanted > 0 ? Math.min(POLICE, wanted + 1) : 0
   // The closest police cars join the chase.
   const police = vehicles.filter((v) => v.police && v.state !== 'parked')
@@ -273,16 +276,23 @@ export function updateTraffic(dt, ctx) {
     v.stall = Math.max(0, v.stall - dt)
     const stalled = v.stall > 0
 
+    // Chasing: head for where they last saw you. Once there with no sign of
+    // you, cruise the nearby streets looking (random turns).
+    let hunt = null
     if (v.chasing) {
-      if (dist > 260) respawnNear(v, focus)
-      if (v.state === 'lane' && dist < 24) v.state = 'direct'
+      const toChase = Math.hypot(v.x - chase.x, v.z - chase.z)
+      hunt = ctx.hidden && toChase < 14 ? null : chase
+      v.hunt = hunt
+      // Far behind while you're in view: a closer patrol car takes over.
+      if (dist > 260 && !ctx.hidden) respawnNear(v, focus)
+      if (v.state === 'lane' && hunt && toChase < 24) v.state = 'direct'
       if (v.state === 'direct') {
-        if (dist > 45) {
+        if (!hunt || toChase > 45) {
           snapToLane(v)
         } else {
-          const want = Math.atan2(focus.x - v.x, focus.z - v.z)
+          const want = Math.atan2(chase.x - v.x, chase.z - v.z)
           v.yaw += clamp(wrap(want - v.yaw), -2.6 * dt, 2.6 * dt)
-          const target = dist < 6 || stalled ? 0 : Math.min(24, dist * 1.4)
+          const target = toChase < 6 || stalled ? 0 : Math.min(24, toChase * 1.4)
           v.speed += clamp(target - v.speed, -20 * dt, 10 * dt)
           v.x += Math.sin(v.yaw) * v.speed * dt
           v.z += Math.cos(v.yaw) * v.speed * dt
@@ -294,7 +304,7 @@ export function updateTraffic(dt, ctx) {
       respawnNear(v, focus)
     }
 
-    const cruise = v.chasing ? 26 : def.cruise
+    const cruise = v.chasing ? (hunt ? 26 : 14) : def.cruise
 
     if (v.state === 'lane') {
       const entry = nodeCoord(v.axis, v.node) - v.dir * (ROAD / 2)
@@ -329,6 +339,16 @@ export function updateTraffic(dt, ctx) {
           const light = lightFor(v.axis)
           const mustStop = light === 'red' || (light === 'yellow' && toEntry > STOP_BACK + 4)
           if (mustStop && toEntry > STOP_BACK - 2) desired = Math.min(desired, Math.max(0, toEntry - STOP_BACK) * 1.2)
+        } else if (hasStop(I, J) && v.stoppedAt !== v.node) {
+          // Stop sign: come to a full stop at the line, wait a moment, go.
+          if (toEntry > STOP_BACK - 2) desired = Math.min(desired, Math.max(0, toEntry - STOP_BACK) * 1.2)
+          if (toEntry < STOP_BACK + 1.5 && v.speed < 0.6) {
+            v.stopWait = (v.stopWait ?? 0) + dt
+            if (v.stopWait > 0.9) {
+              v.stoppedAt = v.node
+              v.stopWait = 0
+            }
+          }
         }
         const beforeQueue = desired
         const gap = leaderGap(v)
@@ -352,7 +372,7 @@ export function updateTraffic(dt, ctx) {
       const pt = lanePoint(v.axis, v.line, v.dir, v.p)
       v.x = pt.x
       v.z = pt.z
-      if ((entry - v.p) * v.dir <= 0) startTurn(v, v.chasing ? focus : null)
+      if ((entry - v.p) * v.dir <= 0) startTurn(v, v.chasing ? v.hunt : null)
     } else if (v.state === 'turn') {
       const t = v.turn
       const turning = !t.next.straight

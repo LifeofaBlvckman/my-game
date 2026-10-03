@@ -79,12 +79,16 @@
 }
 
 .stars.active .on {
+  color: #ffd23a;
+}
+.stars.evading .on {
   animation: flash 0.5s steps(2) infinite;
 }
 
 @keyframes flash {
   50% {
-    color: #ffd23a;
+    color: rgba(0, 0, 0, 0.35);
+    text-shadow: none;
   }
 }
 
@@ -478,7 +482,7 @@
   margin-top: 8px;
 }
 
-/* --- Touch controls (phones and tablets) --- */
+/* --- Touch controls (phones and tablets), in Messenger's quiet style --- */
 .touch {
   position: absolute;
   inset: 0;
@@ -487,160 +491,276 @@
   -webkit-user-select: none;
   touch-action: none;
 }
+.move-zone,
 .look-zone {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 24%;
   bottom: 0;
-  width: 60%;
   pointer-events: auto;
   touch-action: none;
 }
-.stick-zone {
-  position: absolute;
+.move-zone {
   left: 0;
-  bottom: 0;
-  width: 40%;
-  height: 60%;
-  pointer-events: auto;
-  touch-action: none;
+  width: 50%;
+}
+.look-zone {
+  right: 0;
+  width: 50%;
 }
 .stick {
   position: fixed;
-  width: 120px;
-  height: 120px;
-  margin: -60px 0 0 -60px;
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 -56px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-  border: 3px solid rgba(29, 26, 36, 0.55);
-}
-.stick.idle {
-  position: absolute;
-  left: 100px;
-  top: auto;
-  bottom: 40px;
-  margin: 0 0 0 -60px;
-  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.5);
 }
 .knob {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 54px;
-  height: 54px;
-  margin: -27px 0 0 -27px;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.85);
-  border: 3px solid #1d1a24;
+  border: 2px solid #3d4a5c;
 }
-.touch-buttons {
+.touch-actions {
   position: absolute;
-  right: 16px;
-  bottom: 24px;
-  display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 12px;
-  align-items: end;
-  pointer-events: auto;
-}
-.touch-top {
-  position: absolute;
-  right: 16px;
-  top: 128px;
+  right: 18px;
+  bottom: calc(22px + env(safe-area-inset-bottom));
   display: flex;
-  flex-direction: column;
-  gap: 10px;
   align-items: flex-end;
+  gap: 12px;
   pointer-events: auto;
 }
 .touch-btn {
-  width: 64px;
-  height: 64px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  border: 3px solid #1d1a24;
-  background: rgba(255, 255, 255, 0.86);
-  color: #1d1a24;
-  font: bold 14px Arial, Helvetica, sans-serif;
-  letter-spacing: 1px;
+  border: 2px solid #3d4a5c;
+  background: rgba(246, 246, 242, 0.92);
+  box-shadow: 3px 3px 0 #3d4a5c;
+  color: #3d4a5c;
+  font: bold 11px Arial, Helvetica, sans-serif;
   text-shadow: none;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
-.touch-btn:active {
-  background: #ffd23a;
+.touch-btn .icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.touch-btn .label {
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
 }
 .touch-btn.big {
-  width: 84px;
-  height: 84px;
-  font-size: 34px;
+  width: 78px;
+  height: 78px;
+}
+.touch-btn.big .icon {
+  font-size: 32px;
 }
 .touch-btn.small {
-  width: 46px;
-  height: 46px;
-  font-size: 20px;
+  order: -1;
+  margin-bottom: 6px;
+}
+.touch-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #3d4a5c;
 }
 .touch-btn.glow {
-  background: #ffd23a;
-  box-shadow: 0 0 0 4px rgba(255, 210, 58, 0.4);
+  background: #ffe38a;
 }
-.emoji-picker {
+.action-caption {
+  position: absolute;
+  right: 0;
+  bottom: 92px;
+  max-width: 62vw;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(17, 17, 17, 0.7);
+  font: bold 12px Arial, Helvetica, sans-serif;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Square icon buttons down the right edge, like Messenger's. */
+.touch-side {
+  position: absolute;
+  right: 14px;
+  top: 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+}
+.sq-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  border: 2px solid #3d4a5c;
+  background: #f6f6f2;
+  box-shadow: 4px 4px 0 #3d4a5c;
+  color: #3d4a5c;
+  font: bold 22px Arial, Helvetica, sans-serif;
+  text-shadow: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.sq-btn.active {
+  background: #ffe38a;
+}
+.menu-sheet,
+.emoji-grid {
+  position: absolute;
+  right: 72px;
+  top: 30%;
+  pointer-events: auto;
+  border-radius: 12px;
+  border: 2px solid #3d4a5c;
+  background: #f6f6f2;
+  box-shadow: 5px 5px 0 #3d4a5c;
+  color: #3d4a5c;
+  text-shadow: none;
+}
+.menu-sheet {
+  width: min(250px, 66vw);
+  padding: 8px;
+}
+.menu-title {
+  padding: 6px 8px 8px;
+  font: bold 12px Arial, Helvetica, sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #6a7686;
+}
+.menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-top: 1px solid #dcdcd4;
+  background: none;
+  color: #3d4a5c;
+  font: bold 15px Arial, Helvetica, sans-serif;
+  text-align: left;
 }
-.emoji-list {
-  display: flex;
-  flex-wrap: wrap;
-  width: 176px;
+.menu-item span {
+  width: 24px;
+  font-size: 18px;
+  text-align: center;
+}
+.menu-item:disabled {
+  opacity: 0.4;
+}
+.menu-help {
+  margin: 4px 8px 8px;
+  font: 13px/1.4 Arial, Helvetica, sans-serif;
+}
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
   gap: 4px;
-  padding: 6px;
-  border-radius: 14px;
-  border: 3px solid #1d1a24;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 8px;
 }
-.emoji-list button {
-  width: 38px;
-  height: 38px;
-  font-size: 24px;
+.emoji-grid button {
+  width: 44px;
+  height: 44px;
   border: 0;
   background: none;
-  touch-action: none;
+  font-size: 26px;
 }
-/* With touch controls the radar moves up out of the joystick's way, and the
-   chat sits above it. */
+/* Phone HUD: radar small at top left, stats top right, the job underneath,
+   nothing overlapping. */
 .hud.is-touch .radar {
-  top: 12px;
+  top: calc(10px + env(safe-area-inset-top));
   bottom: auto;
-  left: 12px;
-  transform: scale(0.6);
+  left: 10px;
+  transform: scale(0.56);
   transform-origin: top left;
 }
-.hud.is-touch .help {
-  top: 128px;
-  left: 12px;
-  max-width: 46vw;
+.hud.is-touch .top-right {
+  top: calc(10px + env(safe-area-inset-top));
+  right: 12px;
 }
-.hud.is-touch .chat {
-  bottom: 190px;
+.hud.is-touch .clock {
+  font-size: 22px;
+}
+.hud.is-touch .bar {
+  width: 110px;
+}
+.hud.is-touch .money {
+  font-size: 18px;
+}
+.hud.is-touch .stars {
+  font-size: 16px;
 }
 .hud.is-touch .online {
-  top: 116px;
+  top: calc(108px + env(safe-area-inset-top));
   bottom: auto;
   left: 12px;
+  font-size: 10px;
+}
+.hud.is-touch .online .meet {
+  display: none;
 }
 .hud.is-touch .objective {
-  top: 12px;
+  top: calc(124px + env(safe-area-inset-top));
   bottom: auto;
-  max-width: 44vw;
+  left: 12px;
+  right: auto;
+  transform: none;
+  max-width: 72vw;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  text-align: left;
+}
+.hud.is-touch .objective span {
+  font-size: 9px;
+}
+.hud.is-touch .race-panel {
+  top: calc(176px + env(safe-area-inset-top));
+  font-size: 12px;
+}
+.hud.is-touch .help {
+  display: none;
 }
 .hud.is-touch .speed {
+  top: calc(124px + env(safe-area-inset-top));
   bottom: auto;
-  top: 230px;
-  right: 16px;
-  font-size: 20px;
+  right: 12px;
+  font-size: 16px;
 }
 .hud.is-touch .banner {
-  bottom: 200px;
+  left: 16px;
+  right: auto;
+  bottom: auto;
+  top: 34%;
+  font-size: 26px;
+}
+.hud.is-touch .chat {
+  bottom: auto;
+  top: calc(176px + env(safe-area-inset-top));
+  left: 12px;
+  width: 58vw;
+  font-size: 12px;
+}
+.hud.is-touch .subtitle {
+  bottom: 120px;
 }
 .name-field input,
 .chat input {
@@ -679,8 +799,4 @@
   font-size: 11px;
   letter-spacing: 2px;
   color: #ffd23a;
-}
-.hud.is-touch .race-panel {
-  top: 80px;
-  font-size: 13px;
 }

@@ -20,7 +20,17 @@ export default function CameraRig() {
 
   useEffect(() => {
     const canvas = gl.domElement
-    const lock = () => useGame.getState().phase === 'playing' && canvas.requestPointerLock?.()
+    // Mouse look: capture the pointer on click. Phones and tablets don't
+    // support pointer lock (Android rejects it), and use touch controls anyway.
+    const touch = window.matchMedia?.('(pointer: coarse)').matches
+    const lock = () => {
+      if (touch || useGame.getState().phase !== 'playing') return
+      try {
+        canvas.requestPointerLock?.()?.catch?.(() => {})
+      } catch {
+        // not supported here
+      }
+    }
     const onMove = (e) => {
       if (document.pointerLockElement !== canvas) return
       world.cameraYaw -= e.movementX * 0.0025

@@ -5,6 +5,7 @@ import { Physics } from '@react-three/rapier'
 import City from './game/City'
 import Landmarks from './game/Landmarks'
 import TrafficLights from './game/TrafficLights'
+import StreetDetails from './game/StreetDetails'
 import Traffic from './game/Traffic'
 import Pedestrians from './game/Pedestrians'
 import NamedNpcs from './game/NamedNpcs'
@@ -28,10 +29,14 @@ import { useGame } from './game/state'
 // screen's own sharpness (up to 1.5x on Retina screens) and steps down if
 // the frame rate struggles. Real shadows go first, before it drops below one
 // pixel per screen point, so the picture stays sharp on an older laptop.
-// Phones get a lighter start: their screens are dense but their GPUs are small.
+// Phones have small, very dense screens: anything under about 1.25x looks
+// pixelated there, so they start at up to 2x and never drop below 1.25x
+// (shadows are already off on phones).
 const PHONE = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
-const DEVICE_SCALE = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, PHONE ? 1.25 : 1.5)
-const RENDER_STEPS = [...new Set([DEVICE_SCALE, 1.25, 1, 0.85].filter((v) => v <= DEVICE_SCALE))]
+const DPR = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
+const DEVICE_SCALE = Math.min(DPR, PHONE ? 2 : 1.5)
+const STEPS = PHONE ? [DEVICE_SCALE, 1.75, 1.5, 1.25] : [DEVICE_SCALE, 1.25, 1, 0.85]
+const RENDER_STEPS = [...new Set(STEPS.filter((v) => v <= DEVICE_SCALE))]
 
 export default function App() {
   const outlines = useGame((s) => s.outlines)
@@ -59,8 +64,11 @@ export default function App() {
           }}
           onIncline={() => setStep((k) => Math.max(0, k - 1))}
           onFallback={() => {
-            useGame.setState({ shadows: false })
-            setStep(RENDER_STEPS.indexOf(1))
+            // Still struggling after several tries: settle on the cheapest
+            // settings (on phones that includes the ink-line pass).
+            useGame.setState(PHONE ? { shadows: false, outlines: false } : { shadows: false })
+            const one = RENDER_STEPS.indexOf(1)
+            setStep(one >= 0 ? one : RENDER_STEPS.length - 1)
           }}
         />
         <ShadowCasters />
@@ -71,6 +79,7 @@ export default function App() {
             <City />
             <Landmarks />
             <TrafficLights />
+            <StreetDetails />
             <Traffic />
             <Pedestrians />
             <NamedNpcs />

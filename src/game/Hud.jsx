@@ -227,9 +227,11 @@ function RacePanel({ race }) {
   )
 }
 
-function Stars({ wanted }) {
+// Steady while the police can see you; blinking while you're out of sight
+// and getting away.
+function Stars({ wanted, evading }) {
   return (
-    <div className={`stars ${wanted > 0 ? 'active' : ''}`}>
+    <div className={`stars ${wanted > 0 ? 'active' : ''} ${evading ? 'evading' : ''}`}>
       {[0, 1, 2, 3, 4].map((i) => (
         <span key={i} className={i < wanted ? 'on' : ''}>
           ★
@@ -267,7 +269,7 @@ export default function Hud() {
               <div className="fill health" style={{ width: `${game.health}%` }} />
             </div>
             <div className="money">₦{String(game.money).padStart(8, '0')}</div>
-            <Stars wanted={game.wanted} />
+            <Stars wanted={game.wanted} evading={game.evading} />
           </div>
 
           {game.race && game.race.phase !== 'watching' && !game.dialogue && <RacePanel race={game.race} />}

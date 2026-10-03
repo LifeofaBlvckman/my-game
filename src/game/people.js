@@ -33,6 +33,8 @@ export function randomLook(rand, overrides = {}) {
 }
 
 // Nigeria Police Force: dark uniform and cap.
+// LASTMA traffic warden: lemon shirt, maroon trousers and beret.
+export const WARDEN_LOOK = { face: 2, female: false, top: '#f2dc3a', bottom: '#6b1f2e', hair: 'cap', hairColor: '#6b1f2e', skin: '#4a2c1c', robe: false, height: 1.0, shoes: '#111111' }
 export const COP_LOOK = { face: 5, female: false, top: '#1c2333', bottom: '#1c2333', hair: 'cap', hairColor: '#1c2333', skin: '#5a3624', robe: false, height: 1.02, shoes: '#111111' }
 
 export function lookFromSeed(seed, overrides) {
@@ -238,4 +240,38 @@ export function jointMatrices(p, J) {
     R(T(J[`shin${side}`].copy(leg), 0, -THIGH, 0), p[`shin${side}`], 0, 0)
   }
   return J
+}
+
+// Things carried in the right hand, on the forearm joint (the hand is at
+// y = -0.27). Each: [shape, offset, size, color]; color null = the food's.
+export const CARRY = {
+  // A black "nylon" bag with tatashe peeking out of the top.
+  nylon: [
+    ['sphere', [0, -0.5, 0.03], [0.27, 0.3, 0.2], '#1f1f26'],
+    ['capsule', [0.045, -0.34, 0.03], [0.025, 0.13, 0.025], '#1f1f26'],
+    ['capsule', [-0.045, -0.34, 0.03], [0.025, 0.13, 0.025], '#1f1f26'],
+    ['sphere', [0.04, -0.38, 0.05], [0.09, 0.09, 0.09], '#d62f2f'],
+    ['sphere', [-0.04, -0.375, 0.02], [0.08, 0.08, 0.08], '#f05a1e'],
+  ],
+  drive: [['rbox', [0, -0.29, 0.06], [0.04, 0.09, 0.02], '#2f6fd6']],
+  cloth: [
+    ['rbox', [0, -0.34, 0.09], [0.32, 0.1, 0.24], '#d4af37'],
+    ['rbox', [0, -0.28, 0.09], [0.3, 0.05, 0.22], '#6a1b9a'],
+  ],
+  moneybag: [
+    ['sphere', [0, -0.52, 0.02], [0.32, 0.36, 0.3], '#c9b27a'],
+    ['sphere', [0, -0.34, 0.02], [0.09, 0.07, 0.09], '#8a6a3a'],
+  ],
+  suya: [
+    ['rbox', [0, -0.32, 0.08], [0.13, 0.06, 0.22], '#f2efe8'],
+    ['rbox', [0, -0.29, 0.08], [0.11, 0.03, 0.19], '#8a3b1f'],
+  ],
+  // A bowl of whatever you bought, held up to eat.
+  food: [
+    ['sphere', [0, -0.3, 0.1], [0.17, 0.08, 0.17], '#f4f1ea'],
+    ['sphere', [0, -0.27, 0.1], [0.14, 0.05, 0.14], null],
+  ],
+}
+for (const parts of Object.values(CARRY)) {
+  parts.forEach((p, i) => (parts[i] = { shape: p[0], joint: 'foreR', size: p[2], color: p[3], local: new Matrix4().compose(new Vector3(...p[1]), new Quaternion(), new Vector3(...p[2])) }))
 }

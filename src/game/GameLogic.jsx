@@ -2,14 +2,14 @@ import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { Quaternion, Vector3 } from 'three'
-import { city, ISLAND, MAINLAND, zoneAt } from './cityData'
+import { city, ISLAND, MAINLAND, ROAD, zoneAt } from './cityData'
 import { setLane, swapWithPlayerCar, vehicles } from './trafficSim'
 import { alightRiders, callBoarders, copsGrabbing, deployCop, ejectDriver, npcNear, npcs, punchNpc, recallCops, resumeCops, setCarArrestReach, waitingCounts } from './crowd'
 import { WORLD } from './City'
 import { INTERIORS, mapSpot, roomExit, roomPoint, roomSpawn } from './rooms'
 import { activeJob, activeTarget, CHATTER, NPCS, QUESTS, SIDE_JOBS, STRANGER_LINES } from './quests'
 import { VEHICLES } from './vehicleTypes'
-import { alarm, blip, bust, clang, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn } from './audio'
+import { alarm, blip, bust, clang, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn, whistle } from './audio'
 import { CAR_HP, damagePlayerCar, damageVehicle, hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
@@ -17,6 +17,8 @@ import { emote } from './emotes'
 import { raceMarkers, racePrompt, raceInteract, RACES, setRaceHooks, updateRace } from './racing'
 export { raceInteract }
 import { addChat } from './net'
+import { lightFor, signals } from './signals'
+import { lineOfSight } from './sight'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -41,11 +43,89 @@ function addWanted(n) {
   const { wanted } = useGame.getState()
   const next = Math.min(5, wanted + n)
   if (next !== wanted) useGame.setState({ wanted: next })
-  world.calm = 0
+  // A fresh crime: they know exactly where you are.
+  world.escape = 0
+  world.seenFor = 1.5
+}
+
+// LASTMA wardens book anyone they see driving through a red light.
+function checkRedLights(game) {
+  const inBox = new Set()
+  // (Not during a street race: the city turns a blind eye.)
+  if (game.mode === 'car' && world.car && !game.race && Math.abs(world.carSpeed) > 4) {
+    const c = world.car.translation()
+    for (const w of city.wardens) {
+      if (Math.abs(c.x - w.nx) > 42 || Math.abs(c.z - w.nz) > 42) continue
+      const inside = Math.abs(c.x - w.nx) < ROAD / 2 && Math.abs(c.z - w.nz) < ROAD / 2
+      if (!inside) continue
+      inBox.add(w)
+      if (world.redBox?.has(w)) continue
+      // Just drove into the junction: which way, and was that way red?
+      const h = world.carHeading ?? 0
+      const axis = Math.abs(Math.sin(h)) > Math.abs(Math.cos(h)) ? 'x' : 'z'
+      if (lightFor(axis) === 'red' && Math.hypot(c.x - w.x, c.z - w.z) < 40) {
+        addWanted(1)
+        message('LASTMA SAW YOU RUN THE RED LIGHT!', '#ff6b6b', 3000)
+        whistle()
+      }
+    }
+  }
+  world.redBox = inBox
+}
+
+// Losing the police. They chase where they last saw you, not where you are:
+// get out of sight (far enough away, or behind buildings) and stay hidden,
+// and the stars blink and drop one at a time. Hiding indoors doesn't count.
+const SEE_FAR = 60 // m: cars with a clear view see you this far
+const SEE_NEAR = 18 // m: this close they hear the engine or see you round a corner
+const escapeTime = (wanted) => 6 + wanted * 1.5 // s out of sight per star
+let sightCheck = 0
+
+function copCanSee(x, z, focus, far) {
+  const d = Math.hypot(x - focus.x, z - focus.z)
+  return d < SEE_NEAR || (d < far && lineOfSight(x, z, focus.x, focus.z))
+}
+
+function updateEscape(game, dt, focus) {
+  if (game.wanted === 0) {
+    world.lastSeen = null
+    world.escape = 0
+    if (game.evading) useGame.setState({ evading: false })
+    return
+  }
+  // A few line-of-sight checks a second is plenty.
+  sightCheck -= dt
+  if (sightCheck <= 0 || !world.lastSeen) {
+    sightCheck = 0.2
+    let seen = game.inside ? false : vehicles.some((v) => v.chasing && !v.burning && copCanSee(v.x, v.z, focus, SEE_FAR))
+    if (!seen && !game.inside) seen = npcs.some((n) => n.kind === 'cop' && n.active && n.down <= 0 && copCanSee(n.x, n.z, focus, 35))
+    world.copsSee = seen
+  }
+  world.seenFor = Math.max(0, (world.seenFor ?? 0) - dt)
+  const seen = world.copsSee || world.seenFor > 0 || !world.lastSeen
+  if (seen) {
+    world.lastSeen = { x: focus.x, z: focus.z }
+    world.escape = 0
+  } else if (!game.inside) {
+    // Lying low right where they last saw you works, but slowly: they're
+    // searching that area. Getting well away counts in full.
+    const away = Math.hypot(focus.x - world.lastSeen.x, focus.z - world.lastSeen.z)
+    world.escape = (world.escape ?? 0) + dt * (away > 45 ? 1 : 0.4)
+    if (world.escape > escapeTime(game.wanted)) {
+      world.escape = 0
+      const wanted = game.wanted - 1
+      useGame.setState({ wanted })
+      if (wanted === 0) message('YOU LOST THEM', '#7cff9a', 3000)
+    }
+  }
+  const evading = !seen
+  if (evading !== game.evading) useGame.setState({ evading })
 }
 
 // A step is starting: reset its counters and start its clock, if it has one.
 function startStep(def) {
+  // Being handed something for this step (the pepper, the flash drive...).
+  if (def?.handed) setTimeout(() => banner(def.handed), 1800)
   world.holdTime = 0
   world.stepDeadline = def?.time ? performance.now() + def.time * 1000 : null
   useGame.setState({ jobProgress: 0, collected: [], timer: def?.time ?? null })
@@ -228,6 +308,48 @@ export function goToFriend() {
   })
 }
 
+// --- Food ---
+// Stand at a mama put stall and press E: pay, eat for a few seconds, and get
+// some health back.
+export function nearFood() {
+  if (useGame.getState().inside) return null
+  let best = null
+  let bestD = 3
+  for (const f of city.foodSpots) {
+    const d = Math.hypot(f.x - world.focus.x, f.z - world.focus.z)
+    if (d < bestD) {
+      best = f
+      bestD = d
+    }
+  }
+  return best
+}
+
+const EAT_TIME = 3 // seconds
+function buyFood(food) {
+  const game = useGame.getState()
+  if (world.eating) return
+  if (game.money < food.price) return message('NOT ENOUGH MONEY', '#ff6b6b', 2000)
+  useGame.setState({ money: game.money - food.price })
+  world.eating = { t: EAT_TIME, food }
+  useGame.setState({ subtitle: { speaker: 'Mama Put', text: `Your ${food.name}, hot hot! ${naira(food.price)}.`, key: ++bannerKey } })
+  const key = bannerKey
+  setTimeout(() => useGame.getState().subtitle?.key === key && useGame.setState({ subtitle: null }), 2500)
+}
+
+function updateEating(dt) {
+  const e = world.eating
+  if (!e) return
+  e.t -= dt
+  if (e.t <= 0) {
+    world.eating = null
+    const health = Math.min(100, useGame.getState().health + e.food.health)
+    useGame.setState({ health })
+    jingle()
+    message(`YUM! ${e.food.name.toUpperCase()}\n+${e.food.health} HEALTH`, '#7ee07e', 2200)
+  }
+}
+
 const nearDoor = (from) => city.doors.find((d) => Math.hypot(d.x - from.x, d.z - from.z) < 2.4)
 function nearExit() {
   const id = useGame.getState().inside
@@ -363,6 +485,9 @@ function interact() {
     }
     return
   }
+  // A mama put stall: buy something to eat.
+  const food = nearFood()
+  if (food) return buyFood(food)
   // Anyone else on the street just says something short.
   let best = null
   let bestD = 2.2
@@ -630,7 +755,8 @@ export default function GameLogic() {
         if (v.chasing && !v.officerOut && flat(v, world.focus) < 14) deployCop(v, world.focus)
       }
     }
-    if (game.wanted === 0 || (!onFoot && !carStopped)) recallCops()
+    // Officers on foot who lose sight of you go back to their car.
+    if (game.wanted === 0 || game.evading || (!onFoot && !carStopped)) recallCops()
     else resumeCops()
     if (game.wanted > 0) {
       // An officer has to get hold of you, on foot or through the car door.
@@ -640,13 +766,9 @@ export default function GameLogic() {
         t.busting = 0
         getBusted()
       }
-      // Hiding inside doesn't count: you have to get out and lose them.
-      world.calm = nearestCop < 70 || game.inside ? 0 : (world.calm ?? 0) + dt
-      if (world.calm > 18) {
-        world.calm = 0
-        useGame.setState({ wanted: game.wanted - 1 })
-      }
     }
+    updateEscape(game, dt, copsAim)
+    checkRedLights(game)
 
     // Passengers: stop your danfo or keke at a bus stop to let riders off
     // (they pay) and take on whoever is waiting.
@@ -680,8 +802,15 @@ export default function GameLogic() {
     world.objective = target && target.x !== undefined ? { x: target.x, z: target.z } : null
     // Racing: the race's checkpoints take over the radar marker.
     updateRace()
+    updateEating(dt)
     const active = activeJob(game)
     const stepDef = active?.job.steps[active.step]
+    // What's in Tunde's hand: food while eating, else whatever this job step
+    // has him carry (Mama Nkechi's nylon of pepper, the flash drive...).
+    const carry = world.eating ? 'food' : game.mode === 'foot' ? (stepDef?.carry ?? null) : null
+    const carryColor = world.eating?.food.color ?? null
+    world.carry = carry && carry !== 'food'
+    if (carry !== game.carry || carryColor !== game.carryColor) useGame.setState({ carry, carryColor })
     // Timed steps: the clock runs out and the job is off.
     if (world.stepDeadline) {
       const left = Math.max(0, Math.ceil((world.stepDeadline - performance.now()) / 1000))
@@ -788,21 +917,33 @@ export default function GameLogic() {
     if (t.hud < 0.1) return
     t.hud = 0
     const kmh = Math.round(Math.abs(world.carSpeed ?? 0) * 3.6)
+    // The prompt in the corner, and (for the phone's action button) what
+    // pressing it would do: { key, icon, label }.
     let prompt = null
+    let action = null
+    const act = (key, icon, label) => (action = { key, icon, label })
     if (game.mode === 'foot' && !game.dialogue) {
       const npc = nearestNamedNpc(world.focus)
       const car = !npc && !game.inside && nearestVehicle(world.focus)
       const door = !game.inside && nearDoor(world.focus)
       const thing = nearUsable()
-      if (game.inside && nearExit()) prompt = 'Press E to go outside'
-      else if (thing === 'bed') prompt = 'Press E to sleep until morning'
-      else if (thing === 'bench') prompt = 'Press E to work out'
-      else if (door) prompt = `Press E to enter ${door.name}`
-      else if (npc) prompt = `Press E to talk to ${npc.n.name}`
+      if (game.inside && nearExit()) (prompt = 'Press E to go outside'), act('KeyE', '🚪', 'Exit')
+      else if (thing === 'bed') (prompt = 'Press E to sleep until morning'), act('KeyE', '🛏️', 'Sleep')
+      else if (thing === 'bench') (prompt = 'Press E to work out'), act('KeyE', '🏋️', 'Lift')
+      else if (door) (prompt = `Press E to enter ${door.name}`), act('KeyE', '🚪', 'Enter')
+      else if (npc) (prompt = `Press E to talk to ${npc.n.name}`), act('KeyE', '💬', 'Talk')
       else if (car?.wrecked) prompt = 'This car is wrecked. Find another one.'
-      else if (car) prompt = `Press F to ${car.own ? 'enter' : 'jack'} the ${VEHICLES[car.type].name}`
+      else if (car) (prompt = `Press F to ${car.own ? 'enter' : 'jack'} the ${VEHICLES[car.type].name}`), act('KeyF', '🚗', car.own ? 'Drive' : 'Jack')
+      else {
+        const food = nearFood()
+        if (food) (prompt = `Press E to buy ${food.name} (${naira(food.price)})`), act('KeyE', food.icon, 'Eat')
+      }
     }
-    if (!prompt && !game.dialogue && !game.inside) prompt = racePrompt()
+    if (!prompt && !game.dialogue && !game.inside) {
+      prompt = racePrompt()
+      if (prompt?.startsWith('Press E')) act('KeyE', '🏁', 'Race')
+    }
+    if (JSON.stringify(action) !== JSON.stringify(game.action)) useGame.setState({ action })
     const carHp = Math.round(world.carHp ?? CAR_HP)
     if (kmh !== game.speed || prompt !== game.prompt || carHp !== game.carHp) useGame.setState({ speed: kmh, prompt, carHp })
   })
@@ -860,10 +1001,19 @@ export default function GameLogic() {
       },
       setTime: (hours) => (world.time = hours * 60),
       setWanted: (n) => useGame.setState({ wanted: n }),
+      setSignals: (t) => (signals.t = t),
+      placeCar: (x, z, yaw) => {
+        world.carSkipCrash = performance.now() + 800
+        world.car.setTranslation({ x, y: 1, z }, true)
+        world.car.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, true)
+        world.car.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      },
+      details: () => ({ parks: city.parks, wardens: city.wardens, stopSigns: city.stopSigns, beds: city.flowerBeds }),
+      escape: () => ({ seen: world.copsSee, escape: world.escape, lastSeen: world.lastSeen, evading: useGame.getState().evading, wanted: useGame.getState().wanted, message: useGame.getState().message?.text }),
       setShadows: (on) => useGame.setState({ shadows: on }),
       // Point the camera (yaw 0 looks from +z) and hold it there for a while.
       setCamera: (yaw, pitch = 0.3, distance) => Object.assign(world, { cameraYaw: yaw, cameraPitch: pitch, debugCamDistance: distance, lastMouseMove: performance.now() + 60000 }),
-      vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut, yaw: v.yaw, blockedBy: v.blockedBy, riders: v.riders?.length ?? 0, dwell: v.dwell })),
+      vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut, yaw: v.yaw, blockedBy: v.blockedBy, riders: v.riders?.length ?? 0, dwell: v.dwell, stopWait: v.stopWait })),
       waiting: () => waitingCounts(),
       // Put an NPC danfo on the road just before a bus stop.
       busToStop: (name) => {
@@ -899,6 +1049,7 @@ export default function GameLogic() {
         return m && m.current
       },
       raceStart: (id) => RACES[id].start,
+      foodSpots: () => city.foodSpots,
       sideJobs: () => SIDE_JOBS.map((j) => ({ title: j.title, giver: j.giver, pos: NPCS[j.giver].pos })),
       enterRoom: (id) => placeInRoom(id),
       leaveRoom: () => useGame.getState().inside && placeOutside(useGame.getState().inside),

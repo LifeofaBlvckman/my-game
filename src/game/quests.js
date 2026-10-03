@@ -139,6 +139,8 @@ export const QUESTS = [
       {
         npc: 'basira',
         objective: 'DELIVER THE PEPPER TO IYA BASIRA IN YABA',
+        carry: 'nylon', // a black nylon bag full of tatashe
+        handed: 'MAMA NKECHI HANDS YOU A NYLON OF PEPPER',
         talk: [
           line('Iya Basira', 'Ah, Mama Nkechi pepper! God bless you my son.'),
           line('Iya Basira', 'Take this small change. And come chop amala any time you hungry.'),
@@ -191,6 +193,8 @@ export const QUESTS = [
       {
         npc: 'tobi',
         objective: 'BRING THE FLASH DRIVE BACK TO DJ TOBI AT CLUB EKO',
+        carry: 'drive',
+        handed: 'CHIDI HANDS YOU THE FLASH DRIVE',
         talk: [
           line('DJ Tobi', 'My guy! You don save my life. Tonight go loud!'),
           line('DJ Tobi', 'Take this. And you fit enter Club Eko any time, just tell the bouncer say na me send you.'),
@@ -219,6 +223,8 @@ export const QUESTS = [
       {
         npc: 'funke',
         objective: 'TAKE THE ASO-EBI TO AUNTY FUNKE AT OWAMBE LOUNGE',
+        carry: 'cloth',
+        handed: 'EMEKA HANDS YOU THE ASO-EBI',
         talk: [
           line('Aunty Funke', 'Ah! See fine cloth! Emeka try this time.'),
           line('Aunty Funke', 'Here, take something for transport. Make you come dance o!'),
@@ -261,10 +267,11 @@ export const QUESTS = [
     steps: [
       { enter: 'bank', objective: 'GO INTO NO WAHALA BANK ON LAGOS ISLAND' },
       { hold: 'bank', seconds: 8, objective: 'STAND AT THE COUNTER WHILE THE BAG FILLS', alarm: true },
-      { lose: true, objective: 'GET OUT AND LOSE THE POLICE' },
+      { lose: true, objective: 'GET OUT AND LOSE THE POLICE', carry: 'moneybag', handed: 'YOU GRAB THE BAG OF MONEY' },
       {
         goto: HIDEOUT,
         objective: "BRING THE BAG TO SKIDO'S GARAGE IN IKEJA",
+        carry: 'moneybag',
         talk: [
           line('Skido (phone)', 'Na you be this? Clean work! Nobody follow you?'),
           line('Skido (phone)', 'Your share don drop. Lie low small, the whole Lagos dey find that bag now.'),
@@ -304,6 +311,7 @@ export const SIDE_JOBS = [
         goto: { x: blockX(I(4)) + 4, z: front(1) + 1 },
         time: 35,
         objective: 'RUN THE HOT SUYA TO THE IKOYI OFFICE',
+        carry: 'suya',
         talk: [line('Office Guard', 'Suya! E still dey hot. Oga go happy. Take your money.')],
       },
     ],
@@ -339,6 +347,7 @@ export const SIDE_JOBS = [
         collect: Array.from({ length: 6 }, (_, k) => ({ x: ISLAND.minX + 25 + k * 40 + (k % 2) * 9, z: beachZ + ((k * 7) % 3 - 1) * 8 })),
         time: 70,
         objective: 'PICK UP THE BOTTLES ON BAR BEACH',
+        carry: 'nylon',
         talk: [line('Aunty Bisi', 'God bless you! The beach fine again. Take this small something.')],
       },
     ],

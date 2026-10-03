@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { EMOTES, emote } from './emotes'
 import { useGame, world } from './state'
 
-// On-screen controls for phones and tablets. They press the same keys the
-// keyboard would, so the rest of the game doesn't need to know:
-//  - left thumb: a joystick (W A S D; pushed all the way it sprints)
-//  - right thumb: drag anywhere to look around
-//  - buttons: punch, jump/handbrake, talk/door, car, horn, emoji
+// On-screen controls for phones and tablets, kept as quiet as Messenger's:
+//  - left half: put a thumb down anywhere and drag to move (the stick only
+//    shows while you're touching; push it all the way to sprint)
+//  - right half: drag to look around
+//  - one big action button that becomes whatever makes sense right now
+//    (talk, enter, drive, eat, race... or punch), and a small jump button
+//  - two square buttons: ☰ for the rest (friends, chat, music, help) and 😀
+// They press the same keys the keyboard would, so the game doesn't need to know.
 export const isTouch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window)
 
 const held = new Set()
@@ -16,10 +19,14 @@ function key(code, down) {
   else held.delete(code)
   window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code }))
 }
+const tap = (code) => {
+  key(code, true)
+  setTimeout(() => key(code, false), 80)
+}
 
-const STICK = 56 // px from the center to the edge of the stick's travel
+const STICK = 52 // px from the center to the edge of the stick's travel
 
-function Joystick() {
+function MoveZone() {
   const [knob, setKnob] = useState(null) // { x, y, cx, cy } in px
   const pointer = useRef(null)
   const update = (e) => {
@@ -47,7 +54,7 @@ function Joystick() {
   }
   return (
     <div
-      className="stick-zone"
+      className="move-zone"
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId)
         pointer.current = { id: e.pointerId, cx: e.clientX, cy: e.clientY }
@@ -57,20 +64,15 @@ function Joystick() {
       onPointerUp={release}
       onPointerCancel={release}
     >
-      {knob ? (
+      {knob && (
         <div className="stick" style={{ left: knob.cx, top: knob.cy }}>
           <div className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
-        </div>
-      ) : (
-        <div className="stick idle">
-          <div className="knob" />
         </div>
       )}
     </div>
   )
 }
 
-// Drag on the right half of the screen to turn the camera.
 function LookZone() {
   const last = useRef(null)
   return (
@@ -95,7 +97,9 @@ function LookZone() {
   )
 }
 
-function Button({ code, label, className = '' }) {
+// A round button that holds its key down while pressed.
+function HoldButton({ code, icon, label, className = '' }) {
+  const up = () => key(code, false)
   return (
     <button
       className={`touch-btn ${className}`}
@@ -104,48 +108,96 @@ function Button({ code, label, className = '' }) {
         e.stopPropagation()
         key(code, true)
       }}
-      onPointerUp={() => key(code, false)}
-      onPointerCancel={() => key(code, false)}
-      onPointerLeave={() => key(code, false)}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onPointerLeave={up}
       onClick={(e) => e.stopPropagation()}
     >
-      {label}
+      <span className="icon">{icon}</span>
+      {label && <span className="label">{label}</span>}
     </button>
   )
 }
 
-function EmojiPicker() {
-  const [open, setOpen] = useState(false)
+// Messenger-style square icon button.
+function Square({ icon, onPress, active }) {
   return (
-    <div className="emoji-picker">
-      {open && (
-        <div className="emoji-list">
-          {EMOTES.map((e, i) => (
-            <button
-              key={i}
-              onPointerDown={(ev) => {
-                ev.stopPropagation()
-                emote(i)
-                setOpen(false)
-              }}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
+    <button
+      className={`sq-btn ${active ? 'active' : ''}`}
+      onPointerDown={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onPress()
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {icon}
+    </button>
+  )
+}
+
+function EmojiGrid({ onDone }) {
+  return (
+    <div className="emoji-grid" onPointerDown={(e) => e.stopPropagation()}>
+      {EMOTES.map((e, i) => (
+        <button
+          key={i}
+          onPointerDown={(ev) => {
+            ev.stopPropagation()
+            emote(i)
+            onDone()
+          }}
+        >
+          {e}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const MUSIC_LABEL = { calm: 'Calm', afro: 'Afrobeats', off: 'Off' }
+
+function Menu({ onClose }) {
+  const online = useGame((s) => s.online)
+  const players = useGame((s) => s.players)
+  const music = useGame((s) => s.music)
+  const [help, setHelp] = useState(false)
+  const item = (icon, text, fn, disabled) => (
+    <button
+      className="menu-item"
+      disabled={disabled}
+      onPointerDown={(e) => {
+        e.stopPropagation()
+        if (disabled) return
+        fn()
+      }}
+    >
+      <span>{icon}</span>
+      {text}
+    </button>
+  )
+  return (
+    <div className="menu-sheet" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="menu-title">{online ? `Online · ${players} player${players > 1 ? 's' : ''}` : 'Offline'}</div>
+      {item('👥', 'Go to a friend', () => (tap('KeyG'), onClose()), !online || players < 2)}
+      {item('💬', 'Chat', () => (tap('KeyY'), onClose()), !online)}
+      {item('♪', `Music: ${MUSIC_LABEL[music] ?? music}`, () => tap('KeyM'))}
+      {item('❓', 'How to play', () => setHelp((h) => !h))}
+      {help && (
+        <p className="menu-help">
+          Left thumb: move (push far to sprint). Right thumb: look. The big button does whatever is nearby: talk, enter, drive, eat, race. Otherwise it punches. Follow the yellow dot on the radar; pink dots are friends.
+        </p>
       )}
-      <button className="touch-btn small" onPointerDown={(e) => (e.stopPropagation(), setOpen((o) => !o))}>
-        😀
-      </button>
+      {item('✕', 'Close', onClose)}
     </div>
   )
 }
 
 export default function TouchControls() {
   const mode = useGame((s) => s.mode)
+  const action = useGame((s) => s.action)
   const prompt = useGame((s) => s.prompt)
-  const online = useGame((s) => s.online)
-  // Let go of everything if the page is hidden mid-press.
+  const [panel, setPanel] = useState(null) // 'menu' | 'emoji' | null
   useEffect(() => {
     const off = () => [...held].forEach((c) => key(c, false))
     window.addEventListener('blur', off)
@@ -156,23 +208,27 @@ export default function TouchControls() {
     }
   }, [])
   const car = mode === 'car'
+  // The big button: what's nearby, else punch (on foot) or the horn (driving).
+  const main = action ?? (car ? { key: 'KeyQ', icon: '📯', label: 'Horn' } : { key: 'KeyX', icon: '👊', label: '' })
+  // Say what the button will do ("talk to Mama Nkechi"), or show a hint.
+  const bare = prompt?.replace(/^Press [EF] to /, '')
+  const caption = bare ? bare[0].toUpperCase() + bare.slice(1) : null
   return (
     <div className="touch">
       <LookZone />
-      <Joystick />
-      <div className="touch-buttons">
-        {!car && <Button code="KeyX" label="👊" className="big" />}
-        {car && <Button code="KeyQ" label="📯" className="big" />}
-        <Button code="Space" label={car ? 'BRAKE' : 'JUMP'} />
-        <Button code="KeyF" label="CAR" />
-        {prompt && <Button code="KeyE" label="E" className="glow" />}
+      <MoveZone />
+      <div className="touch-side">
+        <Square icon="☰" active={panel === 'menu'} onPress={() => setPanel((p) => (p === 'menu' ? null : 'menu'))} />
+        <Square icon="😀" active={panel === 'emoji'} onPress={() => setPanel((p) => (p === 'emoji' ? null : 'emoji'))} />
       </div>
-      <div className="touch-top">
-        <EmojiPicker />
-        {online && <Button code="KeyG" label="👥" className="small" />}
-        {online && <Button code="KeyY" label="💬" className="small" />}
-        <Button code="KeyM" label="♪" className="small" />
+      {panel === 'menu' && <Menu onClose={() => setPanel(null)} />}
+      {panel === 'emoji' && <EmojiGrid onDone={() => setPanel(null)} />}
+      <div className="touch-actions">
+        {caption && <div className="action-caption">{caption}</div>}
+        <HoldButton key={main.key + main.icon} code={main.key} icon={main.icon} label={main.label} className={`big ${action ? 'glow' : ''}`} />
+        {car ? <HoldButton code="KeyF" icon="🚪" label="Exit" className="small" /> : <HoldButton code="Space" icon="⤴" className="small" />}
       </div>
     </div>
   )
 }
+
