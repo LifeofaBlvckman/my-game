@@ -152,31 +152,6 @@ function Title() {
         <button className="start" onClick={startGame} disabled={busy}>
           {busy ? 'Loading your game…' : isTouch ? 'Tap to start' : 'Press Enter to start'}
         </button>
-        {isTouch ? (
-          <ul className="keys">
-            <li>
-              Left thumb: move (push all the way to sprint) · Right thumb: look around
-            </li>
-            <li>
-              The big button does what's nearby (talk, enter, drive, eat) or punches · In a car: GAS and BRAKE · ☰ menu · 😀 emoji · 📱 phone
-            </li>
-          </ul>
-        ) : (
-        <ul className="keys">
-            <li>
-              <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump / handbrake
-            </li>
-            <li>
-              <b>E</b> talk · <b>F</b> enter, exit or jack a car · <b>Q</b> horn
-            </li>
-            <li>
-              <b>Click</b> or <b>X</b> punch · <b>Y</b> chat when online
-            </li>
-            <li>
-              <b>G</b> go to a friend · <b>1</b>–<b>8</b> emoji · <b>M</b> music · <b>O</b> outlines · <b>T</b> skip an hour · <b>H</b> help
-            </li>
-          </ul>
-        )}
       </div>
     </div>
   )
