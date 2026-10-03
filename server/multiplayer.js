@@ -8,6 +8,11 @@ import { WebSocketServer } from 'ws'
 // needed: everything lives in memory while people are connected.
 
 const ROOM_SIZE = 16 // players who see each other
+// Races: one at a time per room. Someone opens one at a start flag, others
+// have LOBBY_MS to join, then the server starts it and keeps the results.
+const RACE_ROUTES = new Set(['street', 'beach'])
+const LOBBY_MS = 20000
+const RACE_MAX_MS = 180000
 const MAX_PLAYERS = 256 // per server
 const MAX_MESSAGE = 2048
 const MAX_RATE = 40 // messages per second per client
@@ -36,6 +41,27 @@ export function attachMultiplayer(httpServer) {
     const data = JSON.stringify(msg)
     for (const p of room.values()) if (p.id !== except && p.ws.readyState === 1) p.ws.send(data)
   }
+  const endRace = (room) => {
+    if (!room.race) return
+    clearTimeout(room.race.timer)
+    room.race = null
+    broadcast(room, { t: 'race', a: 'end' })
+  }
+  const goRace = (room) => {
+    const race = room.race
+    if (!race) return
+    race.racers = race.racers.filter((id) => room.has(id))
+    if (!race.racers.length) return endRace(room)
+    race.started = true
+    broadcast(room, { t: 'race', a: 'go', route: race.route, racers: race.racers })
+    race.timer = setTimeout(() => endRace(room), RACE_MAX_MS)
+  }
+  // Everyone still racing has crossed the line (or left): the race is over.
+  const checkRaceOver = (room) => {
+    const race = room.race
+    if (race?.started && race.racers.every((id) => race.finished.includes(id) || !room.has(id))) endRace(room)
+  }
+  const raceInfo = (race, now) => ({ t: 'race', a: 'open', route: race.route, host: race.host, in: Math.max(0, race.goAt - now), racers: race.racers })
   const joinRoom = (player) => {
     let number = 1
     while (rooms.get(number)?.size >= ROOM_SIZE) number++
@@ -86,6 +112,8 @@ export function attachMultiplayer(httpServer) {
           players: [...player.room.values()].filter((p) => p.id !== player.id).map((p) => ({ id: p.id, name: p.name, s: p.state })),
         })
         broadcast(player.room, { t: 'join', id: player.id, name: player.name }, player.id)
+        // A race is waiting for racers: let the newcomer know.
+        if (player.room.race && !player.room.race.started) send(ws, raceInfo(player.room.race, Date.now()))
         return
       }
       if (!player.name) return
@@ -112,6 +140,25 @@ export function attachMultiplayer(httpServer) {
       } else if (msg.t === 'chat') {
         const text = clean(msg.text, 120)
         if (text) broadcast(player.room, { t: 'chat', id: player.id, name: player.name, text })
+      } else if (msg.t === 'race') {
+        const room = player.room
+        const race = room.race
+        if (msg.a === 'open' && !race && RACE_ROUTES.has(msg.route)) {
+          room.race = { route: msg.route, host: player.name, racers: [player.id], finished: [], goAt: now + LOBBY_MS, started: false }
+          room.race.timer = setTimeout(() => goRace(room), LOBBY_MS)
+          broadcast(room, raceInfo(room.race, now))
+        } else if (msg.a === 'join' && race && !race.started && msg.route === race.route && !race.racers.includes(player.id)) {
+          race.racers.push(player.id)
+          broadcast(room, { t: 'race', a: 'joined', name: player.name, in: Math.max(0, race.goAt - now), racers: race.racers })
+        } else if (msg.a === 'leave' && race && race.racers.includes(player.id)) {
+          race.racers = race.racers.filter((id) => id !== player.id)
+          if (!race.started && !race.racers.length) endRace(room)
+          else checkRaceOver(room)
+        } else if (msg.a === 'finish' && race?.started && race.racers.includes(player.id) && !race.finished.includes(player.id)) {
+          race.finished.push(player.id)
+          broadcast(room, { t: 'race', a: 'result', id: player.id, name: player.name, place: race.finished.length, time: Math.max(0, num(msg.time, 600)) })
+          checkRaceOver(room)
+        }
       } else if (msg.t === 'emote') {
         // Emoji reactions: an index into the client's list, at most a couple a second.
         const e = num(msg.e, 7) | 0
@@ -125,7 +172,11 @@ export function attachMultiplayer(httpServer) {
       if (!players.delete(player.id)) return
       player.room.delete(player.id)
       broadcast(player.room, { t: 'leave', id: player.id, name: player.name })
-      if (!player.room.size) rooms.delete(player.roomNumber)
+      checkRaceOver(player.room)
+      if (!player.room.size) {
+        clearTimeout(player.room.race?.timer)
+        rooms.delete(player.roomNumber)
+      }
     })
   })
 

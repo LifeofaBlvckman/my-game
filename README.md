@@ -13,14 +13,21 @@ Rapier physics and Vite.
 - **Traffic:** danfos, kekes, sedans and jeeps with drivers, traffic lights,
   horns and engine sounds. Danfos and kekes pick up passengers at bus stops.
 - **Police:** wanted stars, chases, and officers who get out to arrest you.
-- **Six jobs:** pepper delivery, church, a flash drive across the bridge,
+- **Six story jobs:** pepper delivery, church, a flash drive across the bridge,
   aso-ebi, driving a danfo, and a bank robbery.
+- **Side jobs on the Island** (blue markers), any time: a timed suya run, a
+  checkpoint drive round Lekki, and a Bar Beach clean-up.
+- **Races with friends:** press E at a start flag on the Island (the Island
+  Street Race by car, or the Bar Beach Sprint on foot). Everyone online gets
+  20 seconds to join; first across the line wins. Alone, you race the clock.
 - **Fighting and damage:** punch people and cars, carjack with F; cars smoke,
   burn and explode.
 - **Multiplayer:** see friends, chat, punch, and send emoji, in rooms of 16.
+  Friends are pink dots on the radar; press **G** to go to them.
 - **Phones:** touch controls appear automatically.
-- **Look and sound:** two-tone shading, ink outlines, painted sky, birds, day
-  and night, and synthesized music (calm theme or Afrobeats) with no audio files.
+- **Look and sound:** two-tone shading, ink outlines, painted sky, birds, clear
+  water with fish, day and night, and synthesized music (calm theme or
+  Afrobeats) with no audio files.
 
 ## Run it
 
@@ -56,17 +63,19 @@ minute.
 | Shift | Sprint | |
 | Space | Jump | Handbrake |
 | Click / X | Punch | |
-| E | Talk, use doors, sleep, work out | |
+| E | Talk, use doors, sleep, work out, start or join a race | Start or join a race |
 | F | Get in or jack a car | Get out |
 | Q | | Horn |
 | 1 – 8 | Emoji | Emoji |
+| G | Go to a friend (online) | |
 | Y | Chat (online) | Chat |
 | M / O / T / H | Music (calm, Afrobeats, off) · outlines · skip an hour · help | |
 
 ## Where things are
 
 - `src/game/cityData.js`: the map, districts, landmarks and bus stops
-- `src/game/quests.js`: characters, jobs and dialogue
+- `src/game/quests.js`: characters, story jobs, side jobs and dialogue
+- `src/game/racing.js`: race routes and prizes
 - `src/game/rooms.js`: building interiors
 - `src/game/people.js`: how characters look and move
 - `src/game/vehicleTypes.js`: vehicles and their handling

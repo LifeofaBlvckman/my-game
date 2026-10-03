@@ -67,10 +67,17 @@ export default function CameraRig() {
     // Pull the camera in if a building is between it and the target.
     const ray = new rapier.Ray(lookAt, desired)
     const exclude = driving ? world.car : world.player
-    const hit = physics.castRay(ray, distance, true, undefined, undefined, undefined, exclude, (c) => !world.trafficColliders.has(c.handle))
+    // Thin things (lamp posts, traffic lights, trees) and traffic don't push
+    // the camera in: running past them made it jump in and out.
+    const solid = (c) => !world.trafficColliders.has(c.handle) && !(c.shapeType() === rapier.ShapeType.Cylinder && c.radius() < 0.5)
+    const hit = physics.castRay(ray, distance, true, undefined, undefined, undefined, exclude, solid)
     // Never push through the wall: in a tight spot the camera comes in close
-    // and rises to look over the shoulder instead.
-    const d = hit ? Math.max(0.5, hit.timeOfImpact - 0.3) : distance
+    // and rises to look over the shoulder instead. It closes in fast but
+    // eases back out, so it doesn't pump in and out.
+    const target = hit ? Math.max(0.5, hit.timeOfImpact - 0.3) : distance
+    const current = world.cameraDistance ?? target
+    world.cameraDistance = target < current ? target : current + (target - current) * Math.min(1, dt * 3)
+    const d = world.cameraDistance
     desired.multiplyScalar(d).add(lookAt)
     if (d < 1.8) desired.y += (1.8 - d) * 0.6
 

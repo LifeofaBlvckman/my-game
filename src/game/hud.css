@@ -647,3 +647,40 @@
   user-select: text;
   -webkit-user-select: text;
 }
+.online .meet {
+  color: #ff9ee3;
+}
+.objective.side span {
+  color: #7cc8ff;
+}
+.objective .timer {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+  color: #fff;
+}
+.objective .timer.low {
+  color: #ff6b6b;
+}
+.race-panel {
+  position: absolute;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(520px, 80vw);
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(17, 17, 17, 0.75);
+  font: bold 15px Arial, Helvetica, sans-serif;
+  text-align: center;
+}
+.race-panel span {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #ffd23a;
+}
+.hud.is-touch .race-panel {
+  top: 80px;
+  font-size: 13px;
+}

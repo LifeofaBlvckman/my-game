@@ -4,26 +4,26 @@ import { BoxGeometry, Color, CylinderGeometry } from 'three'
 import { gableRoof, puff } from './shapes'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
 import { BEACH, city, GX, GZ, ISLAND, MAINLAND, nodeCount, ROAD, roadX, roadZ, segmentValid } from './cityData'
-import { createBuildingMaterial, nightUniform, toon, unlit } from './materials'
+import { createBuildingMaterial, nightUniform, unlit } from './materials'
 import { Instances, groundQuad } from './Instances'
+import Water, { SEABED_Y } from './Water'
 
 // Outer limits of the playable area: both landmasses plus their beaches.
 export const WORLD = { minX: MAINLAND.minX - BEACH, maxX: ISLAND.maxX + BEACH, minZ: MAINLAND.minZ - BEACH, maxZ: MAINLAND.maxZ + BEACH }
-const WATER_Y = -1.4
 const QUAY = 0.9 // height of the lagoon wall above the road
 
 // Box helper: { x0, x1, z0, z1, y0, y1 }.
 const box = (x0, x1, z0, z1, y0, y1) => ({ x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: (y0 + y1) / 2, w: x1 - x0, d: z1 - z0, h: y1 - y0 })
 
 // Land, beaches, bridge decks and walls, as plain boxes for both the meshes and the colliders.
-const beachMainland = box(WORLD.minX, MAINLAND.maxX, WORLD.minZ, WORLD.maxZ, -2, -0.02)
-const beachIsland = box(ISLAND.minX, WORLD.maxX, WORLD.minZ, WORLD.maxZ, -2, -0.02)
+const beachMainland = box(WORLD.minX, MAINLAND.maxX, WORLD.minZ, WORLD.maxZ, SEABED_Y, -0.02)
+const beachIsland = box(ISLAND.minX, WORLD.maxX, WORLD.minZ, WORLD.maxZ, SEABED_Y, -0.02)
 const lands = [box(MAINLAND.minX, MAINLAND.maxX, MAINLAND.minZ, MAINLAND.maxZ, -2, 0), box(ISLAND.minX, ISLAND.maxX, ISLAND.minZ, ISLAND.maxZ, -2, 0)]
 const decks = city.bridges.map((b) => box(b.x0 - 1, b.x1 + 1, b.z - ROAD / 2 - 1.2, b.z + ROAD / 2 + 1.2, -1, 0))
 const barriers = city.bridges.flatMap((b) => [-1, 1].map((s) => box(b.x0, b.x1, b.z + s * (ROAD / 2 + 0.8) - 0.25, b.z + s * (ROAD / 2 + 0.8) + 0.25, 0, 0.9)))
 const pillars = city.bridges.flatMap((b) => {
   const list = []
-  for (let x = b.x0 + 14; x < b.x1 - 8; x += 22) list.push(box(x - 1.2, x + 1.2, b.z - ROAD / 2, b.z + ROAD / 2, WATER_Y - 1, -1))
+  for (let x = b.x0 + 14; x < b.x1 - 8; x += 22) list.push(box(x - 1.2, x + 1.2, b.z - ROAD / 2, b.z + ROAD / 2, SEABED_Y, -1))
   return list
 })
 // Quay walls along both lagoon shores, with gaps where the bridges land.
@@ -32,13 +32,33 @@ function quay(x) {
   const walls = []
   let z = WORLD.minZ
   for (const [g0, g1] of gaps) {
-    walls.push(box(x - 0.3, x + 0.3, z, g0, WATER_Y - 0.5, QUAY))
+    walls.push(box(x - 0.3, x + 0.3, z, g0, SEABED_Y, QUAY))
     z = g1
   }
-  walls.push(box(x - 0.3, x + 0.3, z, WORLD.maxZ, WATER_Y - 0.5, QUAY))
+  walls.push(box(x - 0.3, x + 0.3, z, WORLD.maxZ, SEABED_Y, QUAY))
   return walls
 }
 const quays = [...quay(MAINLAND.maxX + 0.3), ...quay(ISLAND.minX - 0.3)]
+// Where the beach meets the sea, the sand slopes away under the clear water
+// down to the seabed. Each shelf: a sloped slab along one outer edge.
+const SHELF = 30
+const shelfAngle = Math.atan2(-0.02 - SEABED_Y, SHELF)
+const shelves = [
+  // [edge x or z, along-from, along-to, axis, outward sign]
+  [WORLD.maxZ, WORLD.minX, MAINLAND.maxX, 'z', 1],
+  [WORLD.maxZ, ISLAND.minX, WORLD.maxX, 'z', 1],
+  [WORLD.minZ, WORLD.minX, MAINLAND.maxX, 'z', -1],
+  [WORLD.minZ, ISLAND.minX, WORLD.maxX, 'z', -1],
+  [WORLD.minX, WORLD.minZ - SHELF, WORLD.maxZ + SHELF, 'x', -1],
+  [WORLD.maxX, WORLD.minZ - SHELF, WORLD.maxZ + SHELF, 'x', 1],
+].map(([edge, a0, a1, axis, sign]) => {
+  const length = Math.hypot(SHELF, -0.02 - SEABED_Y)
+  const mid = edge + (sign * SHELF) / 2
+  const y = (-0.02 + SEABED_Y) / 2 - 0.25
+  return axis === 'z'
+    ? { x: (a0 + a1) / 2, y, z: mid, w: a1 - a0, h: 0.5, d: length, rx: sign * shelfAngle, ry: 0 }
+    : { x: mid, y, z: (a0 + a1) / 2, w: length, h: 0.5, d: a1 - a0, rx: 0, rz: -sign * shelfAngle }
+})
 const solidBox = (o, b) => {
   o.position.set(b.x, b.y - b.h / 2, b.z)
   o.scale.set(b.w, b.h, b.d)
@@ -63,7 +83,6 @@ const lampGlow = unlit({ color: '#3a3a36' })
 const dayLamp = new Color('#3a3a36')
 const nightLamp = new Color('#ffd27a')
 
-const oceanMaterial = toon({ color: '#3f9fb2' })
 
 // A junction is a real crossing if a cross road meets it there.
 const isJunction = (axis, line, k) => {
@@ -100,9 +119,17 @@ export default function City() {
   return (
     <group>
       {/* Ocean and lagoon, beaches, the two landmasses, bridges and quays */}
-      <mesh rotation-x={-Math.PI / 2} position-y={WATER_Y} material={oceanMaterial}>
-        <planeGeometry args={[4000, 4000]} />
-      </mesh>
+      <Water bounds={WORLD} />
+      <Instances
+        items={shelves}
+        castShadow={false}
+        transform={(o, b) => {
+          o.position.set(b.x, b.y - b.h / 2, b.z)
+          o.rotation.set(b.rx ?? 0, 0, b.rz ?? 0)
+          o.scale.set(b.w, b.h, b.d)
+        }}
+        colors={() => '#dcca94'}
+      />
       <Instances items={[beachMainland, beachIsland]} castShadow={false} transform={solidBox} colors={() => '#e2cf98'} />
       <Instances items={lands} castShadow={false} transform={solidBox} colors={() => '#3d3d42'} />
       <Instances items={decks} transform={solidBox} colors={() => '#45454a'} />

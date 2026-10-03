@@ -29,6 +29,11 @@ export const useGame = create((set) => ({
   outlines: true,
   // Real shadows; off from the start on phones.
   shadows: !(typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches), // real cast shadows; turned off automatically on slow machines
+  race: null, // the race you're in or invited to (races.js), for the HUD
+  sideJob: null, // { index, step } while doing a side job (quests.js SIDE_JOBS)
+  jobProgress: 0, // checkpoints reached / items collected in the current step
+  collected: [],
+  timer: null, // seconds left on a timed step
   music: 'calm', // 'calm' | 'afro' | 'off' (M cycles)
   // Multiplayer
   playerName: '',

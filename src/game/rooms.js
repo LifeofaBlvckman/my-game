@@ -180,3 +180,13 @@ Object.entries(INTERIORS).forEach(([id, room], k) => {
 export const roomPoint = (room, x, z, y = 0) => [room.origin[0] + x, room.origin[1] + y, room.origin[2] + z]
 export const roomSpawn = (room) => roomPoint(room, 0, room.size[2] / 2 - 2, 1.2)
 export const roomExit = (room) => roomPoint(room, 0, room.size[2] / 2 - 1)
+
+// Which room a world position is in (rooms sit far east of the city), if any.
+export const roomAt = (x, z = 0) => Object.values(INTERIORS).find((room) => Math.abs(x - room.origin[0]) < 40 && Math.abs(z - room.origin[2]) < 40) ?? null
+
+// Where someone is, as far as the city map is concerned: their spot outdoors,
+// or the door of the building they're in.
+export function mapSpot(x, z) {
+  const room = roomAt(x, z)
+  return room ? { x: room.door.x, z: room.door.z, room } : { x, z, room: null }
+}

@@ -136,7 +136,8 @@ export function zoneAt(x, z) {
   }
   const i = Math.floor((x + HALF_X) / CELL)
   const j = Math.floor((z + HALF_Z) / CELL)
-  if (i <= MAINLAND_LAST) {
+  if (x <= MAINLAND.maxX) {
+    // (the shore road past the last Mainland column still counts as Mainland)
     if (j < 4) return i <= 2 ? ZONES.ikeja : ZONES.yaba
     return i <= 2 ? ZONES.surulere : ZONES.ebute
   }

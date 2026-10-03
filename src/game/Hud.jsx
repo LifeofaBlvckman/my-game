@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Radar from './Radar'
 import { INTRO_LENGTH } from './CameraRig'
-import { currentTarget, INTRO_CALL } from './quests'
+import { activeTarget, INTRO_CALL } from './quests'
 import { blip, setMusic, startAudio } from './audio'
 import TouchControls, { isTouch } from './TouchControls'
 import { openDialogue, placeInRoom } from './GameLogic'
@@ -75,7 +75,7 @@ function Title() {
               Left thumb: move (push all the way to sprint) · Right thumb: look around
             </li>
             <li>
-              👊 punch · <b>JUMP</b> · <b>CAR</b> get in or out · <b>E</b> talk or go through a door · 😀 emoji
+              👊 punch · <b>JUMP</b> · <b>CAR</b> get in or out · <b>E</b> talk or go through a door · 😀 emoji · 👥 go to a friend
             </li>
           </ul>
         ) : (
@@ -90,7 +90,7 @@ function Title() {
               <b>Click</b> or <b>X</b> punch · <b>Y</b> chat when online
             </li>
             <li>
-              <b>1</b>–<b>8</b> emoji · <b>M</b> music · <b>O</b> outlines · <b>T</b> skip an hour · <b>H</b> help
+              <b>G</b> go to a friend · <b>1</b>–<b>8</b> emoji · <b>M</b> music · <b>O</b> outlines · <b>T</b> skip an hour · <b>H</b> help
             </li>
           </ul>
         )}
@@ -211,6 +211,22 @@ function Chat({ chat, open }) {
   )
 }
 
+function RacePanel({ race }) {
+  const time = `${Math.floor(race.time / 60)}:${(race.time % 60).toFixed(1).padStart(4, '0')}`
+  let text
+  if (race.phase === 'lobby' && race.joined) text = `${race.name} starts in ${race.left}s · ${race.racers} racer${race.racers > 1 ? 's' : ''}`
+  else if (race.phase === 'lobby') text = `${race.host ?? 'Someone'} started the ${race.name}! ${race.left}s to join: get to the flag on the Island`
+  else if (race.phase === 'grid') text = `${race.name}: get ready…`
+  else if (race.phase === 'running') text = `CHECKPOINT ${race.cp}/${race.count} · ${time}`
+  else text = `${race.name}: finished ${time}`
+  return (
+    <div className="race-panel">
+      <span>🏁 RACE</span>
+      {text}
+    </div>
+  )
+}
+
 function Stars({ wanted }) {
   return (
     <div className={`stars ${wanted > 0 ? 'active' : ''}`}>
@@ -236,7 +252,7 @@ export default function Hud() {
 
   if (game.phase === 'title') return <Title />
 
-  const target = currentTarget(game.quest, game.step)
+  const target = activeTarget(game)
   const playing = game.phase === 'playing'
 
   return (
@@ -254,10 +270,12 @@ export default function Hud() {
             <Stars wanted={game.wanted} />
           </div>
 
-          {target && !game.dialogue && (
-            <div className="objective">
-              <span>NEXT UP</span>
+          {game.race && game.race.phase !== 'watching' && !game.dialogue && <RacePanel race={game.race} />}
+          {target && !game.dialogue && !(game.race && ['grid', 'running'].includes(game.race.phase)) && (
+            <div className={`objective ${game.sideJob ? 'side' : ''}`}>
+              <span>{game.sideJob ? 'SIDE JOB' : 'NEXT UP'}</span>
               {target.objective}
+              {game.timer != null && <b className={`timer ${game.timer <= 10 ? 'low' : ''}`}>⏱ {game.timer}s</b>}
             </div>
           )}
 
@@ -287,7 +305,12 @@ export default function Hud() {
           )}
           {game.hurt > 0 && <div className="hurt" key={`hurt${game.hurt}`} />}
           <Chat chat={game.chat} open={game.chatOpen} />
-          {game.online && <div className="online">● ONLINE · {game.players}</div>}
+          {game.online && (
+            <div className="online">
+              ● ONLINE · {game.players}
+              {game.players > 1 && <span className="meet">{isTouch ? ' · tap 👥 to meet up' : ' · press G to meet up'}</span>}
+            </div>
+          )}
           {game.subtitle && !game.dialogue && (
             <div className="subtitle">
               <b>{game.subtitle.speaker}:</b> {game.subtitle.text}

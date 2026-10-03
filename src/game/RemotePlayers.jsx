@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Billboard } from '@react-three/drei'
 import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier'
 import { CanvasTexture, Quaternion, SRGBColorSpace, Vector3 } from 'three'
@@ -46,19 +46,38 @@ function RemotePlayer({ id }) {
   const [shape, setShape] = useState({ m: r?.s?.m ?? 'f', c: r?.s?.c ?? 'sedan', k: r?.s?.k ?? '#c9ccd1' })
   const look = useMemo(() => lookFromSeed(hashName(r?.name ?? 'player'), { robe: false }), [r?.name])
   const tag = useMemo(() => nameTag(r?.name ?? 'Player'), [r?.name])
+  const tagMesh = useRef()
+  const camera = useThree((st) => st.camera)
 
   useFrame((_, rawDt) => {
     const net = world.net
     const remote = net?.remotes.get(id)
     if (!remote || !body.current) return
     net.sample(remote)
+    remote.body = body.current
     const s = remote.s
     if (!s) return
+    // The name tag grows with distance so friends can spot each other from
+    // far away (it shows through buildings too).
+    if (tagMesh.current) {
+      const d = camera.position.distanceTo(body.current.translation())
+      tagMesh.current.scale.setScalar(Math.min(8, Math.max(1, d / 14)))
+    }
     if (s.m !== shape.m || s.c !== shape.c || s.k !== shape.k) setShape({ m: s.m, c: s.c, k: s.k })
 
     q.setFromAxisAngle(up, remote.yaw)
-    body.current.setNextKinematicTranslation({ x: remote.x, y: remote.y, z: remote.z })
-    body.current.setNextKinematicRotation(s.m === 'c' ? q : { x: 0, y: 0, z: 0, w: 1 })
+    // A big jump (they just appeared, went through a door, or respawned) is a
+    // teleport. Moving a kinematic body that far in one step would count as
+    // thousands of m/s and fling anyone standing nearby across the map.
+    const at = body.current.translation()
+    const rotation = s.m === 'c' ? q : { x: 0, y: 0, z: 0, w: 1 }
+    if (Math.hypot(remote.x - at.x, remote.y - at.y, remote.z - at.z) > 3) {
+      body.current.setTranslation({ x: remote.x, y: remote.y, z: remote.z }, true)
+      body.current.setRotation(rotation, true)
+    } else {
+      body.current.setNextKinematicTranslation({ x: remote.x, y: remote.y, z: remote.z })
+      body.current.setNextKinematicRotation(rotation)
+    }
 
     const dt = Math.min(rawDt, 0.1)
     const a = anim.current
@@ -117,7 +136,7 @@ function RemotePlayer({ id }) {
       )}
       <EmoteBubble get={() => world.net?.remotes.get(id)?.emote} y={shape.m === 'c' ? def.half[1] + 2.2 : 2.2} />
       <Billboard position-y={shape.m === 'c' ? def.half[1] + 1.4 : 1.45}>
-        <mesh>
+        <mesh ref={tagMesh} renderOrder={20}>
           <planeGeometry args={[1.6, 0.4]} />
           <meshBasicMaterial map={tag} transparent toneMapped={false} depthTest={false} />
         </mesh>

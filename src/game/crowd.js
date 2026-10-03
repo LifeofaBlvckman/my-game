@@ -1,4 +1,4 @@
-import { BLOCK, city, mulberry32, SIDEWALK_Y } from './cityData'
+import { BEACH, BLOCK, city, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
 import { COP_LOOK, lookFromSeed, randomLook } from './people'
 
 // Crowd simulation. Plain objects updated every frame; Pedestrians.jsx draws them.
@@ -261,6 +261,11 @@ export function ejectDriver(x, z, yaw, focus) {
   pick.kind = 'loose'
   pick.x = x + Math.sin(left) * 1.6
   pick.z = z + Math.cos(left) * 1.6
+  if (!walkable(pick.x, pick.z)) {
+    // The car door opens over the water (edge of a bridge): out on the deck side instead.
+    pick.x = x - (pick.x - x)
+    pick.z = z - (pick.z - z)
+  }
   pick.ox = pick.oz = 0
   pick.down = 1.4
   pick.afterDown = rand() < 0.35 ? 'fight' : 'flee'
@@ -284,6 +289,11 @@ export function driverGetsOut(x, z, yaw, focus, mood) {
   pick.kind = 'loose'
   pick.x = x + Math.sin(left) * 1.5
   pick.z = z + Math.cos(left) * 1.5
+  if (!walkable(pick.x, pick.z)) {
+    // The car door opens over the water (edge of a bridge): out on the deck side instead.
+    pick.x = x - (pick.x - x)
+    pick.z = z - (pick.z - z)
+  }
   pick.ox = pick.oz = pick.vx = pick.vz = 0
   pick.down = 0
   pick.yaw = Math.atan2(focus.x - pick.x, focus.z - pick.z)
@@ -292,14 +302,37 @@ export function driverGetsOut(x, z, yaw, focus, mood) {
   return pick
 }
 
+// Ground people can stand on: the two landmasses with their beaches, and
+// the bridge decks. (Building interiors sit far to the east, past x = 1500.)
+const LAND = [
+  { minX: MAINLAND.minX - BEACH, maxX: MAINLAND.maxX, minZ: MAINLAND.minZ - BEACH, maxZ: MAINLAND.maxZ + BEACH },
+  { minX: ISLAND.minX, maxX: ISLAND.maxX + BEACH, minZ: ISLAND.minZ - BEACH, maxZ: ISLAND.maxZ + BEACH },
+]
+export function walkable(x, z) {
+  if (x > 1500) return true
+  for (const r of LAND) if (x > r.minX + 0.5 && x < r.maxX - 0.5 && z > r.minZ + 0.5 && z < r.maxZ - 0.5) return true
+  return city.bridges.some((b) => x > b.x0 - 1 && x < b.x1 + 1 && Math.abs(z - b.z) < ROAD / 2 + 0.6)
+}
+
+// Move to (x, z) if it's solid ground; otherwise slide along the edge, or
+// stay put. Nobody walks on water.
+function stepTo(n, x, z) {
+  if (walkable(x, z)) {
+    n.x = x
+    n.z = z
+  } else if (walkable(x, n.z)) n.x = x
+  else if (walkable(n.x, z)) n.z = z
+  else return false
+  return true
+}
+
 function walkToward(n, tx, tz, speed, dt) {
   const dx = tx - n.x
   const dz = tz - n.z
   const d = Math.hypot(dx, dz)
   if (d < 0.05) return d
   const step = Math.min(d, speed * dt)
-  n.x += (dx / d) * step
-  n.z += (dz / d) * step
+  stepTo(n, n.x + (dx / d) * step, n.z + (dz / d) * step)
   n.yaw += wrap(Math.atan2(dx, dz) - n.yaw) * Math.min(1, dt * 8)
   n.moving = true
   return d
@@ -376,8 +409,8 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
     if (n.active === false) continue
     if (n.down > 0) {
       n.down -= dt
-      n.x += n.vx * dt
-      n.z += n.vz * dt
+      // Knocked flying, but never off the edge into the water.
+      if (!stepTo(n, n.x + n.vx * dt, n.z + n.vz * dt)) n.vx = n.vz = 0
       const drag = Math.exp(-3 * dt)
       n.vx *= drag
       n.vz *= drag

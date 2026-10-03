@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { mapSpot } from './rooms'
+import { RACES } from './racing'
 import { city, ISLAND, MAINLAND } from './cityData'
 import { WORLD } from './City'
 import { vehicles } from './trafficSim'
@@ -108,6 +110,15 @@ export default function Radar() {
         vehicles.forEach((v) => v.chasing && blip(v.x, v.z, rot, flash ? '#ff3030' : '#3060ff', 3.5))
       }
       if (objective) blip(objective.x, objective.z, rot, '#ffd23a', 5.5)
+      // Race start flags: chequered squares.
+      for (const race of Object.values(RACES)) blip(race.start.x, race.start.z, rot, game.race?.phase === 'lobby' && !game.race.joined ? '#ffd23a' : '#ffffff', 3.5, true)
+      // Friends online: pink dots, pinned to the rim when far away. Someone
+      // indoors shows at their building's door.
+      for (const r of world.net?.remotes.values() ?? []) {
+        if (!r.s) continue
+        const spot = mapSpot(r.x, r.z)
+        blip(spot.x, spot.z, rot, '#ff6fd0', 5)
+      }
 
       // Player arrow.
       ctx.translate(SIZE / 2, SIZE / 2)

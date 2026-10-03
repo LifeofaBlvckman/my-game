@@ -1,4 +1,4 @@
-import { BLOCK, blockX, blockZ, city, ISLAND_FIRST, SIDEWALK_Y, zoneAt } from './cityData'
+import { BEACH, BLOCK, blockX, blockZ, city, ISLAND, ISLAND_FIRST, MAINLAND, roadX, roadZ, SIDEWALK_Y, zoneAt } from './cityData'
 import { INTERIORS, roomPoint } from './rooms'
 
 // Named characters with something to say. Outdoor ones stand by the
@@ -67,6 +67,27 @@ export const NPCS = {
     pos: [stop('OJUELEGBA').x - 4, stop('OJUELEGBA').z + 1.2],
     yaw: Math.PI,
     look: { female: false, face: 5, hair: 'cap', hairColor: '#f5f0e1', top: '#1b3f8f', bottom: '#212121', robe: true, height: 1.0 },
+  },
+  // Side-job characters on the Island: they always have work going.
+  sule: {
+    name: 'Mallam Sule',
+    pos: [blockX(ISLAND_FIRST + 2) - 6, front(2) - 1.8],
+    yaw: 0,
+    look: { female: false, face: 6, hair: 'cap', hairColor: '#f5f0e1', top: '#f5f0e1', bottom: '#f5f0e1', robe: true, height: 1.0 },
+    stall: true,
+  },
+  kunle: {
+    name: 'Kunle Speed',
+    pos: [blockX(ISLAND_FIRST + 3) - 8, front(6) - 1.8],
+    yaw: 0,
+    look: { female: false, face: 1, hair: 'locs', top: '#e04848', bottom: '#212121', robe: false, height: 1.0 },
+  },
+  bisi: {
+    name: 'Aunty Bisi',
+    pos: [blockX(ISLAND_FIRST + 2), MAINLAND.maxZ + 7],
+    y: -0.02, // on the sand, not a sidewalk
+    yaw: Math.PI,
+    look: { female: true, face: 10, hair: 'braids', top: '#1aa395', bottom: '#f4d03f', robe: false, height: 0.95 },
   },
   skido: {
     name: 'Skido',
@@ -260,6 +281,70 @@ export const INTRO_CALL = [
   line('Mama', 'Jet lag ko, jet lag ni. Mama Nkechi say make you come see am for Oja Oba Market. She get small work for you.'),
 ]
 
+// --- Side jobs ---
+// Work you can pick up any time from the Island characters above, and do
+// again as often as you like. Same steps as the story jobs, plus:
+//   time: seconds to finish the step in (or the job is off)
+//   checkpoints: [{ x, z }]: reach each in turn (with `vehicle`: in a car)
+//   collect: [{ x, z }]: walk over every one
+const junction = (i, j) => ({ x: roadX(i), z: roadZ(j) })
+const I = (k) => ISLAND_FIRST + k
+const beachZ = MAINLAND.maxZ + BEACH / 2
+export const SIDE_JOBS = [
+  {
+    title: 'Suya Run',
+    giver: 'sule',
+    reward: 4000,
+    start: [
+      line('Mallam Sule', 'My friend! Oga Kunle for that office for Ikoyi order suya. E must reach am while e still hot.'),
+      line('Mallam Sule', 'Run! Thirty-five seconds, no more. Cold suya na insult.'),
+    ],
+    steps: [
+      {
+        goto: { x: blockX(I(4)) + 4, z: front(1) + 1 },
+        time: 35,
+        objective: 'RUN THE HOT SUYA TO THE IKOYI OFFICE',
+        talk: [line('Office Guard', 'Suya! E still dey hot. Oga go happy. Take your money.')],
+      },
+    ],
+  },
+  {
+    title: 'Lekki Toll Dash',
+    giver: 'kunle',
+    reward: 7000,
+    start: [
+      line('Kunle Speed', 'You think say you sabi drive? Make we see. Get motor, follow my checkpoints round the Island.'),
+      line('Kunle Speed', 'Seventy-five seconds. If you slow, na you go pay my fuel.'),
+    ],
+    steps: [
+      {
+        checkpoints: [junction(I(2), 7), junction(I(2), 5), junction(I(4), 5), junction(I(4), 2), junction(I(1), 2), junction(I(1), 6), junction(I(3), 6), junction(I(3), 8)],
+        vehicle: true,
+        time: 75,
+        objective: 'DRIVE THROUGH EVERY CHECKPOINT',
+        talk: [line('Kunle Speed', 'Haa! You fast pass my cousin. See your money.')],
+      },
+    ],
+  },
+  {
+    title: 'Bar Beach Clean-Up',
+    giver: 'bisi',
+    reward: 3000,
+    start: [
+      line('Aunty Bisi', 'Look at this beach! Plastic everywhere. People no get shame.'),
+      line('Aunty Bisi', 'Help me pack the bottles before the tide carry them. Seventy seconds, quick quick.'),
+    ],
+    steps: [
+      {
+        collect: Array.from({ length: 6 }, (_, k) => ({ x: ISLAND.minX + 25 + k * 40 + (k % 2) * 9, z: beachZ + ((k * 7) % 3 - 1) * 8 })),
+        time: 70,
+        objective: 'PICK UP THE BOTTLES ON BAR BEACH',
+        talk: [line('Aunty Bisi', 'God bless you! The beach fine again. Take this small something.')],
+      },
+    ],
+  },
+]
+
 export const CHATTER = ['How far?', 'Lagos no easy o.', 'No wahala.', 'I dey my lane.', 'Shey you dey alright?', 'Traffic don too much today.', 'Abeg I dey hurry.']
 export const STRANGER_LINES = ['How far, bros?', 'Oga, wetin you dey find?', 'Fine boy, no pimples!', 'E go better.', 'Abeg shift.', 'Sharp guy!', 'You get change for N1000?']
 
@@ -271,9 +356,24 @@ function placeFor(room, x, z, inside) {
   return { x: door.x, z: door.z }
 }
 
+// The job being worked on: a side job if one is running, else the next story job.
+export function activeJob(game) {
+  if (game.sideJob) return { job: SIDE_JOBS[game.sideJob.index], step: game.sideJob.step, side: true }
+  const job = QUESTS[game.quest]
+  return job ? { job, step: game.step, side: false } : null
+}
+
 // What the player should be doing right now, and where the marker goes.
+export function activeTarget(game) {
+  const a = activeJob(game)
+  return a ? jobTarget(a.job, a.step, game.inside, game.jobProgress ?? 0, game.collected) : null
+}
+
 export function currentTarget(questIndex, step, inside = null) {
-  const q = QUESTS[questIndex]
+  return jobTarget(QUESTS[questIndex], step, inside)
+}
+
+function jobTarget(q, step, inside = null, progress = 0, collected = null) {
   if (!q) return null
   if (step < 0) {
     const g = NPCS[q.giver]
@@ -295,9 +395,19 @@ export function currentTarget(questIndex, step, inside = null) {
     return { hold: s.hold, seconds: s.seconds, ...placeFor(s.hold, p[0], p[2], inside), spot: { x: p[0], z: p[2], y: p[1] }, objective: s.objective }
   }
   if (s.lose) return { lose: true, objective: s.objective }
+  if (s.checkpoints) {
+    const at = s.checkpoints[Math.min(progress, s.checkpoints.length - 1)]
+    const next = s.checkpoints[progress + 1]
+    return { checkpoints: true, vehicle: s.vehicle, time: s.time, x: at.x, z: at.z, next, done: progress, count: s.checkpoints.length, objective: `${s.objective} (${progress}/${s.checkpoints.length})` }
+  }
+  if (s.collect) {
+    const left = s.collect.filter((_, k) => !collected?.includes(k))
+    const at = left[0] ?? s.collect[0]
+    return { collect: true, time: s.time, items: s.collect, left, x: at.x, z: at.z, done: s.collect.length - left.length, count: s.collect.length, objective: `${s.objective} (${s.collect.length - left.length}/${s.collect.length})` }
+  }
   if (s.pickup || s.dropoff) {
     const b = stop(s.pickup ?? s.dropoff)
     return { pickup: s.pickup, dropoff: s.dropoff, count: s.count, vehicle: s.vehicle, stop: b, x: b.x, z: b.z, objective: s.objective }
   }
-  return { goto: true, vehicle: s.vehicle, x: s.goto.x, z: s.goto.z, objective: s.objective }
+  return { goto: true, vehicle: s.vehicle, time: s.time, x: s.goto.x, z: s.goto.z, objective: s.objective }
 }

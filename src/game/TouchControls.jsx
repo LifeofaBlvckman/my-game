@@ -169,6 +169,7 @@ export default function TouchControls() {
       </div>
       <div className="touch-top">
         <EmojiPicker />
+        {online && <Button code="KeyG" label="👥" className="small" />}
         {online && <Button code="KeyY" label="💬" className="small" />}
         <Button code="KeyM" label="♪" className="small" />
       </div>

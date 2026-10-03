@@ -62,8 +62,11 @@ export function Body({ type, color, driver, driverFace, riders = [] }) {
 const CRASH_THRESHOLD = 6
 const plainBox = new BoxGeometry(1, 1, 1)
 
+const anchorDir = new Vector3()
+
 export default function Car() {
   const body = useRef()
+  const anchor = useRef()
   const wheelSpin = useRef([])
   const wheelSteer = useRef([])
   const steer = useRef(0)
@@ -86,7 +89,7 @@ export default function Car() {
     const dt = Math.min(rawDt, 0.1)
     const game = useGame.getState()
     const driving = game.mode === 'car' && game.phase === 'playing' && !game.dialogue && !world.carWrecked && !game.chatOpen && !game.wasted && !game.busted
-    const keys = driving ? getKeys() : {}
+    const keys = driving && !world.raceHold ? getKeys() : {} // held on the start line until GO
 
     const r = b.rotation()
     q.set(r.x, r.y, r.z, r.w)
@@ -166,9 +169,17 @@ export default function Car() {
 
     world.carHeading = Math.atan2(fwd.x, fwd.z)
     if (game.mode === 'car') {
-      const p = pos
-      world.focus.set(p.x, p.y, p.z)
-      world.heading = world.carHeading
+      // Follow the smoothed (interpolated) position the car is drawn at, not
+      // the raw physics step, or the camera judders whenever the frame rate
+      // doesn't line up with the 60 Hz physics.
+      if (anchor.current) {
+        anchor.current.getWorldPosition(world.focus)
+        anchor.current.getWorldDirection(anchorDir)
+        world.heading = Math.atan2(anchorDir.x, anchorDir.z)
+      } else {
+        world.focus.set(pos.x, pos.y, pos.z)
+        world.heading = world.carHeading
+      }
       world.carSpeed = speed
     }
     setEngine(game.mode === 'car', speed)
@@ -193,6 +204,7 @@ export default function Car() {
         </group>
       ))}
       <Blob position-y={-def.half[1] + 0.03} scale={[def.half[0] * 2.6, 1, def.half[2] * 2.4]} />
+      <group ref={anchor} />
     </RigidBody>
   )
 }

@@ -30,6 +30,7 @@ const move = new Vector3()
 export default function Player() {
   const body = useRef()
   const visual = useRef()
+  const anchor = useRef()
   const person = useRef()
   const anim = useRef({ facing: Math.PI, phase: 0 })
   const { rapier, world: physics } = useRapier()
@@ -52,7 +53,7 @@ export default function Player() {
     world.playerDown = Math.max(0, (world.playerDown ?? 0) - dt)
     world.flinch = Math.max(0, (world.flinch ?? 0) - dt)
     const down = world.playerDown > 0
-    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted || !!game.wasted || down || !!game.chatOpen
+    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted || !!game.wasted || down || !!game.chatOpen || !!world.raceHold
 
     const { forward, back, left, right, run, jump } = frozen ? {} : getKeys()
 
@@ -68,6 +69,9 @@ export default function Player() {
     const v = b.linvel()
     // While knocked down, let physics carry the body instead of the controls.
     if (!down) b.setLinvel({ x: move.x * speed, y: v.y, z: move.z * speed }, true)
+    // Never let a bad shove (from a teleporting body, say) launch him.
+    else if (Math.hypot(v.x, v.y, v.z) > 30) b.setLinvel({ x: 0, y: Math.min(v.y, 0), z: 0 }, true)
+    if (v.y > 25) b.setLinvel({ x: v.x, y: 0, z: v.z }, true)
 
     const p = b.translation()
     const ray = new rapier.Ray({ x: p.x, y: p.y, z: p.z }, { x: 0, y: -1, z: 0 })
@@ -127,7 +131,10 @@ export default function Player() {
     visual.current.rotation.x += ((down ? -Math.PI / 2 : 0) - visual.current.rotation.x) * Math.min(1, dt * 12)
     visual.current.position.y = -FOOT_OFFSET + (down ? 0.2 : 0)
 
-    world.focus.set(p.x, p.y, p.z)
+    // Follow the smoothed position he's drawn at (see Car.jsx) so the camera
+    // doesn't judder when the frame rate and the 60 Hz physics drift apart.
+    if (anchor.current) anchor.current.getWorldPosition(world.focus)
+    else world.focus.set(p.x, p.y, p.z)
     world.heading = a.facing
   })
 
@@ -139,6 +146,7 @@ export default function Player() {
         <Blob position-y={0.03} scale={[0.9, 1, 0.9]} />
       </group>
       {mode === 'foot' && <EmoteBubble get={() => world.emote} y={1.4} />}
+      <group ref={anchor} />
     </RigidBody>
   )
 }

@@ -1,6 +1,7 @@
 import { hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
+import { onRaceMessage } from './racing'
 
 // Client side of multiplayer. Connects to the server on the same address the
 // game was loaded from; if there isn't one, the game just stays single player.
@@ -18,16 +19,41 @@ export function addChat(name, text, system = false) {
 const syncRoster = (net) => useGame.setState({ remotes: [...net.remotes.keys()], players: net.remotes.size + 1 })
 
 function addRemote(net, id, name, s) {
-  net.remotes.set(id, { id, name, samples: s ? [{ time: performance.now(), ...s }] : [], x: s?.p[0] ?? 0, y: s?.p[1] ?? 0, z: s?.p[2] ?? 0, yaw: s?.y ?? 0, s })
+  net.remotes.set(id, { id, name, samples: s ? [{ time: performance.now(), ...s }] : [], x: s?.p[0] ?? 0, y: s?.p[1] ?? -500, z: s?.p[2] ?? 0 /* parked out of the way until their first update */, yaw: s?.y ?? 0, s })
+}
+
+// If the connection drops (the server restarted after an update, a free
+// server woke up, the phone slept), keep trying to get back online.
+let retryTimer = null
+let retryDelay = 2000
+let full = false
+function scheduleReconnect(name) {
+  if (retryTimer || full) return
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    connectMultiplayer(name)
+  }, retryDelay)
+  retryDelay = Math.min(30000, retryDelay * 2)
 }
 
 export function connectMultiplayer(name) {
   if (world.net || typeof WebSocket === 'undefined') return world.net
+  if (!connectMultiplayer.watching) {
+    // Coming back to the tab: reconnect straight away.
+    connectMultiplayer.watching = true
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || world.net || full) return
+      clearTimeout(retryTimer)
+      retryTimer = null
+      connectMultiplayer(name)
+    })
+  }
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/mp`
   let ws
   try {
     ws = new WebSocket(url)
   } catch {
+    scheduleReconnect(name)
     return null
   }
 
@@ -97,6 +123,7 @@ export function connectMultiplayer(name) {
       return
     }
     if (msg.t === 'welcome') {
+      retryDelay = 2000
       net.id = msg.id
       world.time = msg.time
       msg.players.forEach((p) => addRemote(net, p.id, p.name, p.s))
@@ -107,7 +134,7 @@ export function connectMultiplayer(name) {
     } else if (msg.t === 'join') {
       addRemote(net, msg.id, msg.name)
       syncRoster(net)
-      addChat(null, `${msg.name} joined`, true)
+      addChat(null, `${msg.name} joined. They're the pink dot on your radar.`, true)
     } else if (msg.t === 'leave') {
       net.remotes.delete(msg.id)
       syncRoster(net)
@@ -123,18 +150,28 @@ export function connectMultiplayer(name) {
       if (from && msg.dmg >= 15) fx.shake(0.4)
     } else if (msg.t === 'chat') {
       addChat(msg.name, msg.text)
+    } else if (msg.t === 'race') {
+      onRaceMessage(msg, net.id)
     } else if (msg.t === 'emote') {
       const r = net.remotes.get(msg.id)
       if (r) r.emote = { e: msg.e, at: performance.now() }
     } else if (msg.t === 'full') {
+      full = true
       addChat(null, 'The server is full, so you are playing offline.', true)
     }
   }
   ws.onclose = () => {
     const wasOnline = useGame.getState().online
-    world.net = null
+    if (world.net === net) world.net = null
     useGame.setState({ online: false, players: 1, remotes: [] })
-    if (wasOnline) addChat(null, 'Disconnected from the server.', true)
+    // An online race can't finish without the server.
+    if (world.race?.online) {
+      world.race = null
+      world.raceHold = false
+      useGame.setState({ race: null })
+    }
+    if (wasOnline) addChat(null, 'Lost the connection. Reconnecting...', true)
+    scheduleReconnect(name)
   }
   world.net = net
   return net
