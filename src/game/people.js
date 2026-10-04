@@ -156,6 +156,19 @@ export function personParts(look) {
   if (look.hood && !look.robe) parts.push(P('sphere', 'chest', [0, 1.4, -0.105], [0.26, 0.13, 0.12], look.top))
   if (wrapper) parts.push(P('rbox', 'root', [0, 0.7, 0], [0.4, 0.5, 0.28], look.bottom)) // iro wrapper
   if (agbada) parts.push(P('rbox', 'chest', [0, 1.06, 0], [0.62, 0.72, 0.3], look.top)) // flowing agbada
+  if (look.tray) {
+    // A hawker's tray on the head: Gala, sachets of pure water, biscuits.
+    parts.push(P('rbox', 'head', [0, 0.43, 0], [0.56, 0.06, 0.44], '#c9b27a'))
+    parts.push(P('rbox', 'head', [-0.12, 0.5, 0.06], [0.2, 0.08, 0.12], '#e04848'))
+    parts.push(P('sphere', 'head', [0.12, 0.5, -0.05], [0.16, 0.08, 0.16], '#bfe3ef'))
+    parts.push(P('rbox', 'head', [0.1, 0.49, 0.12], [0.16, 0.06, 0.1], '#f4d03f'))
+  }
+  if (look.bible) parts.push(P('rbox', 'foreL', [0, -0.3, 0.06], [0.06, 0.2, 0.15], '#1b1b1f')) // a Bible in the left hand
+  if (look.armed) {
+    // A pistol in the right hand: barrel forward, grip down into the fist.
+    parts.push(P('rbox', 'foreR', [0, -0.3, 0.1], [0.045, 0.085, 0.25], '#1b1b1f'))
+    parts.push(P('rbox', 'foreR', [0, -0.35, 0.02], [0.04, 0.12, 0.06], '#2a2622'))
+  }
   for (const p of parts) {
     p.local = new Matrix4().compose(new Vector3(...p.offset), new Quaternion().setFromEuler(new Euler(...(p.rot ?? [0, 0, 0]))), new Vector3(...p.size))
   }
@@ -169,7 +182,7 @@ export const SLOTS = (() => {
     for (const robe of [false, true]) {
       for (const female of [false, true]) {
         const count = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
-        personParts({ hair, robe, female, hood: !robe, skin: '#000', top: '#000', bottom: '#000', hairColor: '#000', face: 0 }).forEach((p) => count[p.shape]++)
+        personParts({ hair, robe, female, hood: !robe, armed: true, tray: true, bible: true, skin: '#000', top: '#000', bottom: '#000', hairColor: '#000', face: 0 }).forEach((p) => count[p.shape]++)
         for (const k in max) max[k] = Math.max(max[k], count[k])
       }
     }

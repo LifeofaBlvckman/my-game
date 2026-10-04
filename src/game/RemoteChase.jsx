@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import Person from './Person'
 import { Body, Wheel } from './Car'
 import { Blob } from './Shadows'
-import { computePose, COP_LOOK } from './people'
+import { computePose, COP_LOOK, WARDEN_LOOK } from './people'
 import { VEHICLES } from './vehicleTypes'
 import { toonRamp, unlit } from './materials'
 import { world } from './state'
@@ -13,7 +13,7 @@ import { world } from './state'
 // this draws them (with flashing lights) so you can watch a friend's chase.
 // They're only pictures: they don't block you or arrest you.
 
-const CARS = 3
+const CARS = 6
 const OFFICERS = 3
 const def = VEHICLES.police
 const red = unlit({ color: '#ff2a2a', fog: true })
@@ -40,8 +40,13 @@ function follow(o, target, dt) {
   o.speed = d / Math.max(dt, 0.001)
 }
 
+const lastmaDef = VEHICLES.lastma
+const amber = unlit({ color: '#ffb31a', fog: true })
+
 function CopCar({ index, get }) {
   const group = useRef()
+  const police = useRef()
+  const warden = useRef()
   const left = useRef()
   const right = useRef()
   const o = useRef({})
@@ -55,18 +60,30 @@ function CopCar({ index, get }) {
       return
     }
     follow(o.current, target, Math.min(rawDt, 0.1))
-    g.position.set(o.current.x, def.half[1], o.current.z)
+    // A LASTMA patrol after them for a red light, or the police.
+    const isLastma = target[3] === 1
+    police.current.visible = !isLastma
+    warden.current.visible = isLastma
+    g.position.set(o.current.x, (isLastma ? lastmaDef : def).half[1], o.current.z)
     g.rotation.y = o.current.yaw
     const flip = Math.floor(clock.elapsedTime * 6) % 2 === 0
-    left.current.material = flip ? red : off
-    right.current.material = flip ? off : blue
+    left.current.material = flip ? (isLastma ? amber : red) : off
+    right.current.material = flip ? off : isLastma ? amber : blue
   })
   return (
     <group ref={group} visible={false}>
-      <Body type="police" color={def.colors[0]} driver={COP_LOOK} />
-      {def.wheels.at.map((w, i) => (
-        <Wheel key={i} r={def.wheels.r} position={w} />
-      ))}
+      <group ref={police}>
+        <Body type="police" color={def.colors[0]} driver={COP_LOOK} />
+        {def.wheels.at.map((w, i) => (
+          <Wheel key={i} r={def.wheels.r} position={w} />
+        ))}
+      </group>
+      <group ref={warden} visible={false}>
+        <Body type="lastma" color={lastmaDef.colors[0]} driver={WARDEN_LOOK} />
+        {lastmaDef.wheels.at.map((w, i) => (
+          <Wheel key={i} r={lastmaDef.wheels.r} position={w} />
+        ))}
+      </group>
       {/* Light bar, bright enough to see from down the road */}
       <mesh ref={left} {...bar(sirenA)} material={red}>
         <boxGeometry />

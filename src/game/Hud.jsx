@@ -376,7 +376,12 @@ export default function Hud() {
           </div>
 
           {game.race && game.race.phase !== 'watching' && !game.dialogue && <RacePanel race={game.race} />}
-          {target && !game.dialogue && !(game.race && ['grid', 'running'].includes(game.race.phase)) && (
+          {game.flight && (
+            <div className="flight-panel">
+              <span>EKO AIR · NOW FLYING</span>✈ {game.flight.to}
+            </div>
+          )}
+          {target && !game.dialogue && !game.flight && !(game.race && ['grid', 'running'].includes(game.race.phase)) && (
             <div className={`objective ${game.sideJob ? 'side' : ''}`}>
               <span>{game.sideJob ? 'SIDE JOB' : 'NEXT UP'}</span>
               {personalize(target.objective)}

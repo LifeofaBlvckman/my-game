@@ -102,7 +102,7 @@ export default function Pedestrians() {
       const dx = n.x - fx
       const dz = n.z - fz
       const d2 = dx * dx + dz * dz
-      if (d2 > DRAW_DISTANCE * DRAW_DISTANCE || n.active === false || n.x === undefined) {
+      if (d2 > DRAW_DISTANCE * DRAW_DISTANCE || n.active === false || n.away || n.x === undefined) {
         n.posed = false
         return
       }
@@ -111,7 +111,7 @@ export default function Pedestrians() {
       const repose = !n.posed || d2 < LOD_DISTANCE * LOD_DISTANCE || (frame.current + i) % 3 === 0
       if (repose) {
         n.posed = true
-        const fast = n.panic > 0 || n.fight > 0 || n.kind === 'cop' || (n.kind === 'walk' && weather.rain > 0.4)
+        const fast = n.panic > 0 || n.fight > 0 || n.kind === 'cop' || !!n.brawlWith || n.chasePlayer || (n.kind === 'walk' && weather.rain > 0.4)
         n.phase += rawDt * (n.moving ? (fast ? 11 : 7.5) : 0)
         poseIn.phase = n.phase
         poseIn.t = time + i
@@ -121,6 +121,59 @@ export default function Pedestrians() {
         poseIn.punchSide = n.punchSide ?? 1
         poseIn.flinch = n.flinch > 0 ? n.flinch / 0.4 : 0
         computePose(pose, poseIn)
+        if (n.aim > 0 && n.down <= 0) {
+          // Gun up: right arm straight out at the target, left hand steadying it.
+          const k = n.aim
+          pose.armR = pose.armR * (1 - k) - 1.5 * k
+          pose.foreR = pose.foreR * (1 - k) - 0.04 * k
+          pose.armL = pose.armL * (1 - k) - 1.25 * k
+          pose.foreL = pose.foreL * (1 - k) - 0.55 * k
+          pose.splayL = 0.32 * k
+          pose.twist = 0.12 * k
+          pose.lean = Math.min(pose.lean, 0.06)
+        }
+        const still = n.down <= 0 && !(n.panic > 0) && !(n.fight > 0)
+        if (n.role === 'hawker' && still) {
+          // One hand up steadying the tray on the head.
+          pose.armR = -2.95
+          pose.foreR = -0.45
+          pose.splayR = -0.25
+        } else if (n.role === 'preacher' && still && !poseIn.moving) {
+          // Bible held to the chest, the other hand raised to heaven.
+          const beat = Math.sin(time * 1.6 + i)
+          pose.armL = -0.95
+          pose.foreL = -1.5
+          pose.armR = -2.3 - beat * 0.5
+          pose.foreR = -0.3 + Math.min(0, beat) * 0.5
+          pose.headNod = -0.12 + beat * 0.08
+          pose.lean = 0.08 * beat
+        } else if (n.role === 'chat' && still && !poseIn.moving) {
+          // Gisting: talking with the hands, taking turns.
+          const talk = Math.sin(time * 0.5 + (n.group ?? 0) * 1.7 + i * 2.1) > 0.2
+          if (talk) {
+            const g = Math.sin(time * 3 + i)
+            pose.armR = -0.7 + g * 0.35
+            pose.foreR = -1.3 - g * 0.3
+            pose.armL = -0.3 - Math.max(0, -g) * 0.3
+            pose.foreL = -0.9
+            pose.headNod = Math.sin(time * 4 + i) * 0.08
+          } else {
+            pose.armL = pose.armR = 0.15
+            pose.foreL = pose.foreR = -0.3
+            pose.headTilt = 0.1
+          }
+        } else if (n.watching && !poseIn.moving && still) {
+          // Watching a fight: fists in the air now and then.
+          const cheer = Math.sin(time * 1.3 + i * 1.9) > 0.3
+          if (cheer) {
+            const pump = Math.sin(time * 7 + i)
+            pose.armR = -2.7 - pump * 0.3
+            pose.foreR = -0.5
+            pose.armL = -2.4 + pump * 0.3
+            pose.foreL = -0.6
+            pose.bob = Math.abs(pump) * 0.04
+          }
+        }
         if (n.role === 'warden' && !poseIn.moving && n.down <= 0 && !(n.panic > 0)) {
           // Directing traffic: one arm out, the other waving cars through.
           const wave = Math.sin(time * 3.2 + i)

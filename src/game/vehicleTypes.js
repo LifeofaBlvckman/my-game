@@ -341,6 +341,31 @@ export const VEHICLES = {
     steer: 2.8,
     cruise: 8,
   },
+  // Okada: a motorbike taxi, the rider in front and room for one behind.
+  okada: {
+    name: 'Okada',
+    half: [0.4, 0.62, 1.0],
+    parts: withTrim({ doors: 0, mirrors: false, plates: false }, [
+      [0, -0.22, 0, 0.16, 0.22, 1.3, 'body'],
+      [0, 0.0, 0.32, 0.34, 0.24, 0.5, 'body'], // tank
+      [0, 0.02, -0.3, 0.32, 0.1, 0.78, '#1a1a1a'], // seat
+      [0, -0.36, 0.08, 0.3, 0.3, 0.44, '#5d656b'], // engine
+      [0.16, -0.36, -0.36, 0.08, 0.08, 0.62, '#b8bdc2'], // exhaust
+      [0, 0.05, 0.74, 0.06, 0.72, 0.06, '#9aa0a6'], // fork
+      [0, 0.4, 0.66, 0.72, 0.05, 0.05, '#1a1a1a'], // handlebars
+      [0, -0.06, -0.68, 0.34, 0.04, 0.24, '#1a1a1a'], // rack
+      [0, 0.22, 0.8, 0.18, 0.15, 0.08, '#fff4c8', E],
+      [0, 0.0, -0.8, 0.12, 0.06, 0.04, '#c3262b', E],
+    ]),
+    wheels: { r: 0.33, at: [[0, -0.29, 0.74], [0, -0.29, -0.68]] },
+    seat: [0, 0.32, -0.08, 0.72],
+    passengers: [[0, 0.36, -0.52, 0.72]],
+    colors: ['#c3262b', '#1d2a44', '#2e8b3a', '#111114'],
+    maxSpeed: 26,
+    accel: 10,
+    steer: 3.4,
+    cruise: 10,
+  },
   benz: {
     name: 'Luxury Saloon',
     half: [1.0, 0.5, 2.45],

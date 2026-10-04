@@ -1,18 +1,20 @@
 import { CELL, city, halfFor, hasLight, hasStop, ISLAND, lanePoint, lineCount, mulberry32, nodeCount, nodeCoord, ROAD, roadX, roadZ, segmentValid } from './cityData'
 import { lightFor } from './signals'
 import { VEHICLES } from './vehicleTypes'
+import { claimVehicle, drivePuppet, runsVehicle, sharedVehicle } from './worldSync'
 
 // Traffic simulation on the road grid. Vehicles follow lanes, pick a random
 // way at each junction, stop at red lights and queue behind each other.
 // Police cars patrol the same way until you're wanted, then they hunt you.
 
-const MIX = ['danfo', 'danfo', 'danfo', 'keke', 'keke', 'sedan', 'sedan', 'sedan', 'jeep', 'jeep']
+const MIX = ['danfo', 'danfo', 'danfo', 'keke', 'keke', 'okada', 'okada', 'sedan', 'sedan', 'sedan', 'jeep', 'jeep']
 // The Island (Ikoyi, VI, Lekki) is where the money is: mostly big cars.
 const LUX_MIX = ['benz', 'benz', 'benz', 'gwagon', 'gwagon', 'gwagon', 'sports', 'sports', 'jeep', 'danfo', 'keke']
 const mixAt = (x) => (x > ISLAND.minX - 20 ? LUX_MIX : MIX)
 const ISLAND_PARKED = { sedan: 'benz', jeep: 'gwagon' }
-const TRAFFIC = 34
-const POLICE = 6
+const TRAFFIC = 44
+// Vehicles 0..POLICE-1 are each player's own police (never shared online).
+export const POLICE = 6
 const RECYCLE = 190
 const STOP_BACK = 6 // how far before the junction box cars stop
 export const TRAFFIC_HP = 60
@@ -95,7 +97,7 @@ function randomLanePosition(near, min, max) {
     const pt = lanePoint(axis, line, dir, p)
     const d = near ? Math.hypot(pt.x - near.x, pt.z - near.z) : 100
     if (d < min || d > max) continue
-    const crowded = vehicles.some((o) => o.state !== 'parked' && Math.hypot(o.x - pt.x, o.z - pt.z) < 12)
+    const crowded = vehicles.some((o) => o.state !== 'parked' && !o.away && Math.hypot(o.x - pt.x, o.z - pt.z) < 12)
     if (crowded) continue
     return { axis, line, dir, p }
   }
@@ -179,7 +181,7 @@ function startTurn(v, target) {
 
 // Leave the road network and go straight at the target, or rejoin it at the
 // nearest stretch of road that exists, preferring the way it's facing.
-function snapToLane(v) {
+export function snapToLane(v) {
   const sx = Math.sin(v.yaw)
   const sz = Math.cos(v.yaw)
   const facing = Math.abs(sx) > Math.abs(sz) ? 'x' : 'z'
@@ -283,7 +285,7 @@ function blockedAhead(v, range, skip) {
   let who = null
   const nudging = v.nudgeFor > 0
   for (const o of vehicles) {
-    if (o === v || (skip && skip(o))) continue
+    if (o === v || o.away || (skip && skip(o))) continue
     const still = stationary(o)
     if (nudging && !still) continue
     const g = gapFor(v, o, range, still ? -0.15 : 0.3)
@@ -300,9 +302,9 @@ function blockedAhead(v, range, skip) {
 function boxBusy(v, nx, nz) {
   const reach = ROAD / 2 + 1.5
   for (const o of vehicles) {
-    if (o === v || o.state === 'parked' || Math.abs(o.x - nx) > reach || Math.abs(o.z - nz) > reach) continue
+    if (o === v || o.away || o.state === 'parked' || Math.abs(o.x - nx) > reach || Math.abs(o.z - nz) > reach) continue
     const f = o.turn?.from
-    if (o.state === 'turn' && f.axis === v.axis && f.line === v.line && f.dir === v.dir) continue // just ahead of us in our lane
+    if (o.state === 'turn' && f && f.axis === v.axis && f.line === v.line && f.dir === v.dir) continue // just ahead of us in our lane
     if (Math.abs(Math.cos(o.yaw - v.yaw)) < 0.75 || o.state === 'turn') return true
   }
   return false
@@ -313,7 +315,7 @@ function sirenBehind(v) {
   const s = Math.sin(v.yaw)
   const c = Math.cos(v.yaw)
   for (const o of vehicles) {
-    if (!(o.chasing || o.lastmaOn) || o === v) continue
+    if (!(o.chasing || o.lastmaOn) || o === v || o.away) continue
     const dx = o.x - v.x
     const dz = o.z - v.z
     const behind = -(dx * s + dz * c)
@@ -333,7 +335,33 @@ function obstacleGap(v, x, z, width) {
   return ahead > 0 && ahead < 30 && side < width ? ahead : Infinity
 }
 
-function respawnNear(v, focus) {
+// Online, the host keeps traffic going round every player, not just itself:
+// how far a car is from the nearest player, and where a recycled car should
+// turn up (round whoever has the fewest cars near them).
+let foci = null
+function nearestFocus(v, own) {
+  if (!foci || !sharedVehicle(v)) return Math.hypot(v.x - own.x, v.z - own.z)
+  let d = Infinity
+  for (const f of foci) d = Math.min(d, Math.hypot(v.x - f.x, v.z - f.z))
+  return d
+}
+function neediest(v, own) {
+  if (!foci || foci.length < 2 || !sharedVehicle(v)) return own
+  let best = own
+  let fewest = Infinity
+  for (const f of foci) {
+    let n = 0
+    for (const o of vehicles) if (o.state !== 'parked' && sharedVehicle(o) && Math.abs(o.x - f.x) < 170 && Math.abs(o.z - f.z) < 170) n++
+    if (n < fewest) {
+      fewest = n
+      best = f
+    }
+  }
+  return best
+}
+
+function respawnNear(v, own) {
+  const focus = neediest(v, own)
   const spot = randomLanePosition(focus, 90, 170)
   if (!spot) return
   if (!v.police && vehicles.filter((o) => o.police).length < POLICE) {
@@ -380,6 +408,27 @@ function roleTarget(v, chase, pv, n) {
 
 // ctx: { focus, playerCar: {x,z} | null (only while driving), pedestrian: {x,z} | null, wanted,
 //        chase: {x,z} where the police last saw you, hidden: they can't see you now }
+// Online, with players far apart: now and then move a car nobody can see
+// from round a busy player to one with hardly any traffic.
+let balanceIn = 1
+function rebalance(dt) {
+  balanceIn -= dt
+  if (!foci || balanceIn > 0) return
+  balanceIn = 0.4
+  const near = (o, f) => Math.hypot(o.x - f.x, o.z - f.z) < 170
+  const ours = vehicles.filter((o) => o.state !== 'parked' && sharedVehicle(o) && runsVehicle(o))
+  // A few at a time, so someone who just arrived gets traffic quickly.
+  for (let moves = 0; moves < 4; moves++) {
+    const counts = foci.map((f) => ours.filter((o) => near(o, f)).length)
+    const low = counts.indexOf(Math.min(...counts))
+    const high = counts.indexOf(Math.max(...counts))
+    if (counts[high] - counts[low] < 4) return
+    const spare = ours.find((o) => o.state === 'lane' && !o.chasing && !o.lastmaOn && !o.riders.length && near(o, foci[high]) && foci.every((f) => Math.hypot(o.x - f.x, o.z - f.z) > 85))
+    if (!spare) return
+    respawnNear(spare, foci[low])
+  }
+}
+
 export function updateTraffic(dt, ctx) {
   const { focus, wanted } = ctx
   const chasePoint = ctx.chase ?? focus
@@ -387,7 +436,10 @@ export function updateTraffic(dt, ctx) {
   // The closest police cars join the chase: closest to you while they can
   // see you, closest to where they last saw you while you're hidden (patrols
   // that never saw you don't magically know where you are).
-  const police = vehicles.filter((v) => v.police && v.state !== 'parked')
+  foci = ctx.foci?.length > 1 ? ctx.foci : null
+  rebalance(dt)
+  const now = performance.now()
+  const police = vehicles.filter((v) => v.police && v.state !== 'parked' && runsVehicle(v))
   const near = ctx.hidden ? chasePoint : focus
   police.sort((a, b) => Math.hypot(a.x - near.x, a.z - near.z) - Math.hypot(b.x - near.x, b.z - near.z))
   police.forEach((v, k) => {
@@ -404,7 +456,13 @@ export function updateTraffic(dt, ctx) {
     const decay = Math.exp(-2 * dt)
     v.offX *= decay
     v.offZ *= decay
-    const dist = Math.hypot(v.x - focus.x, v.z - focus.z)
+    // Someone else online runs this one: just follow what they send.
+    if (!runsVehicle(v)) {
+      drivePuppet(v, dt, now)
+      continue
+    }
+    const pursuer = v.chasing || v.lastmaOn
+    const dist = pursuer ? Math.hypot(v.x - focus.x, v.z - focus.z) : nearestFocus(v, focus)
 
     if (v.state === 'parked') {
       v.speed = 0
@@ -560,6 +618,11 @@ export function updateTraffic(dt, ctx) {
         const beforePlayer = desired
         if (ctx.playerCar) desired = Math.min(desired, Math.max(0, obstacleGap(v, ctx.playerCar.x, ctx.playerCar.z, width) - 6.5) * 1.1)
         if (ctx.pedestrian) desired = Math.min(desired, Math.max(0, obstacleGap(v, ctx.pedestrian.x, ctx.pedestrian.z, width - 0.5) - 4) * 1.1)
+        // Other players online, on foot or driving.
+        for (const f of foci ?? []) {
+          if (!f.remote) continue
+          desired = Math.min(desired, Math.max(0, obstacleGap(v, f.x, f.z, width - (f.remote.s?.m === 'c' ? 0 : 0.5)) - (f.remote.s?.m === 'c' ? 6.5 : 4)) * 1.1)
+        }
         // How long this driver has been held up, and by whom: drivers lean on
         // the horn when you are in their way (Traffic.jsx plays it).
         v.blockedBy = desired < beforePlayer - 2 ? 'player' : queued && v.speed < 2 ? 'queue' : null
@@ -637,9 +700,11 @@ export function summonLastma(focus) {
     if (!spot) return null
     // Borrow the farthest ordinary car for it.
     v = vehicles
-      .filter((o) => !o.police && o.state !== 'parked' && !o.riders.length && !o.lastmaOn)
+      .filter((o) => !o.police && o.state !== 'parked' && !o.riders.length && !o.lastmaOn && !o.away && o.x !== undefined)
       .sort((a, b) => Math.hypot(b.x - focus.x, b.z - focus.z) - Math.hypot(a.x - focus.x, a.z - focus.z))[0]
     if (!v) return null
+    // (Online it may be someone else's car: it's ours now.)
+    claimVehicle(v)
     v.type = 'lastma'
     v.color = VEHICLES.lastma.colors[0]
     v.dirty = true
@@ -658,6 +723,7 @@ export function summonLastma(focus) {
 // Swap the player's car with a traffic vehicle (carjacking). The old player
 // car is left parked where it was, as a regular parked vehicle.
 export function swapWithPlayerCar(v, playerCar) {
+  claimVehicle(v)
   const taken = { type: v.type, color: v.color, x: v.x, z: v.z, yaw: v.yaw, speed: v.speed, police: v.police, hp: v.hp }
   v.type = playerCar.type
   v.color = playerCar.color

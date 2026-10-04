@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { mapSpot } from './rooms'
 import { RACES } from './racing'
-import { BANANA, city, ISLAND, MAINLAND, zoneAt } from './cityData'
+import { BANANA, city, EKO, ISLAND, MAINLAND, ROAD, zoneAt } from './cityData'
 import { WORLD } from './City'
 import { vehicles } from './trafficSim'
 import { useGame, world } from './state'
@@ -10,7 +10,7 @@ const SIZE = 170 // px on screen
 const SCALE = 0.75 // px per meter
 const MAP_PX = 2 // offscreen map resolution, px per meter
 const MARGIN = 60
-const MAP = { x0: WORLD.minX - MARGIN, z0: WORLD.minZ - MARGIN, w: WORLD.maxX - WORLD.minX + MARGIN * 2, d: WORLD.maxZ - WORLD.minZ + MARGIN * 2 }
+const MAP = { x0: WORLD.minX - MARGIN, z0: WORLD.minZ - MARGIN, w: WORLD.maxX - WORLD.minX + MARGIN * 2, d: Math.max(WORLD.maxZ, EKO.maxZ) - WORLD.minZ + MARGIN * 2 }
 const OCEAN = '#3f9fb2'
 const RIM = SIZE / 2 - 9
 
@@ -25,6 +25,7 @@ export function mapPlaces(game) {
     city.barracks && { at: { x: city.barracks.gateX, z: city.barracks.gateZ }, glyph: '▲', bg: '#4b5536', label: 'Army barracks' },
     { at: door('bank'), glyph: '₦', bg: '#d4af37', fg: '#1b1b24', label: 'Bank' },
     city.airport && { at: city.airport.terminal, glyph: '✈', bg: '#0d3b6e', label: 'Airport' },
+    city.ekoAirport && { at: city.ekoAirport.terminal, glyph: '✈', bg: '#0d3b6e', label: 'Airport' },
   ]
   for (const p of city.properties) {
     if (!game.properties.includes(p.id)) continue
@@ -75,8 +76,12 @@ export function drawMap() {
   rect(BANANA, '#2e2f33')
   ctx.fillStyle = '#2e2f33'
   ctx.fillRect(BANANA.causeway.x0, BANANA.causeway.z - 7, BANANA.causeway.x1 - BANANA.causeway.x0, 14)
+  // Eko Atlantic, out on the Atlantic past Bar Beach, and its causeway.
+  rect(EKO, '#2e2f33')
+  ctx.fillStyle = '#2e2f33'
+  ctx.fillRect(EKO.causeway.x - ROAD / 2, EKO.causeway.z0, ROAD, EKO.causeway.z1 - EKO.causeway.z0)
   city.blocks.forEach((b) => {
-    ctx.fillStyle = b.color === '#a8784c' ? '#9a6d45' : b.color === '#a9c27c' ? '#6f9a4a' : '#7d7f73'
+    ctx.fillStyle = b.color === '#a8784c' ? '#9a6d45' : b.color === '#a9c27c' || b.color === '#9fbf72' ? '#6f9a4a' : '#7d7f73'
     ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d)
   })
   ctx.fillStyle = '#5f8a3c'
@@ -91,6 +96,11 @@ export function drawMap() {
     }
     ctx.fillStyle = '#3a3b3f'
     ctx.fillRect(ap.runway.x0, ap.runway.z - 8, ap.runway.x1 - ap.runway.x0, 16)
+  }
+  const ek = city.ekoAirport
+  if (ek) {
+    ctx.fillStyle = '#3a3b3f'
+    ctx.fillRect(ek.runway.x0, ek.runway.z - 10, ek.runway.x1 - ek.runway.x0, 20)
   }
   ctx.fillStyle = '#a5a79c'
   city.buildings.forEach((b) => ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d))

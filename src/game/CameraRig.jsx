@@ -56,6 +56,23 @@ export default function CameraRig() {
       return
     }
 
+    // On a flight: follow the plane from behind and a little above, closer
+    // in while it's on the runway, and swing round slowly in the cruise.
+    const f = world.flight
+    if (f?.pose) {
+      const p = f.pose
+      const air = Math.min(1, p.y / 60)
+      const back = 34 + air * 18
+      const swing = p.yaw + Math.sin(clock.elapsedTime * 0.12) * air * 0.6
+      desired.set(p.x - Math.sin(swing) * back, p.y + 7 + air * 8, p.z - Math.cos(swing) * back)
+      if (!world.flightCam) world.flightCam = desired.clone()
+      world.flightCam.lerp(desired, Math.min(1, dt * 2.5))
+      camera.position.copy(world.flightCam)
+      lookAt.set(p.x + Math.sin(p.yaw) * 6, p.y + 3, p.z + Math.cos(p.yaw) * 6)
+      camera.lookAt(lookAt)
+      return
+    }
+    world.flightCam = null
     const driving = game.mode === 'car'
     const distance = world.debugCamDistance ?? (driving ? 9 : 5)
     const { focus } = world

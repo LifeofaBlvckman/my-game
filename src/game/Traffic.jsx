@@ -17,6 +17,7 @@ import { alightRiders, callBoarders, waitingCounts } from './crowd'
 import { city as cityMap } from './cityData'
 import { COP_LOOK, randomLook, WARDEN_LOOK } from './people'
 import { FACE_COLS, getFaceAtlas } from './faces'
+import { runsVehicle, updateWorldSync } from './worldSync'
 // Missions park cars too (Baba Femi's danfo): load them before traffic is set up.
 import './quests'
 
@@ -141,14 +142,36 @@ export default function Traffic() {
     }
   }, [physics, rapier])
 
+  // Take a vehicle off the map: no parts drawn, its body out of the way.
+  const hideVehicle = (i, v) => {
+    if (v.hidden) return
+    v.hidden = true
+    v.body?.setNextKinematicTranslation({ x: v.x, y: -60, z: v.z })
+    for (const kind of KINDS) for (let k = 0; k < MAX_PARTS[kind]; k++) meshes[kind].current.setMatrixAt(i * MAX_PARTS[kind] + k, zero)
+    for (let seat = 0; seat < SEATS; seat++) {
+      const slotBase = i * SEATS + seat
+      faces.current.setMatrixAt(slotBase, zero)
+      for (const shape of Object.keys(DRIVER_SLOTS)) for (let k = 0; k < DRIVER_SLOTS[shape]; k++) people[shape].current.setMatrixAt(slotBase * DRIVER_SLOTS[shape] + k, zero)
+    }
+    steering.current.setMatrixAt(i, zero)
+    shadows.current.setMatrixAt(i, zero)
+    for (let k = 0; k < MAX_WHEELS; k++) {
+      wheels.current.setMatrixAt(i * MAX_WHEELS + k, zero)
+      rims.current.setMatrixAt(i * MAX_WHEELS + k, zero)
+    }
+  }
+
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const game = useGame.getState()
     const driving = game.mode === 'car' && world.car
     const carPos = driving ? world.car.translation() : null
     const waiting = waitingCounts()
+    // Online: send our share of the city, take in everyone else's.
+    updateWorldSync()
     updateTraffic(dt, {
       waiting,
+      foci: world.foci,
       focus: world.simFocus ?? world.focus,
       wanted: game.wanted,
       // Police go where they last saw you (GameLogic keeps track).
@@ -177,12 +200,25 @@ export default function Traffic() {
     vehicles.forEach((v, i) => {
       const def = VEHICLES[v.type]
       const rig = rigs[v.type]
+      const runs = runsVehicle(v)
+
+      // Online, somewhere out of everyone's sight that its owner isn't
+      // telling us about: not on our map at all.
+      if (v.away) {
+        hideVehicle(i, v)
+        return
+      }
+      if (v.hidden) {
+        v.hidden = false
+        v.dirty = true
+        v.driverRecolor = true
+      }
 
       // Damage: smoke, then fire, then a bang.
       const hoodX = Math.sin(v.yaw) * def.half[2] * 0.7
       const hoodZ = Math.cos(v.yaw) * def.half[2] * 0.7
       vehicleSmoke(v.x + hoodX, def.half[1] * 1.6, v.z + hoodZ, v.hp, TRAFFIC_HP, v.burning, dt)
-      if (v.burning > 0) {
+      if (v.burning > 0 && runs) {
         v.burning -= dt
         if (v.burning <= 0) {
           wreckVehicle(v)
@@ -243,12 +279,12 @@ export default function Traffic() {
       }
 
       // Passengers: drop them at the stop, then load whoever is waiting.
-      if (v.dwellNew) {
+      if (v.dwellNew && runs) {
         v.dwellNew = false
         if (v.riders.length) alightRiders(v.dwellStop, v, Math.ceil(v.riders.length * Math.random()))
         callBoarders(v.dwellStop, v, def.passengers.length - v.riders.length)
       }
-      if (v.dropRiders || ((v.wrecked || v.burning > 0) && v.riders.length)) {
+      if (runs && (v.dropRiders || ((v.wrecked || v.burning > 0) && v.riders.length))) {
         // Teleported or wrecked: everyone gets off at the nearest stop.
         v.dropRiders = false
         let near = cityMap.busStops[0]
@@ -334,7 +370,7 @@ export default function Traffic() {
     // Engines: the few closest vehicles with somebody at the wheel.
     heard.length = 0
     for (const v of vehicles) {
-      if (!hasDriver(v)) continue
+      if (!hasDriver(v) || v.away) continue
       const d = Math.hypot(v.x - listener.x, v.z - listener.z)
       if (d < 55) heard.push({ d, x: v.x, z: v.z, speed: v.speed, type: v.type })
     }

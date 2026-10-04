@@ -1,9 +1,11 @@
-import { BANANA, BEACH, BLOCK, city, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
+import { BANANA, BEACH, BLOCK, city, EKO, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
 import { COP_LOOK, lookFromSeed, randomLook, SOLDIER_LOOK, thugLook, WARDEN_LOOK } from './people'
 import { weather } from './weather'
+import { claimNpc, movePuppet, runsNpc } from './worldSync'
+import { world } from './state'
 
 // Crowd simulation. Plain objects updated every frame; Pedestrians.jsx draws them.
-const WALKERS = 70
+const WALKERS = 90
 const RECYCLE = 140
 const FIGHT_RANGE = 1.15
 
@@ -26,6 +28,13 @@ for (const o of [...city.buildings, ...city.solids.filter((o) => o.collider)]) {
       wallGrid.get(key).push(box)
     }
   }
+}
+// Nothing solid on the straight line between two points (sampled every 1.5 m).
+export function lineClear(x0, z0, x1, z1) {
+  const d = Math.hypot(x1 - x0, z1 - z0)
+  const steps = Math.ceil(d / 1.5)
+  for (let k = 1; k < steps; k++) if (insideWall(x0 + ((x1 - x0) * k) / steps, z0 + ((z1 - z0) * k) / steps)) return false
+  return true
 }
 export function insideWall(x, z) {
   const list = wallGrid.get(Math.floor(x / GRID) * 10007 + Math.floor(z / GRID))
@@ -50,8 +59,13 @@ function placeWalker(n, near) {
   n.posed = false
 }
 
+// Estate security and the gatemen at Banana Island's villas.
+const GUARD_LOOK = { ...COP_LOOK, top: '#23232b', bottom: '#23232b', hairColor: '#7a1f2e', height: 1.05 }
+const GATEMAN_LOOK = { top: '#c9b27a', bottom: '#5a4a32', hair: 'cap', hairColor: '#5a4a32', robe: false, hood: false }
+
 for (let k = 0; k < WALKERS; k++) {
-  const n = { kind: 'walk', look: randomLook(rand), speed: 1.1 + rand() * 0.6, y: SIDEWALK_Y }
+  // About one passer-by in twenty carries a pistol: push them and see.
+  const n = { kind: 'walk', look: randomLook(rand, rand() < 0.05 ? { armed: true, robe: false } : {}), speed: 1.1 + rand() * 0.6, y: SIDEWALK_Y }
   placeWalker(n)
   npcs.push(n)
 }
@@ -67,20 +81,25 @@ city.idlers.forEach((spot, k) => {
           : spot.role === 'cop-guard'
             ? { ...COP_LOOK }
             : spot.role === 'soldier'
-              ? { ...SOLDIER_LOOK, face: [3, 0, 5, 1, 6][k % 5], height: 1.0 + (k % 3) * 0.03 }
+              ? { ...SOLDIER_LOOK, face: [3, 0, 5, 1, 6][k % 5], height: 1.0 + (k % 3) * 0.03, armed: true }
               : spot.role === 'guard'
-                ? { ...COP_LOOK, face: [2, 6][k % 2], top: '#23232b', bottom: '#23232b', hairColor: '#7a1f2e', height: 1.05 }
-              : spot.role === 'thug'
-                ? thugLook(rand)
-                : randomLook(rand)
-  npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role, gang: spot.gang, lead: spot.lead, drill: spot.drill, lookout: spot.lookout, home: { ...spot } })
+                ? { ...GUARD_LOOK, face: [2, 6][k % 2] }
+                : spot.role === 'gateman'
+                  ? randomLook(rand, { ...GATEMAN_LOOK, female: false, face: [0, 1, 3, 5][k % 4] })
+                  : spot.role === 'preacher'
+                    ? randomLook(rand, { female: false, face: [1, 3, 5][k % 3], top: '#f7f1e3', bottom: '#1d2a44', robe: false, hood: false, hair: 'short', bible: true })
+                  : spot.role === 'thug'
+                    ? { ...thugLook(rand), armed: rand() < 0.5 }
+                    : randomLook(rand)
+  npcs.push({ kind: 'idle', look, x: spot.x, z: spot.z, y: spot.y, yaw: spot.yaw, role: spot.role, gang: spot.gang, group: spot.group, lead: spot.lead, drill: spot.drill, lookout: spot.lookout, home: { ...spot } })
 })
 
 city.wanderAreas.forEach((area) => {
   for (let k = 0; k < area.count; k++) {
     npcs.push({
       kind: 'wander',
-      look: randomLook(rand),
+      look: area.guard ? { ...GUARD_LOOK, face: [2, 6, 0][k % 3] } : randomLook(rand, area.hawker ? { tray: true, robe: false, hood: false } : {}),
+      role: area.guard ? 'guard' : area.hawker ? 'hawker' : undefined,
       area,
       x: area.x + (rand() - 0.5) * area.w,
       z: area.z + (rand() - 0.5) * area.d,
@@ -122,11 +141,18 @@ const PUNCH = { bouncer: 12, thug: 9, soldier: 14 }
 // market). Hidden until a job needs them (pursuit.js).
 export const SKIDO_LOOK = { face: 3, female: false, hair: 'cap', hairColor: '#e04848', top: '#111111', bottom: '#2a2633', shoes: '#f2efe8', skin: '#4a2c1c', robe: false, hood: false, height: 1.04 }
 for (let k = 0; k < 4; k++) {
-  npcs.push({ kind: 'idle', role: 'thug', brawler: true, active: false, look: k === 0 ? SKIDO_LOOK : thugLook(rand), x: 0, z: 0, y: SIDEWALK_Y })
+  npcs.push({ kind: 'idle', role: 'thug', brawler: true, active: false, look: k === 0 ? SKIDO_LOOK : { ...thugLook(rand), armed: k === 2 }, x: 0, z: 0, y: SIDEWALK_Y })
 }
 
 // Common per-NPC state.
-npcs.forEach((n) => {
+npcs.forEach((n, i) => {
+  n.index = i
+  // Online, the passers-by, bus queues and wanderers are the same people on
+  // everyone's screen (worldSync.js); traders, guards, police and the like
+  // are each player's own.
+  n.shared = (n.kind === 'walk' || n.kind === 'wander' || n.role === 'waiting') && n.role !== 'guard'
+  n.armed = !!n.look.armed
+  n.aim = 0 // > 0 while pointing a gun
   n.yaw ??= 0
   n.phase = rand() * 10
   n.moving = false
@@ -139,7 +165,7 @@ npcs.forEach((n) => {
   n.hp = fullHp(n)
   // Bouncers, area boys and soldiers always fight back; about one in four
   // others will too.
-  n.tough = HARD.has(n.role) || (n.role !== 'trader' && n.role !== 'cop' && rand() < 0.25)
+  n.tough = HARD.has(n.role) || n.armed || n.role === 'guard' || (n.role !== 'trader' && n.role !== 'cop' && rand() < 0.4)
   n.vx = 0
   n.vz = 0
   n.ox = 0 // push offset (from the player bumping into them)
@@ -170,11 +196,14 @@ function panicAround(n, radius = 20) {
 }
 
 export function knockDown(n, dx, dz, force) {
+  claimNpc(n)
   const d = Math.hypot(dx, dz) || 1
   n.vx = (dx / d) * Math.min(10, force)
   n.vz = (dz / d) * Math.min(10, force)
   n.down = 5
   n.fight = 0
+  n.aim = 0
+  n.chasePlayer = false
   n.punchT = -1
   n.hp = fullHp(n)
   n.yaw = Math.atan2(-dx, -dz) // fall away from the hit
@@ -183,6 +212,15 @@ export function knockDown(n, dx, dz, force) {
 
 // The player punched this NPC. Returns 'down' or 'hurt'.
 export function punchNpc(n, fromX, fromZ) {
+  claimNpc(n)
+  // Breaking up a street fight: they both turn on you.
+  if (n.brawlWith) {
+    const o = n.brawlWith
+    o.brawlWith = null
+    n.brawlWith = null
+    o.fight = 10
+    n.fight = 12
+  }
   const dx = n.x + n.ox - fromX
   const dz = n.z + n.oz - fromZ
   if (n.down > 0) return 'down'
@@ -206,7 +244,7 @@ export function npcNear(x, z, radius) {
   let best = null
   let bestD = radius
   for (const n of npcs) {
-    if (n.x === undefined || n.active === false) continue
+    if (n.x === undefined || n.active === false || n.away) continue
     const d = Math.hypot(n.x + n.ox - x, n.z + n.oz - z)
     if (d < bestD) {
       best = n
@@ -259,7 +297,7 @@ export function callBoarders(stop, vehicle, max) {
   let called = 0
   for (const n of npcs) {
     if (called >= max) break
-    if (n.role !== 'waiting' || n.stop !== stop.id || n.kind !== 'idle' || n.active === false || n.down > 0) continue
+    if (n.role !== 'waiting' || n.stop !== stop.id || n.kind !== 'idle' || n.active === false || n.down > 0 || !runsNpc(n)) continue
     n.kind = 'boarding'
     n.vehicle = vehicle
     called++
@@ -319,7 +357,7 @@ export function ejectDriver(x, z, yaw, focus) {
   let pick = null
   let far = -1
   for (const n of npcs) {
-    if (n.kind !== 'walk' || n.down > 0) continue
+    if (n.kind !== 'walk' || n.down > 0 || n.x === undefined) continue
     const d = Math.hypot(n.x - focus.x, n.z - focus.z)
     if (d > far) {
       far = d
@@ -327,6 +365,7 @@ export function ejectDriver(x, z, yaw, focus) {
     }
   }
   if (!pick) return
+  claimNpc(pick)
   const left = yaw + Math.PI / 2
   knockDown(pick, Math.sin(left), Math.cos(left), 3)
   // Position after knocking down: knockDown snaps walkers to their route.
@@ -349,7 +388,7 @@ export function driverGetsOut(x, z, yaw, focus, mood) {
   let pick = null
   let far = -1
   for (const n of npcs) {
-    if (n.kind !== 'walk' || n.down > 0) continue
+    if (n.kind !== 'walk' || n.down > 0 || n.x === undefined) continue
     const d = Math.hypot(n.x - focus.x, n.z - focus.z)
     if (d > far) {
       far = d
@@ -357,6 +396,8 @@ export function driverGetsOut(x, z, yaw, focus, mood) {
     }
   }
   if (!pick) return null
+  claimNpc(pick)
+  pick.away = false
   const left = yaw + Math.PI / 2
   pick.kind = 'loose'
   pick.x = x + Math.sin(left) * 1.5
@@ -382,6 +423,8 @@ const LAND = [
   BANANA,
   // the causeway out to Banana Island
   { minX: BANANA.maxX - 1, maxX: ISLAND.minX + 1, minZ: BANANA.causeway.z - ROAD / 2, maxZ: BANANA.causeway.z + ROAD / 2 },
+  EKO,
+  { minX: EKO.causeway.x - ROAD / 2, maxX: EKO.causeway.x + ROAD / 2, minZ: EKO.causeway.z0, maxZ: EKO.causeway.z1 + 1 },
 ]
 export function walkable(x, z) {
   if (x > 1500) return true
@@ -430,16 +473,16 @@ let refillTimer = 0
 function refillStops(focus) {
   const counts = waitingCounts()
   city.busStops.forEach((stop) => {
-    const hidden = Math.hypot(stop.x - focus.x, stop.z - focus.z) > 90
+    const hidden = hiddenFromAll(stop.x, stop.z, focus, 90)
     // Too many people dropped off here: the extras go about their day.
     if (counts[stop.id] > WAITING_PER_STOP + 2 && hidden) {
-      const extra = npcs.find((n) => n.role === 'waiting' && n.stop === stop.id && n.kind === 'idle' && n.active !== false)
+      const extra = npcs.find((n) => n.role === 'waiting' && n.stop === stop.id && n.kind === 'idle' && n.active !== false && runsNpc(n))
       if (extra) {
         extra.role = null
         extra.home = null
         extra.kind = 'walk'
         extra.speed ??= 1.1 + rand() * 0.6
-        placeWalker(extra, focus)
+        placeWalker(extra, neediestFocus(focus))
       }
       return
     }
@@ -447,12 +490,12 @@ function refillStops(focus) {
     for (let c = counts[stop.id]; c < WAITING_PER_STOP; c++) {
       let pick = null
       for (const n of npcs) {
-        if (n.kind !== 'walk' || n.down > 0 || n.panic > 0 || n.x === undefined) continue
+        if (n.kind !== 'walk' || n.down > 0 || n.panic > 0 || n.x === undefined || !runsNpc(n)) continue
         // Close by and on the same stretch of pavement (so they walk along
         // the curb, not across the road or through a building).
         const d = Math.hypot(n.x - stop.x, n.z - stop.z)
         const sameCurb = stop.axis === 'x' ? Math.abs(n.z - stop.z) < 2.5 : Math.abs(n.x - stop.x) < 2.5
-        if ((d < 25 && sameCurb) || (hidden && Math.hypot(n.x - focus.x, n.z - focus.z) > 90)) {
+        if ((d < 25 && sameCurb) || (hidden && hiddenFromAll(n.x, n.z, focus, 90))) {
           pick = n
           if (d < 25 && sameCurb) break
         }
@@ -461,7 +504,7 @@ function refillStops(focus) {
       // walks up along the sidewalk instead.
       let walkUp = false
       if (!pick && !hidden) {
-        pick = npcs.find((n) => n.kind === 'walk' && n.down <= 0 && !(n.panic > 0) && n.x !== undefined && Math.hypot(n.x - focus.x, n.z - focus.z) > 45)
+        pick = npcs.find((n) => n.kind === 'walk' && n.down <= 0 && !(n.panic > 0) && n.x !== undefined && runsNpc(n) && hiddenFromAll(n.x, n.z, focus, 45))
         walkUp = !!pick
       }
       if (!pick) break
@@ -484,17 +527,92 @@ function refillStops(focus) {
   })
 }
 
+// Online, the host keeps people around every player: the distance (squared)
+// to the nearest one, and where to send a walker that's out of everyone's sight.
+function nearestSq(n, focus) {
+  const dx = (n.x ?? 0) - focus.x
+  const dz = (n.z ?? 0) - focus.z
+  let d = dx * dx + dz * dz
+  if (!n.shared) return d
+  for (const f of world.foci ?? []) {
+    if (!f.remote) continue
+    const ex = (n.x ?? 0) - f.x
+    const ez = (n.z ?? 0) - f.z
+    d = Math.min(d, ex * ex + ez * ez)
+  }
+  return d
+}
+function neediestFocus(focus) {
+  const list = world.foci
+  if (!list || list.length < 2) return focus
+  let best = focus
+  let fewest = Infinity
+  for (const f of list) {
+    let c = 0
+    for (const n of npcs) if (n.kind === 'walk' && n.x !== undefined && Math.abs(n.x - f.x) < 110 && Math.abs(n.z - f.z) < 110) c++
+    if (c < fewest) {
+      fewest = c
+      best = f
+    }
+  }
+  return best
+}
+const hiddenFromAll = (x, z, focus, r) => Math.hypot(x - focus.x, z - focus.z) > r && (world.foci ?? []).every((f) => !f.remote || Math.hypot(x - f.x, z - f.z) > r)
+
+// Online, with players far apart: walkers nobody can see move from round a
+// busy player to a quiet one.
+let balanceIn = 1
+function rebalance(dt, focus) {
+  balanceIn -= dt
+  const list = world.foci
+  if (!list || list.length < 2 || balanceIn > 0) return
+  balanceIn = 0.3
+  const near = (n, f) => Math.abs(n.x - f.x) < 110 && Math.abs(n.z - f.z) < 110
+  const ours = npcs.filter((n) => n.kind === 'walk' && runsNpc(n) && n.x !== undefined && !(n.down > 0))
+  for (let moves = 0; moves < 6; moves++) {
+    const counts = list.map((f) => ours.filter((n) => near(n, f)).length)
+    const low = counts.indexOf(Math.min(...counts))
+    const high = counts.indexOf(Math.max(...counts))
+    if (counts[high] - counts[low] < 6) return
+    const spare = ours.find((n) => near(n, list[high]) && list.every((f) => Math.hypot(n.x - f.x, n.z - f.z) > 60))
+    if (!spare) return
+    placeWalker(spare, list[low])
+    // (Placed at the far end, so they're counted there from now on.)
+    const p = loopPoint(spare)
+    spare.x = p.x
+    spare.z = p.z
+  }
+}
+
 export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
   const hits = []
+  rebalance(dt, focus)
   refillTimer -= dt
   if (refillTimer <= 0) {
     refillTimer = 3
     refillStops(focus)
   }
+  const now = performance.now()
   for (const n of npcs) {
-    const dx = (n.x ?? 0) - focus.x
-    const dz = (n.z ?? 0) - focus.z
-    const far = dx * dx + dz * dz > 160 * 160
+    // Someone else online runs this one: follow what they send, but they can
+    // still be knocked flying by our car (and then they're ours for a while).
+    if (!runsNpc(n)) {
+      movePuppet(n, dt, now, loopPoint)
+      n.flinch = Math.max(0, n.flinch - dt)
+      if (!n.away && n.active !== false && !(n.down > 0) && car && Math.abs(car.speed) > 4) {
+        const rx = n.x - car.x
+        const rz = n.z - car.z
+        const c = Math.cos(car.yaw)
+        const s = Math.sin(car.yaw)
+        if (Math.abs(rx * c - rz * s) < car.half[0] + 0.3 && Math.abs(rx * s + rz * c) < car.half[2] + 0.3) {
+          knockDown(n, rx, rz, Math.abs(car.speed) * 0.5)
+          hits.push({ x: n.x, z: n.z })
+        }
+      }
+      continue
+    }
+    const distSq = nearestSq(n, focus)
+    const far = distSq > 160 * 160
     if (far && n.kind !== 'walk' && n.kind !== 'cop') continue
     n.flinch = Math.max(0, n.flinch - dt)
 
@@ -536,26 +654,95 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
         n.yaw += wrap(Math.atan2(focus.x - n.x, focus.z - n.z) - n.yaw) * Math.min(1, dt * 10)
         n.grab = true
       }
+    } else if (n.brawlWith) {
+      // Two people fighting in the street (streetlife.js starts it).
+      const o = n.brawlWith
+      n.brawlT -= dt
+      if (n.brawlT <= 0 || o.brawlWith !== n || o.down > 0 || o.active === false) {
+        n.brawlWith = null
+        n.punchT = -1
+      } else {
+        const d = Math.hypot(o.x - n.x, o.z - n.z)
+        if (d > 1.05) walkToward(n, o.x, o.z, 2.8, dt)
+        else n.yaw += wrap(Math.atan2(o.x - n.x, o.z - n.z) - n.yaw) * Math.min(1, dt * 10)
+        n.punchCooldown -= dt
+        if (n.punchT >= 0) {
+          const before = n.punchT
+          n.punchT += dt * 3
+          if (before < 0.5 && n.punchT >= 0.5 && d < 1.5) {
+            o.flinch = 0.4
+            o.brawlHp = (o.brawlHp ?? 4) - 1
+            events.push({ type: 'brawlHit', x: o.x, z: o.z })
+            if (o.brawlHp <= 0) {
+              knockDown(o, o.x - n.x, o.z - n.z, 4)
+              o.brawlWith = null
+              n.brawlWith = null
+              events.push({ type: 'brawlKO', x: o.x, z: o.z })
+            }
+          }
+          if (n.punchT > 1) n.punchT = -1
+        } else if (d < 1.4 && n.punchCooldown <= 0) {
+          n.punchT = 0
+          n.punchSide = -(n.punchSide ?? 1)
+          n.punchCooldown = 0.7 + rand() * 0.8
+        }
+      }
+    } else if (n.watching) {
+      // In the ring of people watching a fight: crowd round and cheer.
+      const w = n.watching
+      if (now > w.until) n.watching = null
+      else if (walkToward(n, w.x, w.z, 2.6, dt) < 0.2) {
+        n.moving = false
+        n.yaw += wrap(Math.atan2(w.cx - n.x, w.cz - n.z) - n.yaw) * Math.min(1, dt * 6)
+      }
+    } else if (n.chasePlayer && playerOnFoot) {
+      // Estate security after a trespasser: run them down and grab hold.
+      const d = Math.hypot(focus.x - n.x, focus.z - n.z)
+      n.grab = false
+      if (d > 1.15) walkToward(n, focus.x, focus.z, 6.4, dt)
+      else {
+        n.yaw += wrap(Math.atan2(focus.x - n.x, focus.z - n.z) - n.yaw) * Math.min(1, dt * 10)
+        n.grab = true
+      }
     } else if (n.fight > 0 && playerOnFoot) {
-      // Square up to the player and throw punches.
+      // Square up to the player and throw punches, or (with a gun) back off
+      // and shoot.
       n.fight -= dt
       n.punchCooldown -= dt
       const d = Math.hypot(focus.x - n.x, focus.z - n.z)
-      if (d > 18) n.fight = 0
-      if (d > FIGHT_RANGE) walkToward(n, focus.x, focus.z, 3.4, dt)
-      else n.yaw += wrap(Math.atan2(focus.x - n.x, focus.z - n.z) - n.yaw) * Math.min(1, dt * 10)
-      if (n.punchT >= 0) {
-        const before = n.punchT
-        n.punchT += dt * 3
-        if (before < 0.5 && n.punchT >= 0.5 && d < FIGHT_RANGE + 0.4) events.push({ type: 'npcPunch', x: n.x, z: n.z, damage: PUNCH[n.role] ?? 7 })
-        if (n.punchT > 1) n.punchT = -1
-      } else if (d < FIGHT_RANGE + 0.2 && n.punchCooldown <= 0) {
-        n.punchT = 0
-        n.punchSide = -(n.punchSide ?? 1)
-        n.punchCooldown = n.role === 'bouncer' || n.role === 'soldier' ? 0.8 : 1.1
+      if (d > (n.armed ? 40 : 18)) n.fight = 0
+      const face = () => (n.yaw += wrap(Math.atan2(focus.x - n.x, focus.z - n.z) - n.yaw) * Math.min(1, dt * 10))
+      if (n.armed && d > FIGHT_RANGE + 1.2) {
+        n.aim = Math.min(1, n.aim + dt * 4)
+        n.shotCooldown = (n.shotCooldown ?? 0.6) - dt
+        if (d > 16) walkToward(n, focus.x, focus.z, 3.6, dt)
+        else face()
+        if (n.shotCooldown <= 0 && n.aim >= 1 && d < 30) {
+          n.shotCooldown = 0.9 + rand() * 0.9
+          // Harder to hit from far off; never through a wall.
+          const clear = lineClear(n.x, n.z, focus.x, focus.z)
+          const hit = clear && rand() < Math.max(0.15, 0.7 - d * 0.025)
+          events.push({ type: 'npcShot', x: n.x, z: n.z, y: (n.y ?? 0) + 1.25, yaw: n.yaw, tx: focus.x, tz: focus.z, hit, clear, damage: n.role === 'soldier' ? 15 : 10 })
+          panicAround(n, 26)
+        }
+      } else {
+        n.aim = Math.max(0, n.aim - dt * 4)
+        if (d > FIGHT_RANGE) walkToward(n, focus.x, focus.z, 3.4, dt)
+        else face()
+        if (n.punchT >= 0) {
+          const before = n.punchT
+          n.punchT += dt * 3
+          if (before < 0.5 && n.punchT >= 0.5 && d < FIGHT_RANGE + 0.4) events.push({ type: 'npcPunch', x: n.x, z: n.z, damage: PUNCH[n.role] ?? 7 })
+          if (n.punchT > 1) n.punchT = -1
+        } else if (d < FIGHT_RANGE + 0.2 && n.punchCooldown <= 0) {
+          n.punchT = 0
+          n.punchSide = -(n.punchSide ?? 1)
+          n.punchCooldown = n.role === 'bouncer' || n.role === 'soldier' ? 0.8 : 1.1
+        }
       }
     } else if (n.fight > 0) {
       n.fight = 0
+      n.aim = 0
     } else if (n.kind === 'boarding') {
       // Walk to the vehicle's door and climb in; give up if it drives off.
       const v = n.vehicle
@@ -581,7 +768,7 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
         placeWalker(n, focus)
       }
     } else if (n.kind === 'walk') {
-      if (far && dx * dx + dz * dz > RECYCLE * RECYCLE) placeWalker(n, focus)
+      if (far && distSq > RECYCLE * RECYCLE) placeWalker(n, neediestFocus(focus))
       // Rain: everyone hurries.
       n.t += n.dir * n.speed * (n.panic > 0 ? 3.2 : 1 + weather.rain * 1.2) * dt
       const p = loopPoint(n)
@@ -593,9 +780,9 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
         // Stuck behind a wall on the way back: pop back onto the loop once
         // nobody's looking closely.
         n.stuck = n.x === bx && n.z === bz ? (n.stuck ?? 0) + dt : 0
-        if (n.stuck > 2 && dx * dx + dz * dz > 25 * 25) n.x = undefined
+        if (n.stuck > 2 && distSq > 25 * 25) n.x = undefined
         // Far from their pavement for some reason: just put them back on it.
-        if (Math.hypot(p.x - n.x, p.z - n.z) > 30 && dx * dx + dz * dz > 40 * 40) n.x = undefined
+        if (Math.hypot(p.x - n.x, p.z - n.z) > 30 && distSq > 40 * 40) n.x = undefined
       } else {
         n.x = p.x
         n.z = p.z
@@ -629,6 +816,11 @@ export function updatePedestrians(dt, focus, car, playerOnFoot, events = []) {
       if (d < 0.6 && d > 0.001) {
         n.ox += (px / d) * (0.6 - d)
         n.oz += (pz / d) * (0.6 - d)
+        // Shoulder-barged: they've got something to say about it.
+        if (d < 0.5 && now - (n.bumpedAt ?? -1e9) > 6000) {
+          n.bumpedAt = now
+          events.push({ type: 'bump', npc: n })
+        }
       }
     }
     const decay = Math.exp(-1.5 * dt)

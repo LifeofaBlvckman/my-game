@@ -37,6 +37,8 @@ export const useGame = create((set) => ({
   carryColor: null,
   action: null, // what the phone's action button does: { key, icon, label }
   race: null, // the race you're in or invited to (races.js), for the HUD
+  estatePass: 0, // until when the Banana Island guards let you in (streetlife.js)
+  flight: null, // the flight you're on: { to } (flights.js), for the HUD
   sideJob: null, // { index, step } while doing a side job (quests.js SIDE_JOBS)
   jobProgress: 0, // checkpoints reached / items collected in the current step
   collected: [],

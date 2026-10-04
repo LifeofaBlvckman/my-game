@@ -111,8 +111,20 @@ const BANANA_CAUSEWAY = 30 // m of water between Banana Island and Lagos Island
 export const BANANA = (() => {
   const maxX = ISLAND.minX - BANANA_CAUSEWAY
   const z = roadZ(0) // the causeway lines up with the Island's north road
-  return { minX: maxX - 140, maxX, minZ: MAINLAND.minZ - BEACH + 4, maxZ: roadZ(2) - ROAD / 2 - 18, causeway: { z, x0: maxX, x1: ISLAND.minX } }
+  return { minX: MAINLAND.maxX + 24, maxX, minZ: MAINLAND.minZ - BEACH - 174, maxZ: roadZ(2) - ROAD / 2 - 18, causeway: { z, x0: maxX, x1: ISLAND.minX } }
 })()
+// Eko Atlantic: reclaimed land on the Atlantic off Victoria Island's Bar
+// Beach, joined to the Island by a causeway across the sand. It has the
+// Island's airstrip (fly here from the Mainland airport) and a few new towers.
+export const EKO = (() => {
+  const minZ = ISLAND.maxZ + BEACH + 18
+  const x = roadX(ISLAND_FIRST + 3) // the causeway carries on this Island road
+  return { minX: ISLAND.minX + 12, maxX: ISLAND.maxX, minZ, maxZ: minZ + 172, causeway: { x, z0: ISLAND.maxZ - ROAD / 2, z1: minZ } }
+})()
+export const onEko = (x, z, pad = 0) =>
+  (x > EKO.minX - pad && x < EKO.maxX + pad && z > EKO.minZ - pad && z < EKO.maxZ + pad) ||
+  (Math.abs(x - EKO.causeway.x) < ROAD / 2 + 1.2 + pad && z > EKO.causeway.z0 - pad && z < EKO.causeway.z1 + pad)
+
 export const onBanana = (x, z, pad = 0) => x > BANANA.minX - pad && x < BANANA.maxX + pad && z > BANANA.minZ - pad && z < BANANA.maxZ + pad
 
 // --- Road network ---
@@ -159,6 +171,7 @@ export const ZONES = {
   apapa: 'APAPA',
   ajegunle: 'AJEGUNLE',
   banana: 'BANANA ISLAND',
+  eko: 'EKO ATLANTIC',
   yaba: 'YABA',
   surulere: 'SURULERE',
   ebute: 'EBUTE METTA',
@@ -172,6 +185,7 @@ export const ZONES = {
 
 export function zoneAt(x, z) {
   if (onBanana(x, z, 2)) return ZONES.banana
+  if (z > ISLAND.maxZ + BEACH && onEko(x, z, 2)) return ZONES.eko
   if (z > MAINLAND.maxZ + 2 || z < MAINLAND.minZ - 2 || x < MAINLAND.minX - 2 || x > ISLAND.maxX + 2) return ZONES.beach
   if (onBanana(x, z, 2) || (x > BANANA.maxX && x < ISLAND.minX && Math.abs(z - BANANA.causeway.z) < ROAD)) return ZONES.banana
   if (x > MAINLAND.maxX && x < ISLAND.minX) {
@@ -381,7 +395,13 @@ function addAirport(city) {
   fence({ x: x1 - 0.6, z: (z0 + z1 - 20) / 2, w: 0.12, d: z1 - z0 - 20 })
   // Travellers milling about out front.
   city.wanderAreas.push({ x: tx, z: tz + 8.6, w: 58, d: 2.2, count: 10, y })
+  // Departures: walk in to check in and book a flight to Eko Atlantic.
+  city.doors.push({ id: 'terminal', name: 'MMA TERMINAL', x: tx - 18, z: tz + 7 + 1.3 })
   city.airport = {
+    // Flights take off to the east and land from the west (flights.js).
+    takeoff: 1,
+    land: 1,
+    gate: { x: tx - 18, z: tz + 7 + 2.6 }, // where you come out after a flight
     runway: { x0: cx - rw / 2, x1: cx + rw / 2, z: rz },
     // Parked airliners on the apron, noses to the terminal.
     stands: [-38, -2, 34].map((dx) => ({ x: cx + dx, z: z0 + 58, yaw: 0 })),
@@ -390,9 +410,98 @@ function addAirport(city) {
   }
 }
 
-// The Banana Island estate: one boulevard from the gate, villas behind
-// garden walls on both sides (pools, lawns, palms, a G-Wagon in the drive),
-// the big mansion for sale at the far end, and estate security at the gate.
+// Eko Atlantic: the causeway across Bar Beach, a boulevard with a few new
+// glass towers, and the airport: a terminal, apron, control tower, hangar and
+// a long runway along the Atlantic. Planes.jsx parks jets here too.
+function addEkoAtlantic(city) {
+  const E = EKO
+  const y = SIDEWALK_Y
+  const flat = (o) => city.solids.push({ h: 0.03, y, ...o })
+  const cx = E.causeway.x
+  city.blocks.push({ x: (E.minX + E.maxX) / 2, z: (E.minZ + E.maxZ) / 2, w: E.maxX - E.minX - 2, d: E.maxZ - E.minZ - 2, color: '#9fbf72' }) // grass
+  // The causeway lands on a boulevard running along the north shore.
+  const bz = E.minZ + 9
+  flat({ x: (E.minX + E.maxX) / 2, z: bz, w: E.maxX - E.minX - 6, d: 12, color: '#3d3d42' })
+  flat({ x: cx, z: (E.causeway.z1 + bz) / 2 - 1, w: ROAD, d: bz - E.causeway.z1 + 4, color: '#3d3d42' })
+  for (let x = E.minX + 10; x < E.maxX - 6; x += 9) flat({ x, z: bz, w: 4, d: 0.3, color: '#f2f2ee', y: y + 0.01 })
+  for (let x = E.minX + 14; x < E.maxX - 8; x += 16) city.trees.push({ x, z: bz + 8 })
+  city.lamps.push(...Array.from({ length: 9 }, (_, k) => ({ x: E.minX + 20 + k * 34, z: bz - 7, rot: Math.PI })))
+  // New Eko Atlantic towers at the west end.
+  const towers = [
+    { x: E.minX + 16, z: bz + 22, w: 18, d: 16, h: 62, color: '#6fa3c8' },
+    { x: E.minX + 40, z: bz + 26, w: 16, d: 14, h: 44, color: '#3d5f7a' },
+    { x: E.minX + 62, z: bz + 22, w: 14, d: 14, h: 76, color: '#9cc3d8' },
+  ]
+  for (const t of towers) city.buildings.push({ ...t, landmark: true, facade: 'tower' })
+  city.signs.push({ text: 'EKO ATLANTIC CITY', x: E.minX + 40, y: 3.4, z: bz + 18.5, rot: Math.PI, w: 10, h: 1.4, bg: '#0d2a4a', fg: '#ffffff', posts: true })
+  // Terminal, east of the causeway, its doors on the boulevard.
+  const tx = cx + 52
+  const tz = bz + 18
+  city.buildings.push({ x: tx, z: tz, w: 58, d: 14, h: 10, color: '#e6ecef', landmark: true, facade: 'tower' })
+  city.solids.push({ x: tx, z: tz - 7 - 2.5, w: 50, d: 5, h: 0.35, color: '#e9edf0', y: 4.4 }) // canopy
+  for (let k = -2; k <= 2; k++) city.solids.push({ x: tx + k * 12, z: tz - 7 - 4.6, w: 0.35, d: 0.35, h: 4.4, color: '#c9cdd2', collider: true })
+  city.signs.push({ text: 'EKO ATLANTIC AIRPORT', x: tx, y: 8.2, z: tz - 7.08, rot: Math.PI, w: 26, h: 2, bg: '#0d3b6e', fg: '#ffffff', glow: '#9fd6ff' })
+  city.signs.push({ text: 'DEPARTURES', x: tx - 12, y: 3.4, z: tz - 7.08, rot: Math.PI, w: 7, h: 0.9, bg: '#1b1b24', fg: '#ffd23a' })
+  city.solids.push({ x: tx - 12, z: tz - 7.05, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true })
+  city.solids.push({ x: tx + 12, z: tz - 7.05, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true })
+  city.doors.push({ id: 'ekoterminal', name: 'EKO ATLANTIC AIRPORT', x: tx - 12, z: tz - 7 - 1.3, yaw: Math.PI })
+  city.wanderAreas.push({ x: tx, z: tz - 9, w: 46, d: 2.2, count: 8, y })
+  for (let k = 0; k < 5; k++) city.parkedCars.push({ x: tx + 40 + (k % 2) * 6, z: bz + 10 + Math.floor(k / 2) * 5, yaw: Math.PI / 2, type: ['benz', 'gwagon', 'sports', 'jeep', 'benz'][k] })
+  // Apron and the parked jets, then the taxiway down to the runway.
+  const az = tz + 26
+  flat({ x: tx, z: az, w: 96, d: 30, color: '#b8b8b2' })
+  for (let k = -1; k <= 1; k++) flat({ x: tx + k * 30, z: az, w: 0.4, d: 26, color: '#e8c547', y: y + 0.01 })
+  const rz = E.maxZ - 46
+  flat({ x: tx + 40, z: (az + rz) / 2, w: 10, d: rz - az - 4, color: '#4a4b4f' })
+  flat({ x: tx + 40, z: (az + rz) / 2, w: 0.35, d: rz - az - 4, color: '#e8c547', y: y + 0.01 })
+  // The runway: 300 m along the shore, numbers, centre line and threshold bars.
+  const x0 = E.minX + 8
+  const x1 = E.maxX - 8
+  const rw = x1 - x0
+  const rcx = (x0 + x1) / 2
+  flat({ x: rcx, z: rz, w: rw, d: 20, color: '#353639' })
+  for (let x = x0 + 16; x < x1 - 16; x += 10) flat({ x, z: rz, w: 5, d: 0.5, color: '#f2f2ee', y: y + 0.01 })
+  for (const end of [-1, 1]) {
+    for (let k = -4; k <= 4; k++) if (k) flat({ x: rcx + end * (rw / 2 - 6), z: rz + k * 2, w: 7, d: 0.9, color: '#f2f2ee', y: y + 0.01 })
+    flat({ x: rcx + end * (rw / 2 - 0.6), z: rz, w: 0.6, d: 20, color: '#e8c547', y: y + 0.01 })
+    // Approach lights out on the grass.
+    for (let k = 1; k <= 3; k++) city.solids.push({ x: rcx + end * (rw / 2 + 1 + k * 1.2), z: rz, w: 0.4, d: 8, h: 0.2, color: '#ffd23a', emissive: true, y })
+  }
+  for (const side of [-1, 1]) for (let x = x0 + 4; x < x1; x += 20) city.solids.push({ x, z: rz + side * 10.6, w: 0.3, d: 0.3, h: 0.3, color: side < 0 ? '#9fe0ff' : '#9fe0ff', emissive: true, y })
+  // Control tower and a hangar.
+  const ox = E.maxX - 22
+  const oz = bz + 26
+  city.solids.push({ x: ox, z: oz, w: 3.4, d: 3.4, h: 24, color: '#e9edf0', collider: true })
+  city.solids.push({ x: ox, z: oz, w: 7.4, d: 7.4, h: 0.5, color: '#c9cdd2', y: 24 })
+  city.solids.push({ x: ox, z: oz, w: 6.8, d: 6.8, h: 3.2, color: '#5fc8e8', y: 24.5, emissive: true })
+  city.solids.push({ x: ox, z: oz, w: 7.8, d: 7.8, h: 0.5, color: '#2f3640', y: 27.7 })
+  const hx = cx - 26
+  const hz = az + 2
+  city.buildings.push({ x: hx, z: hz, w: 34, d: 22, h: 12, color: '#c9cdd2', landmark: true, roof: { h: 4, color: '#8a9096' } })
+  city.solids.push({ x: hx, z: hz + 11.06, w: 26, d: 0.1, h: 9, color: '#5d656b' }) // hangar door
+  city.signs.push({ text: 'EKO AIR', x: hx, y: 10.5, z: hz + 11.12, rot: 0, w: 10, h: 1.6, bg: '#1f8a4a', fg: '#ffffff' })
+  // A low fence along the boulevard side of the airfield (open at the terminal).
+  const fence = (o) => city.solids.push({ collider: true, h: 2.2, color: '#9aa0a6', ...o })
+  fence({ x: (E.minX + tx - 32) / 2 + 40, z: az - 16, w: tx - 32 - E.minX - 80, d: 0.12 })
+  fence({ x: (tx + 32 + E.maxX) / 2, z: az - 16, w: E.maxX - tx - 34, d: 0.12 })
+  city.ekoAirport = {
+    // Flights land from the east and take off to the west.
+    takeoff: -1,
+    land: -1,
+    gate: { x: tx - 12, z: tz - 7 - 2.6 },
+    runway: { x0, x1, z: rz },
+    stands: [-30, 0, 30].map((dx) => ({ x: tx + dx, z: az + 2, yaw: Math.PI })),
+    terminal: { x: tx, z: tz - 8 },
+    tower: { x: ox, z: oz },
+  }
+}
+
+// The Banana Island estate: a grid of quiet estate roads behind the gate (a
+// palm boulevard, a north avenue and two cross streets), villas behind
+// garden walls on every road (pools, lawns, a G-Wagon in the drive, a gateman
+// at some gates), the clubhouse with its pool and tennis court, a park, the
+// estate mart, a marina with yachts, and the big mansion for sale at the
+// west end of the boulevard.
 function addBananaIsland(city) {
   const B = BANANA
   const r = mulberry32(5150)
@@ -400,12 +509,30 @@ function addBananaIsland(city) {
   const flat = (o) => city.solids.push({ h: 0.03, y, ...o })
   const cz = B.causeway.z
   city.blocks.push({ x: (B.minX + B.maxX) / 2, z: (B.minZ + B.maxZ) / 2, w: B.maxX - B.minX - 2, d: B.maxZ - B.minZ - 2, color: '#a9c27c' }) // lawns
-  // The boulevard from the gate, with a palm-lined median.
-  flat({ x: (B.minX + B.maxX) / 2 + 4, z: cz, w: B.maxX - B.minX - 8, d: 11, color: '#3d3d42' })
-  flat({ x: (B.minX + B.maxX) / 2 + 4, z: cz, w: B.maxX - B.minX - 30, d: 1.6, color: '#7fa35a', y: y + 0.02 })
-  for (let x = B.minX + 22; x < B.maxX - 14; x += 12) city.trees.push({ x, z: cz })
-  // Estate security: gatehouse, boom barrier (GameLogic lifts it for
-  // residents) and guards.
+  // Estate roads, as rectangles {x0, x1, z0, z1}.
+  const zn = cz - 80 // the avenues
+  const zf = cz - 160
+  const xa = B.minX + 100 // cross streets
+  const xb = B.maxX - 54
+  const roads = [
+    { x0: B.minX + 56, x1: B.maxX + 1, z0: cz - 6, z1: cz + 6, main: true },
+    { x0: B.minX + 4, x1: B.maxX - 4, z0: zn - 5, z1: zn + 5 },
+    { x0: B.minX + 4, x1: B.maxX - 4, z0: zf - 5, z1: zf + 5 },
+    { x0: xa - 4.5, x1: xa + 4.5, z0: zf - 5, z1: B.maxZ - 6 },
+    { x0: xb - 4.5, x1: xb + 4.5, z0: zf - 5, z1: B.maxZ - 6 },
+  ]
+  for (const rd of roads) flat({ x: (rd.x0 + rd.x1) / 2, z: (rd.z0 + rd.z1) / 2, w: rd.x1 - rd.x0, d: rd.z1 - rd.z0, color: '#3d3d42' })
+  // The boulevard's palm median and kerbs.
+  flat({ x: (B.minX + 56 + B.maxX - 20) / 2, z: cz, w: B.maxX - B.minX - 80, d: 1.6, color: '#7fa35a', y: y + 0.02 })
+  for (let x = B.minX + 66; x < B.maxX - 18; x += 12) if (Math.abs(x - xa) > 8 && Math.abs(x - xb) > 8) city.trees.push({ x, z: cz })
+  // Lamps along every road.
+  for (const rd of roads) {
+    const alongX = rd.x1 - rd.x0 > rd.z1 - rd.z0
+    if (alongX) for (let x = rd.x0 + 10; x < rd.x1 - 6; x += 30) city.lamps.push({ x, z: rd.z0 - 1.2 })
+    else for (let z = rd.z0 + 10; z < rd.z1 - 6; z += 30) city.lamps.push({ x: rd.x0 - 1.2, z })
+  }
+  // Estate security: gatehouse, boom barrier (EstateGate.jsx lifts it for
+  // residents) and guards, plus guards walking the roads (streetlife.js).
   const gx = B.maxX - 4
   city.solids.push({ x: gx - 2, z: cz - 8.2, w: 4, d: 3, h: 2.8, color: '#f4f1e8', collider: true })
   city.solids.push({ x: gx - 2, z: cz - 8.2, w: 4.6, d: 3.6, h: 0.2, color: '#3d4a5c', y: 2.8 })
@@ -413,58 +540,187 @@ function addBananaIsland(city) {
   city.signs.push({ text: 'BANANA ISLAND\nRESIDENTS ONLY', x: gx + 1, y: 3.6, z: cz + 7.2, rot: Math.PI / 2, w: 4.6, h: 1.4, bg: '#1f3b2f', fg: '#e0c35a', posts: true })
   city.idlers.push({ x: gx - 0.5, z: cz - 5.6, y, yaw: Math.PI / 2, role: 'guard' })
   city.idlers.push({ x: gx - 0.5, z: cz + 5.8, y, yaw: Math.PI / 2, role: 'guard' })
-  // Villas: three plots each side of the boulevard, the mansion at the end.
+  const patrols = [
+    { x: (B.minX + 56 + B.maxX) / 2, z: cz + 7.5, w: B.maxX - B.minX - 70, d: 1, count: 2, y, guard: true },
+    { x: (B.minX + B.maxX) / 2, z: zn + 6.5, w: B.maxX - B.minX - 20, d: 1, count: 2, y, guard: true },
+    { x: (B.minX + B.maxX) / 2, z: zf + 6.5, w: B.maxX - B.minX - 20, d: 1, count: 1, y, guard: true },
+  ]
+  city.wanderAreas.push(...patrols)
+  // Special lots, kept clear of villas.
+  const lots = []
+  const overlaps = (a, b, pad = 0) => a.x0 < b.x1 + pad && a.x1 > b.x0 - pad && a.z0 < b.z1 + pad && a.z1 > b.z0 - pad
+  // The mansion: its own walled grounds at the west end, facing east down the boulevard.
+  const mz = cz
+  const mansion = { x0: B.minX + 6, x1: B.minX + 54, z0: mz - 34, z1: mz + 34 }
+  lots.push(mansion)
+  {
+    const mx = (mansion.x0 + mansion.x1) / 2
+    const wall = (o) => city.solids.push({ collider: true, h: 2.2, color: '#efe6d2', ...o })
+    wall({ x: mx, z: mansion.z0, w: mansion.x1 - mansion.x0, d: 0.4 })
+    wall({ x: mx, z: mansion.z1, w: mansion.x1 - mansion.x0, d: 0.4 })
+    wall({ x: mansion.x0, z: mz, w: 0.4, d: mansion.z1 - mansion.z0 })
+    wall({ x: mansion.x1, z: (mansion.z0 + mz - 6) / 2, w: 0.4, d: mz - 6 - mansion.z0 })
+    wall({ x: mansion.x1, z: (mansion.z1 + mz + 6) / 2, w: 0.4, d: mansion.z1 - mz - 6 })
+    for (const s of [-1, 1]) city.solids.push({ x: mansion.x1, z: mz + s * 6.4, w: 1.2, d: 1.2, h: 3.2, color: '#d4af37', collider: true }) // gate pillars
+    // The house: a main block with two wings and a columned porch.
+    const hx = mansion.x0 + 18
+    city.buildings.push({ x: hx, z: mz, w: 16, d: 26, h: 11, color: '#fbfaf6', landmark: true, roof: { h: 3.6, color: '#2f3640' } })
+    for (const s of [-1, 1]) city.buildings.push({ x: hx - 2, z: mz + s * 19, w: 12, d: 12, h: 7.4, color: '#f6f1e6', landmark: true, roof: { h: 2.6, color: '#2f3640' } })
+    for (const dz of [-4.5, -1.5, 1.5, 4.5]) city.solids.push({ x: hx + 9.6, z: mz + dz, w: 0.6, d: 0.6, h: 6.4, color: '#ffffff', collider: true, y })
+    city.solids.push({ x: hx + 9.6, z: mz, w: 3, d: 11, h: 0.5, color: '#f2efe6', y: y + 6.4 }) // porch roof
+    // Fountain on the forecourt, a long pool and palms.
+    city.solids.push({ x: hx + 20, z: mz, w: 6, d: 6, h: 0.5, color: '#e9e4d6', collider: true, y })
+    flat({ x: hx + 20, z: mz, w: 5, d: 5, color: '#5fd0e8', y: y + 0.51 })
+    city.solids.push({ x: hx + 20, z: mz, w: 0.6, d: 0.6, h: 1.8, color: '#d4af37', y: y + 0.5 })
+    flat({ x: hx + 4, z: mz + 28.5, w: 16, d: 5, color: '#5fd0e8', y: y + 0.02 })
+    flat({ x: hx + 4, z: mz + 28.5, w: 17, d: 6, color: '#f2efe6', y: y + 0.01 })
+    for (const dz of [-24, -14, 14, 24]) city.trees.push({ x: hx + 26, z: mz + dz })
+    city.parkedCars.push({ x: hx + 14, z: mz + 9, yaw: Math.PI / 2, type: 'sports' })
+    city.parkedCars.push({ x: hx + 14, z: mz - 9, yaw: Math.PI / 2, type: 'gwagon' })
+    // Its door faces east down the boulevard.
+    const doorX = hx + 8 + 1.3
+    city.solids.push({ x: hx + 8.05, z: mz, w: 0.12, d: 2.6, h: 2.8, color: '#ffd9a0', emissive: true })
+    city.signs.push({ text: 'BANANA ISLAND MANSION', x: hx + 8.12, y: 7.6, z: mz, rot: Math.PI / 2, w: 10, h: 1.2, bg: '#d4af37', fg: '#ffffff' })
+    city.doors.push({ id: 'mansion', name: 'BANANA ISLAND MANSION', x: doorX, z: mz, sale: 500000, yaw: Math.PI / 2 })
+    city.properties.push({ id: 'mansion', name: 'BANANA ISLAND MANSION', price: 500000, kind: 'house', x: doorX, z: mz, signRot: Math.PI / 2 })
+  }
+  // The clubhouse, its pool and a tennis court, between the boulevard and the avenue.
+  const club = { x0: xa + 8, x1: xb - 8, z0: zn + 9, z1: cz - 9 }
+  lots.push(club)
+  {
+    const cx = (club.x0 + club.x1) / 2
+    city.buildings.push({ x: cx - 18, z: club.z1 - 12, w: 26, d: 14, h: 7, color: '#f2ece0', landmark: true, roof: { h: 2.8, color: '#7a3b2a' } })
+    city.signs.push({ text: 'BANANA ISLAND CLUB', x: cx - 18, y: 5.8, z: club.z1 - 4.9, rot: 0, w: 12, h: 1.3, bg: '#1f3b2f', fg: '#e0c35a' })
+    city.solids.push({ x: cx - 18, z: club.z1 - 4.95, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true })
+    flat({ x: cx + 14, z: club.z1 - 14, w: 18, d: 9, color: '#5fd0e8', y: y + 0.02 })
+    flat({ x: cx + 14, z: club.z1 - 14, w: 21, d: 12, color: '#f2efe6', y: y + 0.01 })
+    for (let k = 0; k < 4; k++) city.solids.push({ x: cx + 6 + k * 5, z: club.z1 - 21.5, w: 1.6, d: 0.7, h: 0.4, color: '#ffffff', y }) // sun loungers
+    // Tennis court: green, white lines and a net.
+    const tz = club.z0 + 16
+    flat({ x: cx, z: tz, w: 36, d: 18, color: '#2f7a4a', y: y + 0.02 })
+    flat({ x: cx, z: tz, w: 23.8, d: 11, color: '#3f8fd8', y: y + 0.03 })
+    for (const dz of [-5.5, 5.5]) flat({ x: cx, z: tz + dz, w: 23.8, d: 0.1, color: '#ffffff', y: y + 0.04 })
+    for (const dx of [-11.9, 11.9]) flat({ x: cx + dx, z: tz, w: 0.1, d: 11, color: '#ffffff', y: y + 0.04 })
+    city.solids.push({ x: cx, z: tz, w: 0.06, d: 12.8, h: 1.0, color: '#e8e8e8', y })
+    city.wanderAreas.push({ x: cx + 14, z: club.z1 - 21, w: 16, d: 2, count: 4, y }) // by the pool
+  }
+  // A park with a fountain and benches, north of the avenue.
+  const park = { x0: xa + 8, x1: xb - 8, z0: zf + 9, z1: zn - 9 }
+  lots.push(park)
+  {
+    const px = (park.x0 + park.x1) / 2
+    const pz = (park.z0 + park.z1) / 2
+    flat({ x: px, z: pz, w: park.x1 - park.x0, d: 3, color: '#d9cba8', y: y + 0.02 })
+    flat({ x: px, z: pz, w: 3, d: park.z1 - park.z0, color: '#d9cba8', y: y + 0.02 })
+    city.solids.push({ x: px, z: pz, w: 7, d: 7, h: 0.6, color: '#e9e4d6', collider: true, y })
+    flat({ x: px, z: pz, w: 6, d: 6, color: '#5fd0e8', y: y + 0.61 })
+    for (let k = 0; k < 10; k++) city.trees.push({ x: park.x0 + 6 + (k % 5) * ((park.x1 - park.x0 - 12) / 4), z: k < 5 ? park.z0 + 8 : park.z1 - 8 })
+    for (const s of [-1, 1]) city.solids.push({ x: px + s * 9, z: pz + 3, w: 2.2, d: 0.6, h: 0.5, color: '#8a5e3c', y })
+    city.wanderAreas.push({ x: px, z: pz, w: park.x1 - park.x0 - 10, d: 2, count: 5, y })
+  }
+  // The estate mart, by the gate.
+  const mart = { x0: xb + 8, x1: B.maxX - 6, z0: cz - 38, z1: cz - 9 }
+  lots.push(mart)
+  city.buildings.push({ x: (mart.x0 + mart.x1) / 2, z: mart.z1 - 10, w: mart.x1 - mart.x0 - 6, d: 14, h: 6, color: '#e9eef0', landmark: true })
+  city.signs.push({ text: 'ESTATE MART', x: (mart.x0 + mart.x1) / 2, y: 4.6, z: mart.z1 - 2.9, rot: 0, w: 10, h: 1.4, bg: '#c8202a', fg: '#ffffff' })
+  city.solids.push({ x: (mart.x0 + mart.x1) / 2, z: mart.z1 - 2.95, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true })
+  for (let k = 0; k < 3; k++) city.parkedCars.push({ x: mart.x0 + 6 + k * 5, z: mart.z1 - 0.5, yaw: 0, type: ['benz', 'jeep', 'gwagon'][k] })
+  // The marina: a jetty out from the north shore and yachts tied up.
+  const mx0 = xb + 10
+  city.solids.push({ x: mx0 + 14, z: B.minZ - 10, w: 4, d: 26, h: 0.4, color: '#8a6a4a', collider: true, y: -0.2 })
+  city.solids.push({ x: mx0 + 14, z: B.minZ - 22, w: 26, d: 3, h: 0.4, color: '#8a6a4a', collider: true, y: -0.2 })
+  city.yachts = [
+    { x: mx0 + 6, z: B.minZ - 14, yaw: 0, color: '#ffffff' },
+    { x: mx0 + 22, z: B.minZ - 14, yaw: Math.PI, color: '#f2efe6' },
+    { x: mx0 + 2, z: B.minZ - 28, yaw: Math.PI / 2, color: '#1d1d22' },
+  ]
+  city.signs.push({ text: 'BANANA ISLAND MARINA', x: mx0 + 14, y: 2.6, z: B.minZ + 3, rot: Math.PI, w: 9, h: 1.1, bg: '#0d2a4a', fg: '#ffffff', posts: true })
+  // Villas on every road that has room, facing the road.
   const villas = []
-  const plotW = 26
-  for (const side of [-1, 1]) {
-    const depth = side < 0 ? cz - B.minZ - 8 : Math.min(36, B.maxZ - cz - 8)
-    for (let k = 0; k < 3; k++) {
-      const px = B.maxX - 20 - plotW / 2 - k * plotW
-      const pz = cz + side * (5.5 + 2 + depth / 2)
-      villas.push({ x: px, z: pz, w: plotW - 2, d: depth, side })
+  const inside = (p) => p.x0 > B.minX + 3 && p.x1 < B.maxX - 3 && p.z0 > B.minZ + 3 && p.z1 < B.maxZ - 3
+  const tryPlot = (p, face) => {
+    if (!inside(p) || roads.some((rd) => overlaps(p, rd, 1)) || lots.some((l) => overlaps(p, l, 1)) || villas.some((v) => overlaps(p, v, 1))) return
+    villas.push({ ...p, face })
+  }
+  // Walk along each side of each road and take every free plot.
+  const W = 21
+  const D = 27
+  const fits = (p) => inside(p) && !roads.some((rd) => overlaps(p, rd, 1)) && !lots.some((l) => overlaps(p, l, 1)) && !villas.some((v) => overlaps(p, v, 1))
+  for (const rd of roads) {
+    const alongX = rd.x1 - rd.x0 > rd.z1 - rd.z0
+    const [a0, a1] = alongX ? [rd.x0, rd.x1] : [rd.z0, rd.z1]
+    for (const side of [-1, 1]) {
+      for (let a = a0; a + W < a1; ) {
+        const p = alongX
+          ? { x0: a, x1: a + W, z0: side > 0 ? rd.z1 + 3 : rd.z0 - 3 - D, z1: side > 0 ? rd.z1 + 3 + D : rd.z0 - 3 }
+          : { z0: a, z1: a + W, x0: side > 0 ? rd.x1 + 3 : rd.x0 - 3 - D, x1: side > 0 ? rd.x1 + 3 + D : rd.x0 - 3 }
+        if (fits(p)) {
+          tryPlot(p, alongX ? [0, -side] : [-side, 0])
+          a += W + 2
+        } else a += 1
+      }
     }
   }
-  const WALLS = ['#f4f1e8', '#efe6d2', '#e9eef0', '#f6efe6']
-  for (const v of villas) {
-    // Garden wall with a gate gap facing the boulevard.
-    const wall = (o) => city.solids.push({ collider: true, h: 1.7, color: '#e6dfcf', ...o })
-    const front = v.z - v.side * v.d / 2
-    const back = v.z + v.side * v.d / 2
-    wall({ x: v.x, z: back, w: v.w, d: 0.35 })
-    wall({ x: v.x - v.w / 2, z: v.z, w: 0.35, d: v.d })
-    wall({ x: v.x + v.w / 2, z: v.z, w: 0.35, d: v.d })
-    const gap = 5
-    wall({ x: v.x - (v.w + gap) / 4, z: front, w: (v.w - gap) / 2, d: 0.35 })
-    wall({ x: v.x + (v.w + gap) / 4, z: front, w: (v.w - gap) / 2, d: 0.35 })
-    // The house, a pool behind it, a palm or two, and the car in the drive.
-    const hz = v.z + v.side * 2
-    city.buildings.push({ x: v.x + 2, z: hz, w: 13, d: 9, h: 7.6, color: WALLS[Math.floor(r() * WALLS.length)], landmark: true, roof: { h: 3.2, color: r() < 0.5 ? '#3d4a5c' : '#7a3b2a' } })
-    flat({ x: v.x + 2, z: back - v.side * 4.5, w: 8, d: 4, color: '#5fd0e8', y: y + 0.02 }) // pool
-    flat({ x: v.x + 2, z: back - v.side * 4.5, w: 8.8, d: 4.8, color: '#f2efe6', y: y + 0.01 })
-    city.trees.push({ x: v.x - v.w / 2 + 2.5, z: back - v.side * 2.5 })
-    if (r() < 0.6) city.trees.push({ x: v.x + v.w / 2 - 2.5, z: front + v.side * 3 })
-    city.parkedCars.push({ x: v.x - 6, z: front + v.side * 4, yaw: v.side > 0 ? 0 : Math.PI, type: r() < 0.5 ? 'gwagon' : 'benz' })
-  }
-  // The mansion: the biggest plot, at the far end on the water.
-  const mx = B.minX + 14
-  const mz = cz
-  const mw = 26
-  city.solids.push({ x: mx, z: mz - 16, w: mw, d: 0.35, h: 1.9, color: '#e6dfcf', collider: true })
-  city.solids.push({ x: mx, z: mz + 16, w: mw, d: 0.35, h: 1.9, color: '#e6dfcf', collider: true })
-  city.solids.push({ x: mx - mw / 2, z: mz, w: 0.35, d: 32, h: 1.9, color: '#e6dfcf', collider: true })
-  city.buildings.push({ x: mx - 2, z: mz, w: 14, d: 22, h: 10.8, color: '#fbfaf6', landmark: true, roof: { h: 3.4, color: '#2f3640' } })
-  flat({ x: mx + 7, z: mz - 9, w: 6, d: 6, color: '#5fd0e8', y: y + 0.02 }) // pool
-  for (const dz of [-12, 12]) city.trees.push({ x: mx + 9, z: mz + dz })
-  city.parkedCars.push({ x: mx + 8, z: mz + 7, yaw: Math.PI / 2, type: 'sports' })
-  // Its door faces east along the boulevard.
-  const doorX = mx - 2 + 7 + 1.3
-  city.solids.push({ x: mx - 2 + 7.05, z: mz, w: 0.12, d: 2.6, h: 2.8, color: '#ffd9a0', emissive: true })
-  city.signs.push({ text: 'BANANA ISLAND MANSION', x: mx - 2 + 7.12, y: 4.4, z: mz, rot: Math.PI / 2, w: 10, h: 1.2, bg: '#d4af37', fg: '#ffffff' })
-  city.doors.push({ id: 'mansion', name: 'BANANA ISLAND MANSION', x: doorX, z: mz, sale: 500000 })
-  city.properties.push({ id: 'mansion', name: 'BANANA ISLAND MANSION', price: 500000, kind: 'house', x: doorX, z: mz, signRot: Math.PI / 2 })
-  // A few residents out for a walk, and the island for the map.
-  city.wanderAreas.push({ x: (B.minX + B.maxX) / 2, z: cz + 6.2, w: B.maxX - B.minX - 40, d: 1.2, count: 4, y })
-  city.bananaIsland = { gate: { x: B.maxX + 1, z: cz }, villas }
+  const WALLS = ['#f4f1e8', '#efe6d2', '#e9eef0', '#f6efe6', '#f3e3d0']
+  villas.forEach((v, k) => {
+    const cxp = (v.x0 + v.x1) / 2
+    const czp = (v.z0 + v.z1) / 2
+    const [fx, fz] = v.face
+    const alongX = fz !== 0 // the front is an x-running edge
+    const wall = (o) => city.solids.push({ collider: true, h: 1.8, color: '#e6dfcf', ...o })
+    // Garden wall with a gate gap in the front.
+    const gap = 5.5
+    const frontX = fx > 0 ? v.x1 : v.x0
+    const frontZ = fz > 0 ? v.z1 : v.z0
+    if (alongX) {
+      const backZ = fz > 0 ? v.z0 : v.z1
+      wall({ x: cxp, z: backZ, w: v.x1 - v.x0, d: 0.35 })
+      wall({ x: v.x0, z: czp, w: 0.35, d: v.z1 - v.z0 })
+      wall({ x: v.x1, z: czp, w: 0.35, d: v.z1 - v.z0 })
+      const seg = (v.x1 - v.x0 - gap) / 2
+      wall({ x: v.x0 + seg / 2, z: frontZ, w: seg, d: 0.35 })
+      wall({ x: v.x1 - seg / 2, z: frontZ, w: seg, d: 0.35 })
+    } else {
+      const backX = fx > 0 ? v.x0 : v.x1
+      wall({ x: backX, z: czp, w: 0.35, d: v.z1 - v.z0 })
+      wall({ x: cxp, z: v.z0, w: v.x1 - v.x0, d: 0.35 })
+      wall({ x: cxp, z: v.z1, w: v.x1 - v.x0, d: 0.35 })
+      const seg = (v.z1 - v.z0 - gap) / 2
+      wall({ x: frontX, z: v.z0 + seg / 2, w: 0.35, d: seg })
+      wall({ x: frontX, z: v.z1 - seg / 2, w: 0.35, d: seg })
+    }
+    // The house sits back from the gate, the pool behind it.
+    const hx = cxp - fx * 2
+    const hz = czp - fz * 2
+    const modern = r() < 0.5
+    const hw = alongX ? 14 : 10
+    const hd = alongX ? 10 : 14
+    const color = WALLS[Math.floor(r() * WALLS.length)]
+    if (modern) {
+      // A white cube with a cantilevered upper floor and a band of glass.
+      city.buildings.push({ x: hx, z: hz, w: hw, d: hd, h: 7.4, color, landmark: true })
+      city.solids.push({ x: hx + fx * 1.2, z: hz + fz * 1.2, w: hw + (alongX ? 2 : 2.4), d: hd + (alongX ? 2.4 : 2), h: 0.35, color: '#2f3640', y: 7.4 })
+      city.solids.push({ x: hx + fx * (hw / 2 + 0.06) * (alongX ? 0 : 1), z: hz + fz * (hd / 2 + 0.06) * (alongX ? 1 : 0), w: alongX ? hw - 2 : 0.06, d: alongX ? 0.06 : hd - 2, h: 1.3, color: '#9fd6e8', y: 4.4, emissive: true })
+    } else {
+      city.buildings.push({ x: hx, z: hz, w: hw, d: hd, h: 7.6, color, landmark: true, roof: { h: 3.2, color: r() < 0.5 ? '#3d4a5c' : '#7a3b2a' } })
+    }
+    const bx = cxp + fx * -11
+    const bz = czp + fz * -11
+    flat({ x: bx, z: bz, w: alongX ? 9 : 4.2, d: alongX ? 4.2 : 9, color: '#5fd0e8', y: y + 0.02 }) // pool
+    flat({ x: bx, z: bz, w: alongX ? 10 : 5.2, d: alongX ? 5.2 : 10, color: '#f2efe6', y: y + 0.01 })
+    city.trees.push({ x: v.x0 + 2.6, z: v.z0 + 2.6 })
+    if (r() < 0.7) city.trees.push({ x: v.x1 - 2.6, z: v.z1 - 2.6 })
+    // The car in the drive, and a gateman at about half the gates.
+    const dx = frontX - fx * 5 + (alongX ? -6 : 0)
+    const dz = frontZ - fz * 5 + (alongX ? 0 : -6)
+    city.parkedCars.push({ x: dx, z: dz, yaw: alongX ? (fz > 0 ? 0 : Math.PI) : fx > 0 ? Math.PI / 2 : -Math.PI / 2, type: ['gwagon', 'benz', 'sports', 'jeep'][Math.floor(r() * 4)] })
+    if (k % 2 === 0) city.idlers.push({ x: frontX + fx * 1.4 + (alongX ? 3.6 : 0), z: frontZ + fz * 1.4 + (alongX ? 0 : 3.6), y, yaw: Math.atan2(fx, fz), role: 'gateman' })
+  })
+  // Residents out for a walk and joggers along the roads.
+  city.wanderAreas.push({ x: (B.minX + B.maxX) / 2 + 20, z: cz - 7.5, w: B.maxX - B.minX - 80, d: 1.2, count: 6, y })
+  city.wanderAreas.push({ x: (B.minX + B.maxX) / 2, z: zn - 6.5, w: B.maxX - B.minX - 20, d: 1.2, count: 4, y })
+  city.wanderAreas.push({ x: (B.minX + B.maxX) / 2, z: zf - 6.5, w: B.maxX - B.minX - 20, d: 1.2, count: 3, y })
+  city.bananaIsland = { gate: { x: B.maxX + 1, z: cz }, villas, roads, patrols }
 }
 
 // Ikeja Cantonment: an army barracks in a walled compound. Two long halls,
@@ -729,6 +985,7 @@ function addStreetDetails(city, rand) {
 
   addCivicBuildings(city)
   addAirport(city)
+  addEkoAtlantic(city)
   addBananaIsland(city)
   addBarracks(city)
   addFootbridges(city)
@@ -746,6 +1003,46 @@ function addStreetDetails(city, rand) {
     const z = nz + sz * (ROAD / 2 + 1.1)
     city.wardens.push({ x, z, nx, nz })
     city.idlers.push({ x, z, y: SIDEWALK_Y, yaw: Math.atan2(nx - x, nz - z), role: 'warden' })
+  }
+  // Hawkers at the busy junctions, trays of Gala and pure water on their
+  // heads, pacing the kerb for the cars stopped at the lights.
+  for (let n = 0; n < 16 && lit.length; n++) {
+    const [i, j] = lit.splice(Math.floor(rand() * lit.length), 1)[0]
+    const sx = rand() < 0.5 ? 1 : -1
+    const sz = rand() < 0.5 ? 1 : -1
+    const x = roadX(i) + sx * (ROAD / 2 + 6)
+    const z = roadZ(j) + sz * (ROAD / 2 + 0.7)
+    if (clear(x, z, 0.5)) city.wanderAreas.push({ x, z, w: 6, d: 0.4, count: 1, y: SIDEWALK_Y, hawker: true })
+  }
+  // Street preachers by some of the bus stops, Bible in hand.
+  city.busStops.forEach((b, k) => {
+    if (k % 3) return
+    const x = b.x + (b.axis === 'x' ? 7 : 0)
+    const z = b.z + (b.axis === 'z' ? 7 : 0)
+    if (clear(x, z, 0.6)) city.idlers.push({ x, z, y: SIDEWALK_Y, yaw: b.yaw + Math.PI, role: 'preacher' })
+  })
+  // People stopped on the pavement for a gist: twos and threes facing in.
+  const regular = city.blocks.filter((b) => b.w === BLOCK)
+  for (let n = 0, tries = 0; n < 22 && tries < 200; tries++) {
+    const b = regular[Math.floor(rand() * regular.length)]
+    const side = Math.floor(rand() * 4)
+    const r = BLOCK / 2 - 1.6
+    const along = (rand() - 0.5) * (BLOCK - 10)
+    const [x, z] = [
+      [b.x + along, b.z - r],
+      [b.x + r, b.z + along],
+      [b.x + along, b.z + r],
+      [b.x - r, b.z + along],
+    ][side]
+    if (!clear(x, z, 1.6)) continue
+    const size = rand() < 0.5 ? 2 : 3
+    for (let k = 0; k < size; k++) {
+      const a = (k / size) * Math.PI * 2 + rand() * 0.4
+      const px = x + Math.sin(a) * 0.75
+      const pz = z + Math.cos(a) * 0.75
+      city.idlers.push({ x: px, z: pz, y: SIDEWALK_Y, yaw: Math.atan2(x - px, z - pz), role: 'chat', group: n })
+    }
+    n++
   }
   addAreaBoys(city)
 }

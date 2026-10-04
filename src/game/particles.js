@@ -24,6 +24,14 @@ function emit(pool, init) {
 }
 
 export const fx = {
+  // A bullet's streak through the air, and the flash at the muzzle.
+  tracer(x0, y0, z0, x1, y1, z1) {
+    for (let k = 0; k <= 12; k++) {
+      const u = k / 12
+      emit('spark', { x: x0 + (x1 - x0) * u, y: y0 + (y1 - y0) * u, z: z0 + (z1 - z0) * u, life: 0.05 + u * 0.05, size: 0.05, color: '#fff3b0' })
+    }
+    for (let i = 0; i < 5; i++) emit('spark', { x: x0, y: y0, z: z0, vx: rnd(2), vy: rnd(2), vz: rnd(2), life: 0.07, size: 0.14, color: '#ffd84a' })
+  },
   sparks(x, y, z, count = 14, color = '#ffd84a') {
     for (let i = 0; i < count; i++) {
       emit('spark', { x, y, z, vx: rnd(6), vy: Math.random() * 6 + 1, vz: rnd(6), gravity: 18, life: 0.3 + Math.random() * 0.3, size: 0.07 + Math.random() * 0.06, color })

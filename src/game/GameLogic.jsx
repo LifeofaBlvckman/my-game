@@ -4,6 +4,8 @@ import { useKeyboardControls } from '@react-three/drei'
 import { Quaternion, Vector3 } from 'three'
 import { city, ISLAND, MAINLAND, ROAD, zoneAt } from './cityData'
 import { setLane, swapWithPlayerCar, vehicles } from './trafficSim'
+import { runsVehicle } from './worldSync'
+import { bookFlight, FARE as AIR_FARE, setFlightHooks, skipFlight, updateFlight } from './flights'
 import { alightRiders, callBoarders, dismissRiders, copsGrabbing, deployCop, ejectDriver, npcNear, npcs, punchNpc, recallCops, resumeCops, setCarArrestReach, waitingCounts } from './crowd'
 import { WORLD } from './City'
 import { WATER_Y } from './Water'
@@ -11,7 +13,7 @@ import { INTERIORS, mapSpot, roomExit, roomPoint, roomSpawn } from './rooms'
 import { activeJob, activeTarget, CHATTER, npcAround, NPCS, QUESTS, SIDE_JOBS, STRANGER_LINES } from './quests'
 import { brawl, endBrawl, endChase, fugitive, startBrawl, startChase, updateBrawl, updateChase } from './pursuit'
 import { VEHICLES } from './vehicleTypes'
-import { alarm, blip, bust, clang, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn, whistle, setRain, thunder } from './audio'
+import { alarm, blip, bust, clang, gunshot, jingle, MUSIC_STYLES, punchSound, setHorn, setMusic, setSiren, splash, swoosh, thud, trafficHorn, whistle, setRain, thunder } from './audio'
 import { CAR_HP, damagePlayerCar, damageVehicle, hurtPlayer } from './damage'
 import { fx } from './particles'
 import { useGame, world } from './state'
@@ -24,7 +26,7 @@ import { lineOfSight } from './sight'
 import { phone } from './phoneline'
 import { dogs, punchDogs } from './strays'
 import { updateWeather, weather } from './weather'
-import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks, updateEstateGate } from './streetlife'
+import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks, updateEstateGate, estateOffer, settleEstate, setEstateHooks, streetEvent, updateStreetLife, startStreetFight } from './streetlife'
 import { DEFAULT_CAR, garageSpot, owns, propertyNear, storeCar, takeCar, updateBusinesses } from './property'
 import { deliverOrder } from './chopshop'
 import { lastma, startLastma, updateLastma } from './lastma'
@@ -114,7 +116,7 @@ function updateEscape(game, dt, focus) {
   sightCheck -= dt
   if (sightCheck <= 0 || !world.lastSeen) {
     sightCheck = 0.2
-    let seen = game.inside ? false : vehicles.some((v) => v.chasing && !v.burning && copCanSee(v.x, v.z, focus, SEE_FAR))
+    let seen = game.inside ? false : vehicles.some((v) => v.chasing && !v.burning && runsVehicle(v) && copCanSee(v.x, v.z, focus, SEE_FAR))
     if (!seen && !game.inside) seen = npcs.some((n) => n.kind === 'cop' && n.active && n.down <= 0 && copCanSee(n.x, n.z, focus, 35))
     world.copsSee = seen
   }
@@ -230,7 +232,7 @@ function nearestVehicle(from) {
     if (d < ENTER_DISTANCE) best = { own: true, d, type: useGame.getState().carType, wrecked: world.carWrecked }
   }
   for (const v of vehicles) {
-    if (v.wrecked || v.burning > 0) continue
+    if (v.wrecked || v.burning > 0 || v.away) continue
     const d = flat(v, from)
     if (d < ENTER_DISTANCE + VEHICLES[v.type].half[2] * 0.5 && (!best || d < best.d)) best = { v, d, type: v.type }
   }
@@ -275,7 +277,8 @@ export function placeInRoom(id) {
 
 function placeOutside(id) {
   const door = INTERIORS[id].door
-  placePlayer(door.x, 1.2, door.z + 0.6, 0)
+  const yaw = door.yaw ?? 0 // which way the door faces (south unless it says)
+  placePlayer(door.x + Math.sin(yaw) * 0.6, 1.2, door.z + Math.cos(yaw) * 0.6, yaw)
   world.simFocus = null
   useGame.setState({ inside: null })
 }
@@ -289,6 +292,33 @@ function goThrough(fn, force = false) {
     setTimeout(() => useGame.setState({ fade: false }), 150)
   }, 350)
 }
+
+// Banana Island security can march you out to the gate (streetlife.js).
+setEstateHooks({
+  place: (x, z, yaw) => placePlayer(x, 1.2, z, yaw),
+  hurt: (n) => hurtPlayer(n),
+})
+
+// Flights (flights.js): out of the terminal and onto the plane, then off at
+// the other end, outside the arrivals door.
+setFlightHooks({
+  message: (text, color) => message(text, color),
+  leaveTerminal: (to) => {
+    const gate = to.get().gate
+    // You wait at the arrivals door, out of sight, while the plane flies.
+    placePlayer(gate.x, 1.2, gate.z, 0)
+    useGame.setState({ inside: null })
+    jingle()
+  },
+  arrive: (to) =>
+    goThrough(() => {
+      const gate = to.get().gate
+      const door = city.doors.find((d) => d.id === to.terminal)
+      const yaw = door?.yaw ?? 0
+      placePlayer(gate.x, 1.2, gate.z, yaw)
+      banner(to.welcome)
+    }, true),
+})
 
 // Races (races.js) move you to the start line and pay out through these.
 setRaceHooks({
@@ -416,6 +446,11 @@ function nearUsable() {
     if (near(...room.wardrobe, 1.3)) return 'wardrobe'
     if (near(...room.bedSpot, 1.6)) return 'bed'
   }
+  const room = INTERIORS[id]
+  if (room?.ticketDesk) {
+    const [x, , z] = roomPoint(room, ...room.ticketDesk)
+    if (Math.hypot(x - world.focus.x, z - world.focus.z) < 1.8) return 'ticket'
+  }
   if (id === 'gym') {
     for (const bx of [-6, -2, 2]) {
       const [x, , z] = roomPoint(INTERIORS.gym, bx, -3)
@@ -426,6 +461,10 @@ function nearUsable() {
 }
 
 function useThing(thing) {
+  if (thing === 'ticket') {
+    const room = INTERIORS[useGame.getState().inside]
+    return goThrough(() => bookFlight(room.flightTo === 'eko' ? 'mma' : 'eko'))
+  }
   if (thing === 'wardrobe') return useGame.setState({ panel: 'wardrobe' })
   if (thing === 'laptop') return useGame.setState({ panel: 'decor' })
   if (thing === 'bed') {
@@ -593,6 +632,8 @@ function nearTrader() {
 
 function interact() {
   const game = useGame.getState()
+  if (world.flight) return skipFlight()
+  if (game.mode === 'foot' && !game.dialogue && !game.panel && estateOffer()) return settleEstate()
   if (game.mode === 'car' && game.phase === 'playing' && !game.dialogue && !game.panel && !game.chatOpen) return parkInGarage()
   if (game.phase !== 'playing' || game.dialogue || game.panel || game.mode !== 'foot' || game.chatOpen) return
   // The key press that closed a dialogue shouldn't open a new one.
@@ -742,7 +783,7 @@ function resolvePunch() {
     return Math.abs(rx * c - rz * s) < half[0] + 0.45 && Math.abs(rx * s + rz * c) < half[2] + 0.45
   }
   for (const v of vehicles) {
-    if (inBox(v.x, v.z, v.yaw, VEHICLES[v.type].half)) {
+    if (!v.away && inBox(v.x, v.z, v.yaw, VEHICLES[v.type].half)) {
       damageVehicle(v, 6)
       clang()
       fx.sparks(px, 1, pz, 10)
@@ -886,6 +927,27 @@ export default function GameLogic() {
       } else if (e.type === 'npcPunch') {
         hurtPlayer(e.damage, e.x, e.z)
         punchSound()
+      } else if (e.type === 'bump' || e.type === 'brawlKO') {
+        streetEvent(e)
+      } else if (e.type === 'brawlHit') {
+        if (Math.hypot(e.x - world.focus.x, e.z - world.focus.z) < 30) punchSound()
+      } else if (e.type === 'npcShot') {
+        // Someone opened fire on you: the crack, the muzzle flash and the
+        // bullet's streak (on target, or past you into the street).
+        const near = Math.max(0, 1 - Math.hypot(e.x - world.focus.x, e.z - world.focus.z) / 80)
+        gunshot(0.4 + near * 0.6)
+        const mx = e.x + Math.sin(e.yaw) * 0.6
+        const mz = e.z + Math.cos(e.yaw) * 0.6
+        const miss = e.hit ? 0 : 1.5 + Math.random() * 2
+        const side = Math.random() < 0.5 ? -1 : 1
+        const tx = e.tx + Math.cos(e.yaw) * miss * side
+        const tz = e.tz - Math.sin(e.yaw) * miss * side
+        fx.tracer(mx, e.y, mz, tx, world.focus.y + 0.4, tz)
+        if (e.hit) {
+          hurtPlayer(e.damage, e.x, e.z)
+          fx.sparks(world.focus.x, world.focus.y + 0.5, world.focus.z, 6, '#c8202a')
+          fx.shake(0.25)
+        }
       } else if (e.type === 'copHit' && t.ramCooldown <= 0) {
         addWanted(1)
         t.ramCooldown = 3
@@ -922,7 +984,7 @@ export default function GameLogic() {
     let nearestCop = Infinity
     // Indoors, the police wait at the door you went through.
     const copsAim = game.inside ? world.simFocus : world.focus
-    for (const v of vehicles) if (v.chasing) nearestCop = Math.min(nearestCop, flat(v, copsAim))
+    for (const v of vehicles) if (v.chasing && runsVehicle(v)) nearestCop = Math.min(nearestCop, flat(v, copsAim))
     // Our chase, or (fainter) a friend's chase going past us.
     setSiren(Math.max(game.wanted > 0 ? Math.max(0, 1 - nearestCop / 120) : 0, game.inside ? 0 : (world.remoteSiren ?? 0) * 0.7))
     world.remoteSiren = 0
@@ -933,7 +995,7 @@ export default function GameLogic() {
     if (game.wanted > 0 && (onFoot || carStopped)) {
       // Patrol cars close to you let an officer out.
       for (const v of vehicles) {
-        if (v.chasing && !v.officerOut && flat(v, world.focus) < 14) deployCop(v, world.focus)
+        if (v.chasing && !v.officerOut && runsVehicle(v) && flat(v, world.focus) < 14) deployCop(v, world.focus)
       }
     }
     // Officers on foot who lose sight of you go back to their car.
@@ -951,11 +1013,13 @@ export default function GameLogic() {
     updateEscape(game, dt, copsAim)
     checkRedLights(game)
     updateLastma(dt, game, world.focus)
+    updateFlight(dt)
     updateBusinesses(dt)
     // Area boys on the corners, and soldiers guarding the barracks.
     updateAreaBoys(dt, game, world.focus)
     updateBarracks(dt, game, world.focus, addWanted)
-    updateEstateGate(game, world.focus)
+    updateEstateGate(game, world.focus, dt)
+    updateStreetLife(dt, game, world.focus)
 
     // Passengers: stop your danfo or keke at a bus stop to let riders off
     // (they pay) and take on whoever is waiting.
@@ -1136,13 +1200,18 @@ export default function GameLogic() {
     let prompt = null
     let action = null
     const act = (key, icon, label) => (action = { key, icon, label })
-    if (game.mode === 'foot' && !game.dialogue && !game.panel) {
+    const offer = estateOffer()
+    if (world.flight) (prompt = 'Press E to skip to the landing'), act('KeyE', '⏩', 'Skip')
+    else if (offer?.kind === 'catch') (prompt = `Press E to settle the guard (₦${offer.fee.toLocaleString()}) or get thrown out`), act('KeyE', '₦', 'Settle')
+    else if (offer?.kind === 'gate' && game.mode === 'foot') (prompt = `Press E to settle the guards to open the gate (₦${offer.fee.toLocaleString()})`), act('KeyE', '₦', 'Settle')
+    else if (game.mode === 'foot' && !game.dialogue && !game.panel) {
       const npc = nearestNamedNpc(world.focus)
       const car = !npc && !game.inside && nearestVehicle(world.focus)
       const door = !game.inside && nearDoor(world.focus)
       const thing = nearUsable()
       const prop = !game.inside && propertyNear(world.focus)
       if (game.inside && nearExit()) (prompt = 'Press E to go outside'), act('KeyE', '🚪', 'Exit')
+      else if (thing === 'ticket') (prompt = `Press E to fly to ${INTERIORS[game.inside].flightTo === 'eko' ? 'Eko Atlantic' : 'Ikeja (MMA)'} (₦${AIR_FARE.toLocaleString()})`), act('KeyE', '✈', 'Fly')
       else if (thing === 'wardrobe') (prompt = 'Press E to change clothes'), act('KeyE', '👕', 'Clothes')
       else if (thing === 'laptop') (prompt = 'Press E to decorate your room'), act('KeyE', '🛋️', 'Decorate')
       else if (thing === 'bed') (prompt = 'Press E to sleep until morning'), act('KeyE', '🛏️', 'Sleep')
@@ -1214,7 +1283,7 @@ export default function GameLogic() {
       // A crowd member, by index, or the nearest one to the player.
       crowdNpc: (i) => {
         const n = i === undefined ? npcNear(world.focus.x, world.focus.z, 8) : npcs[i]
-        return n && { i: npcs.indexOf(n), tough: !!n.tough, kind: n.kind, role: n.role, x: n.x, z: n.z, y: n.y, down: n.down, hp: n.hp, active: n.active, panic: n.panic, fight: n.fight }
+        return n && { i: npcs.indexOf(n), tough: !!n.tough, armed: !!n.armed, aim: n.aim, kind: n.kind, role: n.role, x: n.x, z: n.z, y: n.y, down: n.down, hp: n.hp, active: n.active, panic: n.panic, fight: n.fight }
       },
       remotes: () => [...(world.net?.remotes.values() ?? [])].map((r) => ({ x: r.x, y: r.y, z: r.z, m: r.s?.m, emote: r.emote?.e, body: r.body?.translation(), samples: r.samples.length })),
       heading: () => world.heading,
@@ -1229,6 +1298,18 @@ export default function GameLogic() {
       gangs: () => gangs.map((g) => ({ id: g.id, x: g.x, z: g.z, state: g.state, members: g.members.map((n) => ({ x: n.x, z: n.z, down: n.down, fight: n.fight, hp: n.hp })) })),
       trespass: () => !!world.trespass,
       gateOpen: () => !!world.gateOpen,
+      punch: () => punch(),
+      brawl: () => startStreetFight(world.focus),
+      brawlers2: () => npcs.filter((n) => n.brawlWith || n.watching).map((n) => ({ i: n.index, x: n.x, z: n.z, b: !!n.brawlWith, w: !!n.watching })),
+      armed: () => npcs.filter((n) => n.armed && n.kind === 'walk' && n.x !== undefined).map((n) => ({ i: n.index, x: n.x, z: n.z })),
+      // Online: who runs the world, and the shared cars and people we can see.
+      sync: () => ({
+        me: world.net?.id ?? null,
+        host: world.net?.hostId ?? null,
+        claims: [...(world.net?.owners ?? [])],
+        cars: vehicles.filter((v) => v.id >= 6 && !v.away && v.state !== 'parked').map((v) => ({ id: v.id, type: v.type, x: Math.round(v.x * 10) / 10, z: Math.round(v.z * 10) / 10, puppet: !!v.puppet })),
+        people: npcs.filter((n) => n.shared && !n.away && n.active !== false && n.x !== undefined).map((n) => ({ i: n.index, kind: n.kind, x: Math.round(n.x * 10) / 10, z: Math.round(n.z * 10) / 10, puppet: !!n.puppet })),
+      }),
       online: () => !!world.net,
       runRed: () => startLastma(world.focus),
       lastma: () => (lastma.v ? { x: lastma.v.x, z: lastma.v.z, state: lastma.v.state, near: lastma.near, far: lastma.far, t: lastma.t } : null),

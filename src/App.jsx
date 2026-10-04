@@ -8,6 +8,8 @@ import PropertySigns from './game/PropertySigns'
 import StreetFronts from './game/StreetFronts'
 import Planes from './game/Planes'
 import EstateGate from './game/EstateGate'
+import Yachts from './game/Yachts'
+import Football from './game/Football'
 import TrafficLights from './game/TrafficLights'
 import StreetDetails from './game/StreetDetails'
 import Traffic from './game/Traffic'
@@ -90,6 +92,8 @@ export default function App() {
             <StreetFronts />
             <Planes />
             <EstateGate />
+            <Yachts />
+            <Football />
             <TrafficLights />
             <StreetDetails />
             <Traffic />

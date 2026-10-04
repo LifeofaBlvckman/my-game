@@ -1,8 +1,12 @@
 import { WebSocketServer } from 'ws'
 
-// Multiplayer relay. Each client simulates its own city (traffic, crowds);
-// the server only shares players with each other: where they are, what they
-// drive, punches between them, chat, emoji, and the time of day.
+// Multiplayer relay. The server shares players with each other (where they
+// are, what they drive, punches between them, chat, emoji, the time of day)
+// and keeps everyone's city the same: the first player in a room is its host
+// and runs the traffic and the crowd; anyone who gets mixed up with a car or
+// a person (hits it, jacks it, punches them) takes it over until they're
+// done ("claims" it). Each player sends the world they're running, and the
+// others draw it (see the client's worldSync.js).
 // Like Messenger, players are split into rooms: everyone joins the first room
 // with space, and a new room opens when they're all full. No database is
 // needed: everything lives in memory while people are connected.
@@ -14,12 +18,18 @@ const RACE_ROUTES = new Set(['street', 'beach'])
 const LOBBY_MS = 20000
 const RACE_MAX_MS = 180000
 const MAX_PLAYERS = 256 // per server
-const MAX_MESSAGE = 2048
+const MAX_MESSAGE = 48 * 1024 // world snapshots are the big ones
 const MAX_RATE = 40 // messages per second per client
-const VEHICLE_TYPES = new Set(['sedan', 'police', 'jeep', 'danfo', 'keke', 'benz', 'gwagon', 'sports', 'truck', 'lastma'])
+const VEHICLE_TYPES = new Set(['sedan', 'police', 'jeep', 'danfo', 'keke', 'benz', 'gwagon', 'sports', 'truck', 'lastma', 'okada'])
 const OUTFIT_ID = /^[a-z0-9-]{1,16}$/
 const HEX = /^#[0-9a-f]{6}$/i
 const START_MINUTES = 17 * 60
+const ENTITY = /^[vn]\d{1,4}$/ // v12: vehicle 12, n40: crowd member 40
+const MAX_CLAIM = 64
+const SNAP_VEHICLES = 160
+const SNAP_PEOPLE = 260
+const SNAP_FIELDS = 16
+const SNAP_TEXT = /^[#\w-]{0,10}$/
 
 const clean = (text, max) =>
   String(text ?? '')
@@ -28,6 +38,15 @@ const clean = (text, max) =>
     .slice(0, max)
 const num = (v, limit) => (Number.isFinite(v) ? Math.max(-limit, Math.min(limit, v)) : 0)
 // A player's police chase: a few [x, z, heading(, height)] for others to draw.
+// A world snapshot: rows of numbers (and the odd short word, like a colour).
+const rows = (list, max) =>
+  Array.isArray(list)
+    ? list
+        .slice(0, max)
+        .filter(Array.isArray)
+        .map((row) => row.slice(0, SNAP_FIELDS).map((v) => (typeof v === 'string' ? (SNAP_TEXT.test(v) ? v : '') : num(v, 1e6))))
+    : []
+const keys = (list) => (Array.isArray(list) ? list.slice(0, MAX_CLAIM).filter((k) => typeof k === 'string' && ENTITY.test(k)) : [])
 const points = (list, max, size) =>
   Array.isArray(list) ? list.slice(0, max).filter(Array.isArray).map((p) => [num(p[0], 1000), num(p[1], 1000), num(p[2], 10), num(p[3], 50)].slice(0, size)) : []
 
@@ -73,6 +92,28 @@ export function attachMultiplayer(httpServer) {
     player.roomNumber = number
     player.room = rooms.get(number)
     player.room.set(player.id, player)
+    player.room.owners ??= new Map()
+  }
+  // The longest-connected player runs the room's traffic and crowd.
+  const hostOf = (room) => room.keys().next().value ?? null
+  // Someone left: whatever they had claimed goes back to the host.
+  const dropClaims = (room, id) => {
+    const back = []
+    for (const [k, owner] of room.owners) if (owner === id) back.push(k)
+    back.forEach((k) => room.owners.delete(k))
+    if (back.length) broadcast(room, { t: 'own', id: null, k: back })
+  }
+  const leaveRoom = (old, number) => {
+    const wasHost = hostOf(old.room) === old.id
+    old.room.delete(old.id)
+    broadcast(old.room, { t: 'leave', id: old.id, name: old.name })
+    dropClaims(old.room, old.id)
+    if (wasHost && old.room.size) broadcast(old.room, { t: 'host', id: hostOf(old.room) })
+    checkRaceOver(old.room)
+    if (!old.room.size) {
+      clearTimeout(old.room.race?.timer)
+      rooms.delete(number)
+    }
   }
 
   httpServer.on('upgrade', (req, socket, head) => {
@@ -114,10 +155,7 @@ export function attachMultiplayer(httpServer) {
           for (const old of [...players.values()]) {
             if (old.sid !== player.sid || old === player) continue
             players.delete(old.id)
-            old.room.delete(old.id)
-            broadcast(old.room, { t: 'leave', id: old.id, name: old.name })
-            checkRaceOver(old.room)
-            if (!old.room.size) rooms.delete(old.roomNumber)
+            leaveRoom(old, old.roomNumber)
             old.ws.terminate()
           }
         }
@@ -128,6 +166,8 @@ export function attachMultiplayer(httpServer) {
           id: player.id,
           room: player.roomNumber,
           time: minutes(),
+          host: hostOf(player.room),
+          owners: [...player.room.owners],
           players: [...player.room.values()].filter((p) => p.id !== player.id).map((p) => ({ id: p.id, name: p.name, s: p.state, o: p.look })),
         })
         broadcast(player.room, { t: 'join', id: player.id, name: player.name }, player.id)
@@ -148,10 +188,21 @@ export function attachMultiplayer(httpServer) {
           a: num(msg.a, 255) | 0, // animation flags
           u: num(msg.u, 1), // punch progress
           w: Math.max(0, Math.min(5, num(msg.w, 5) | 0)), // wanted stars
-          pc: points(msg.pc, 3, 3), // police cars chasing them
+          pc: points(msg.pc, 6, 4), // police (or LASTMA) cars chasing them
           pf: points(msg.pf, 3, 4), // police officers on foot
         }
         broadcast(player.room, { t: 's', id: player.id, ...player.state }, player.id)
+      } else if (msg.t === 'w') {
+        // Our share of the world: the cars and people this player runs.
+        broadcast(player.room, { t: 'w', id: player.id, v: rows(msg.v, SNAP_VEHICLES), n: rows(msg.n, SNAP_PEOPLE) }, player.id)
+      } else if (msg.t === 'claim') {
+        const k = keys(msg.k)
+        k.forEach((key) => player.room.owners.set(key, player.id))
+        if (k.length) broadcast(player.room, { t: 'own', id: player.id, k }, player.id)
+      } else if (msg.t === 'release') {
+        const k = keys(msg.k).filter((key) => player.room.owners.get(key) === player.id)
+        k.forEach((key) => player.room.owners.delete(key))
+        if (k.length) broadcast(player.room, { t: 'own', id: null, k }, player.id)
       } else if (msg.t === 'hit') {
         // Only allow hits on players who are actually close to the attacker.
         const target = player.room.get(msg.to)
@@ -214,13 +265,7 @@ export function attachMultiplayer(httpServer) {
 
     ws.on('close', () => {
       if (!players.delete(player.id)) return
-      player.room.delete(player.id)
-      broadcast(player.room, { t: 'leave', id: player.id, name: player.name })
-      checkRaceOver(player.room)
-      if (!player.room.size) {
-        clearTimeout(player.room.race?.timer)
-        rooms.delete(player.roomNumber)
-      }
+      leaveRoom(player, player.roomNumber)
     })
   })
 

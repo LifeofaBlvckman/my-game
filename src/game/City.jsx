@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { BoxGeometry, Color, CylinderGeometry } from 'three'
 import { gableRoof, puff } from './shapes'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
-import { BANANA, BEACH, city, GX, GZ, ISLAND, MAINLAND, nodeCount, ROAD, roadX, roadZ, segmentValid } from './cityData'
+import { BANANA, BEACH, city, EKO, GX, GZ, ISLAND, MAINLAND, nodeCount, ROAD, roadX, roadZ, segmentValid } from './cityData'
 import { createBuildingMaterial, nightUniform, unlit } from './materials'
 import { Instances, groundQuad } from './Instances'
 import Water, { SEABED_Y } from './Water'
@@ -23,11 +23,19 @@ const lands = [
   box(MAINLAND.minX, MAINLAND.maxX, MAINLAND.minZ, MAINLAND.maxZ, -2, 0),
   box(ISLAND.minX, ISLAND.maxX, ISLAND.minZ, ISLAND.maxZ, -2, 0),
   box(BANANA.minX, BANANA.maxX, BANANA.minZ, BANANA.maxZ, -2, 0),
+  box(EKO.minX, EKO.maxX, EKO.minZ, EKO.maxZ, -2, 0),
 ]
 // The bridges, plus the causeway out to Banana Island.
 const spans = [...city.bridges, { x0: BANANA.causeway.x0, x1: BANANA.causeway.x1, z: BANANA.causeway.z }]
 const decks = spans.map((b) => box(b.x0 - 1, b.x1 + 1, b.z - ROAD / 2 - 1.2, b.z + ROAD / 2 + 1.2, -1, 0))
 const barriers = spans.flatMap((b) => [-1, 1].map((s) => box(b.x0, b.x1, b.z + s * (ROAD / 2 + 0.8) - 0.25, b.z + s * (ROAD / 2 + 0.8) + 0.25, 0, 0.9)))
+// The Eko Atlantic causeway runs north-south, across Bar Beach and the channel.
+{
+  const c = EKO.causeway
+  const sea = ISLAND.maxZ + BEACH
+  decks.push(box(c.x - ROAD / 2 - 1.2, c.x + ROAD / 2 + 1.2, c.z0, c.z1 + 1, -1, 0))
+  for (const s of [-1, 1]) barriers.push(box(c.x + s * (ROAD / 2 + 0.8) - 0.25, c.x + s * (ROAD / 2 + 0.8) + 0.25, sea - 4, c.z1, 0, 0.9))
+}
 const pillars = city.bridges.flatMap((b) => {
   const list = []
   for (let x = b.x0 + 14; x < b.x1 - 8; x += 22) list.push(box(x - 1.2, x + 1.2, b.z - ROAD / 2, b.z + ROAD / 2, SEABED_Y, -1))
@@ -58,7 +66,20 @@ const bananaWalls = (() => {
     box(B.maxX - 0.3, B.maxX + 0.3, c + g, B.maxZ, SEABED_Y, QUAY),
   ]
 })()
-const quays = [...quay(MAINLAND.maxX + 0.3), ...quay(ISLAND.minX - 0.3, true), ...bananaWalls]
+// Eko Atlantic's sea wall, open where the causeway lands.
+const ekoWalls = (() => {
+  const E = EKO
+  const g = ROAD / 2 + 1.2
+  const cx = E.causeway.x
+  return [
+    box(E.minX - 0.3, cx - g, E.minZ - 0.3, E.minZ + 0.3, SEABED_Y, QUAY),
+    box(cx + g, E.maxX + 0.3, E.minZ - 0.3, E.minZ + 0.3, SEABED_Y, QUAY),
+    box(E.minX - 0.3, E.maxX + 0.3, E.maxZ - 0.3, E.maxZ + 0.3, SEABED_Y, QUAY),
+    box(E.minX - 0.3, E.minX + 0.3, E.minZ, E.maxZ, SEABED_Y, QUAY),
+    box(E.maxX - 0.3, E.maxX + 0.3, E.minZ, E.maxZ, SEABED_Y, QUAY),
+  ]
+})()
+const quays = [...quay(MAINLAND.maxX + 0.3), ...quay(ISLAND.minX - 0.3, true), ...bananaWalls, ...ekoWalls]
 // Where the beach meets the sea, the sand slopes away under the clear water
 // down to the seabed. Each shelf: a sloped slab along one outer edge.
 const SHELF = 30

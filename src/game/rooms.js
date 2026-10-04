@@ -397,6 +397,120 @@ INTERIORS.mansion = {
   ],
 }
 
+// Airport terminals: a check-in hall with airline counters, the EKO AIR
+// ticket desk (book a flight there: flights.js), security, rows of seats by
+// the big windows onto the apron, a departures board, a cafe and duty free.
+function terminal({ name, w, d, to, dest, board }) {
+  const hw = w / 2
+  const hd = d / 2
+  const props = [
+    // Glass all along the back, onto the apron, with mullions.
+    [0, 2.6, -hd + 0.06, w - 1, 4.4, 0.05, '#8fd0ee', G],
+    ...rowOf(Math.floor(w / 5), -hw + 2.5, 5, (x) => [x, 2.6, -hd + 0.1, 0.18, 4.6, 0.12, '#5d656b']),
+    [0, 0.08, -hd + 0.4, w - 1, 0.16, 0.5, '#5d656b'],
+    // Columns.
+    ...rowOf(Math.floor(w / 9), -hw + 4.5, 9, (x) => [x, 2.5, 0, 0.7, 5, 0.7, '#e3e6e8', { shape: 'cylinder', solid: true }]),
+    // Floor: a polished strip down the middle and a welcome mat.
+    [0, 0.005, 0, w - 2, 0.01, 2.2, '#c9c2b2'],
+    [0, 0.01, hd - 1.2, 4, 0.02, 1.6, '#1f8a4a'],
+    // Departures board, hung from the ceiling.
+    [0, 4.1, -hd + 4.5, 8, 2.2, 0.15, '#0d1b2e', { kind: 'board', lines: board }],
+    [-3.6, 5.2, -hd + 4.5, 0.06, 1.2, 0.06, '#5d656b'],
+    [3.6, 5.2, -hd + 4.5, 0.06, 1.2, 0.06, '#5d656b'],
+    // Check-in counters on the left, with their airline boards and queue posts.
+    ...[
+      ['LAGOS SKY', '#2962ff'],
+      ['NAIJA WINGS', '#c8202a'],
+      ['EKO AIR', '#1f8a4a'],
+    ].flatMap(([airline, color], k) => {
+      const x = -hw + 4 + k * 4
+      return [
+        [x, 0.55, -hd + 8, 3, 1.1, 1.1, '#3a4a5c', S],
+        [x, 1.12, -hd + 8, 3.1, 0.06, 1.2, '#d8dde2'],
+        [x + 1, 0.3, -hd + 8.9, 0.9, 0.6, 0.6, '#2a2d33'], // baggage belt
+        [x, 2.7, -hd + 7.4, 2.8, 0.7, 0.08, color, { kind: 'sign', text: airline, bg: color, fg: '#ffffff' }],
+        [x - 1.3, 0.45, -hd + 10.6, 0.08, 0.9, 0.08, '#c9cdd2'],
+        [x + 1.3, 0.45, -hd + 10.6, 0.08, 0.9, 0.08, '#c9cdd2'],
+        [x, 0.85, -hd + 10.6, 2.6, 0.06, 0.03, '#c8202a'],
+      ]
+    }),
+    // The EKO AIR ticket desk on the right: buy a seat here.
+    [hw - 5, 0.55, -hd + 7, 6, 1.1, 1.2, '#1f8a4a', S],
+    [hw - 5, 1.12, -hd + 7, 6.2, 0.06, 1.3, '#e0b43a'],
+    [hw - 5, 2.8, -hd + 6.3, 5.6, 0.9, 0.08, '#1f8a4a', { kind: 'sign', text: `EKO AIR TICKETS\nFLIGHTS TO ${to}`, bg: '#1f8a4a', fg: '#ffffff' }],
+    [hw - 6.4, 1.3, -hd + 6.8, 0.5, 0.35, 0.05, '#7fd0ff', G], // screens
+    [hw - 3.6, 1.3, -hd + 6.8, 0.5, 0.35, 0.05, '#7fd0ff', G],
+    // Security: a walk-through arch and an X-ray belt.
+    [2, 1.1, -hd + 9.5, 0.2, 2.2, 0.5, '#9aa0a6', S],
+    [3.6, 1.1, -hd + 9.5, 0.2, 2.2, 0.5, '#9aa0a6', S],
+    [2.8, 2.25, -hd + 9.5, 1.8, 0.2, 0.5, '#9aa0a6'],
+    [2.8, 2.1, -hd + 9.24, 0.6, 0.12, 0.02, '#3fe07a', G],
+    [5.6, 0.5, -hd + 9.5, 2.6, 1.0, 0.9, '#c9cdd2', S],
+    [5.6, 1.02, -hd + 9.5, 2.0, 0.04, 0.7, '#2a2d33'],
+    // Rows of seats facing the windows.
+    ...[-hd + 3, -hd + 4.4].flatMap((z) =>
+      rowOf(8, -hw + 6, 0.62, (x) => [
+        [x, 0.42, z, 0.56, 0.08, 0.52, '#2f5fb8', S],
+        [x, 0.7, z + 0.24, 0.56, 0.5, 0.06, '#2f5fb8'],
+      ]).flat(),
+    ),
+    ...[-hd + 3, -hd + 4.4].map((z) => [-hw + 6 + 3.5 * 0.62, 0.2, z, 5.2, 0.4, 0.08, '#5d656b']),
+    // A cafe in the front corner, and duty free across the hall.
+    [hw - 2.6, 0.55, hd - 4, 1.2, 1.1, 4, '#8a5e3c', S],
+    [hw - 2.6, 1.12, hd - 4, 1.3, 0.06, 4.1, '#f2e2c4'],
+    [hw - 0.4, 2.6, hd - 4, 0.08, 0.9, 3.6, '#e8622c', { kind: 'sign', text: 'MAMA PUT EXPRESS', bg: '#e8622c', fg: '#ffffff', rot: -Math.PI / 2 }],
+    ...[-5.2, -4, -2.8].map((z) => [hw - 3.7, 0.38, hd + z, 0.45, 0.76, 0.45, '#d4af37', { shape: 'cylinder', solid: true }]),
+    [-hw + 1.2, 1.2, hd - 4.5, 1.2, 2.4, 5, '#3a2d26', S],
+    ...rowOf(6, hd - 6.5, 0.75, (z, k) => [-hw + 1.75, 1.5, z, 0.12, 0.4, 0.12, ['#2f8a3a', '#7a2a2a', '#d4af37', '#2a6bff', '#f2f2f2', '#ff2fb4'][k], { shape: 'cylinder' }]),
+    [-hw + 0.25, 2.9, hd - 4.5, 0.08, 0.8, 3.4, '#0d2a4a', { kind: 'sign', text: 'DUTY FREE', bg: '#0d2a4a', fg: '#ffd23a', rot: Math.PI / 2 }],
+    // Plants, a luggage trolley and some bags.
+    ...[
+      [-hw + 1, -hd + 1],
+      [hw - 1, -hd + 1],
+      [-hw + 1, hd - 1],
+    ].flatMap(([x, z]) => [
+      [x, 0.35, z, 0.7, 0.7, 0.7, '#f2f2f2', S],
+      [x, 1.2, z, 1.0, 1.2, 1.0, '#3f8a3a', { shape: 'sphere' }],
+    ]),
+    [-2, 0.45, 2, 1.6, 0.06, 0.8, '#9aa0a6'],
+    [-2, 0.75, 2, 0.9, 0.6, 0.5, '#c8202a'],
+    [-1.2, 0.3, 2.6, 0.5, 0.6, 0.3, '#2a2d33'],
+    [-hw + 6.5, 0.3, -hd + 5.4, 0.45, 0.6, 0.3, '#7a2a4a'],
+    [-hw + 9, 0.3, -hd + 5.4, 0.45, 0.6, 0.3, '#d4af37'],
+    // Ceiling lights.
+    ...rowOf(4, -hw + w / 8, w / 4, (x) => [x, 5.6, 0, 2.6, 0.08, 0.6, '#fff6e0', G]),
+  ]
+  return {
+    name,
+    size: [w, 6, d],
+    floor: '#e2ddd2',
+    wall: '#eef1f2',
+    light: '#fff6e8',
+    props,
+    ticketDesk: [hw - 5, -hd + 8.6],
+    flightTo: dest, // where the desk sells tickets to
+    npcs: [
+      { pos: [hw - 5, -hd + 6.2], yaw: 0, anim: 'idle', seed: 1201, look: { top: '#1f8a4a', bottom: '#1c2333', female: true } }, // ticket agent
+      { pos: [-hw + 4, -hd + 7.2], yaw: 0, anim: 'idle', seed: 1202, look: { top: '#2962ff', bottom: '#1c2333' } },
+      { pos: [-hw + 8, -hd + 7.2], yaw: 0, anim: 'idle', seed: 1203, look: { top: '#c8202a', bottom: '#1c2333', female: true } },
+      { pos: [-hw + 12, -hd + 7.2], yaw: 0, anim: 'idle', seed: 1204, look: { top: '#1f8a4a', bottom: '#1c2333' } },
+      { pos: [4.6, -hd + 10.4], yaw: Math.PI, anim: 'idle', seed: 1205, look: { top: '#1c2333', bottom: '#1c2333', hair: 'cap', hairColor: '#1c2333' } }, // security
+      { pos: [-hw + 6.62, -hd + 2.95], yaw: Math.PI, anim: 'sit', seed: 1206 },
+      { pos: [-hw + 8.48, -hd + 2.95], yaw: Math.PI, anim: 'sit', seed: 1207 },
+      { pos: [-hw + 9.72, -hd + 4.35], yaw: Math.PI, anim: 'sit', seed: 1208 },
+      { pos: [-hw + 7.24, -hd + 4.35], yaw: Math.PI, anim: 'sit', seed: 1209 },
+      { pos: [-hw + 8, -hd + 11.4], yaw: Math.PI, anim: 'idle', seed: 1210 }, // checking in
+      { pos: [-hw + 8, -hd + 12.4], yaw: Math.PI, anim: 'idle', seed: 1211 },
+      { pos: [-1.4, 3.2], yaw: 0.4, anim: 'idle', seed: 1212 },
+      { pos: [hw - 2.6, hd - 5.8], yaw: -Math.PI / 2, anim: 'idle', seed: 1213, look: { top: '#f2f2f2', bottom: '#1c2333' } }, // cafe
+    ],
+  }
+}
+const BOARD_EAST = ['08:15  EKO ATLANTIC   EK 101  ON TIME', '09:40  ABUJA          NW 220  BOARDING', '11:05  EKO ATLANTIC   EK 103  ON TIME', '12:30  PORT HARCOURT  LS 318  DELAYED', '14:10  ACCRA          EK 450  ON TIME']
+const BOARD_WEST = ['08:50  IKEJA (MMA)    EK 102  ON TIME', '10:20  IKEJA (MMA)    EK 104  ON TIME', '13:00  ABUJA          NW 221  BOARDING', '15:45  IKEJA (MMA)    EK 106  ON TIME', '17:30  LONDON         EK 900  DELAYED']
+INTERIORS.terminal = terminal({ name: 'MURTALA MUHAMMED AIRPORT', w: 36, d: 24, to: 'EKO ATLANTIC', dest: 'eko', board: BOARD_EAST })
+INTERIORS.ekoterminal = terminal({ name: 'EKO ATLANTIC AIRPORT', w: 30, d: 22, to: 'IKEJA', dest: 'mma', board: BOARD_WEST })
+
 // Give each room a spot in the world (in a row, far below the city) and link
 // it to its door outside.
 Object.entries(INTERIORS).forEach(([id, room], k) => {

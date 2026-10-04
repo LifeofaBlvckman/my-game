@@ -1,7 +1,8 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
-import { BoxGeometry, Color, CylinderGeometry, SphereGeometry } from 'three'
+import { BoxGeometry, CanvasTexture, Color, CylinderGeometry, SphereGeometry, SRGBColorSpace } from 'three'
+import { makeSignTexture } from './faces'
 import Person from './Person'
 import { FishTank, Painting } from './Ornaments'
 import { Instances } from './Instances'
@@ -15,10 +16,82 @@ const geometries = { box: new BoxGeometry(1, 1, 1), sphere: new SphereGeometry(0
 const DANCE_COLORS = ['#ff2fb4', '#39e6ff', '#ffd23a', '#7a4dff', '#3fe07a'].map((c) => new Color(c))
 const WALL = 0.3
 
+// A painted board (an airline's counter, the cafe), facing +z unless turned.
+function SignBoard({ p }) {
+  const [x, y, z, w, h, d, color, opts] = p
+  const map = useMemo(() => makeSignTexture(opts.text, { bg: opts.bg ?? color, fg: opts.fg ?? '#fff', w: 512, h: Math.round((512 * h) / Math.max(w, d)) }), [opts.text, opts.bg, opts.fg, color, w, h, d])
+  const across = Math.max(w, d)
+  return (
+    <group position={[x, y, z]} rotation-y={opts.rot ?? 0}>
+      <mesh>
+        <boxGeometry args={[across, h, 0.06]} />
+        <meshToonMaterial gradientMap={toonRamp} color={color} />
+      </mesh>
+      <mesh position-z={0.035}>
+        <planeGeometry args={[across - 0.06, h - 0.06]} />
+        <meshBasicMaterial map={map} toneMapped={false} />
+      </mesh>
+    </group>
+  )
+}
+
+// The departures board: flights in amber on navy, the status column blinking.
+function FlightBoard({ p }) {
+  const [x, y, z, w, h, d, , opts] = p
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = Math.round((1024 * h) / w)
+    const tex = new CanvasTexture(canvas)
+    tex.colorSpace = SRGBColorSpace
+    return { canvas, tex }
+  }, [w, h])
+  const blink = useRef(-1)
+  useFrame(({ clock }) => {
+    const on = Math.floor(clock.elapsedTime * 1.5) % 2
+    if (on === blink.current) return
+    blink.current = on
+    const { canvas, tex } = texture
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#0d1b2e'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 34px monospace'
+    ctx.fillText('DEPARTURES', 24, 46)
+    ctx.fillStyle = '#7f8fa6'
+    ctx.font = 'bold 22px monospace'
+    ctx.fillText('TIME   DESTINATION    FLIGHT  STATUS', 24, 84)
+    ctx.font = 'bold 28px monospace'
+    opts.lines.forEach((line, k) => {
+      const status = line.slice(30).trim()
+      const show = status !== 'BOARDING' || on
+      ctx.fillStyle = '#ffd23a'
+      ctx.fillText(line.slice(0, 30), 24, 128 + k * 44)
+      ctx.fillStyle = status === 'DELAYED' ? '#ff6b6b' : status === 'BOARDING' ? '#3fe07a' : '#9fd6ff'
+      if (show) ctx.fillText(status, 24 + 30 * 16.8, 128 + k * 44)
+    })
+    tex.needsUpdate = true
+  })
+  return (
+    <group position={[x, y, z]}>
+      <mesh>
+        <boxGeometry args={[w + 0.2, h + 0.2, d]} />
+        <meshToonMaterial gradientMap={toonRamp} color="#2a2d33" />
+      </mesh>
+      <mesh position-z={d / 2 + 0.01}>
+        <planeGeometry args={[w, h]} />
+        <meshBasicMaterial map={texture.tex} toneMapped={false} />
+      </mesh>
+    </group>
+  )
+}
+
 function Prop({ p }) {
   const [x, y, z, w, h, d, color, opts = {}] = p
   if (opts.kind === 'tank') return <FishTank p={p} />
   if (opts.kind === 'painting') return <Painting p={p} />
+  if (opts.kind === 'sign') return <SignBoard p={p} />
+  if (opts.kind === 'board') return <FlightBoard p={p} />
   const geometry = geometries[opts.shape ?? 'box']
   // Cylinders stand upright, unless much wider than deep (a vault door): then they face forward.
   const flat = opts.shape === 'cylinder' && w > d * 2

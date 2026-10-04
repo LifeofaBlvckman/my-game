@@ -17,7 +17,8 @@ const lamp = unlit({ color: '#ffb02e' })
 
 export default function EstateGate() {
   const g = city.bananaIsland?.gate
-  const resident = useGame((s) => s.properties.includes('mansion'))
+  // Residents, and anyone who has settled the guards.
+  const resident = useGame((s) => s.properties.includes('mansion') || (s.estatePass ?? 0) > Date.now())
   const arm = useRef()
   useFrame((_, dt) => {
     if (!arm.current) return

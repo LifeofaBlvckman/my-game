@@ -38,6 +38,7 @@ export default function Player() {
   const { rapier, world: physics } = useRapier()
   const [, getKeys] = useKeyboardControls()
   const mode = useGame((s) => s.mode)
+  const flying = useGame((s) => !!s.flight)
   const carry = useGame((s) => s.carry)
   const carryColor = useGame((s) => s.carryColor)
   const outfit = useGame((s) => s.outfit)
@@ -61,7 +62,7 @@ export default function Player() {
     world.playerDown = Math.max(0, (world.playerDown ?? 0) - dt)
     world.flinch = Math.max(0, (world.flinch ?? 0) - dt)
     const down = world.playerDown > 0
-    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted || !!game.wasted || down || !!game.chatOpen || !!game.panel || !!world.raceHold
+    const frozen = game.phase !== 'playing' || !!game.dialogue || !!game.busted || !!game.wasted || down || !!game.chatOpen || !!game.panel || !!world.raceHold || !!world.flight || !!world.guardHold
 
     const { forward, back, left, right, run, jump } = frozen ? {} : getKeys()
 
@@ -201,7 +202,7 @@ export default function Player() {
   return (
     <RigidBody ref={body} colliders={false} position={city.spawn} enabledRotations={[false, false, false]} canSleep={false}>
       <CapsuleCollider args={[0.55, 0.35]} friction={0} frictionCombineRule={CoefficientCombineRule.Min} />
-      <group ref={visual} position-y={-FOOT_OFFSET} visible={mode === 'foot'}>
+      <group ref={visual} position-y={-FOOT_OFFSET} visible={mode === 'foot' && !flying}>
         <Person ref={person} look={look} shirtMap={hasPattern(outfit) ? shirt : null} faceOverride={face} carry={carry} carryColor={carryColor} />
         <Blob position-y={0.03} scale={[0.9, 1, 0.9]} />
       </group>

@@ -1,6 +1,7 @@
 import { fx } from './particles'
 import { driverGetsOut, knockDown, npcs } from './crowd'
 import { TRAFFIC_HP, vehicles } from './trafficSim'
+import { claimVehicle } from './worldSync'
 import { VEHICLES } from './vehicleTypes'
 import { boom, crashSound, thud } from './audio'
 import { useGame, world } from './state'
@@ -52,7 +53,9 @@ const occupied = (v) => v.state !== 'parked' && !v.wrecked && !(v.burning > 0) &
 // Damage a traffic vehicle. A hard enough knock can bring the driver out to
 // argue (and sometimes fight); a fire always gets them out.
 export function damageVehicle(v, amount, impact = 0) {
-  if (v.wrecked || amount <= 0) return
+  if (v.wrecked || amount <= 0 || v.away) return
+  // Online: whoever hits a car runs it from now on (worldSync.js).
+  claimVehicle(v)
   v.hp = (v.hp ?? TRAFFIC_HP) - amount
   v.stall = Math.max(v.stall ?? 0, 2.5)
   if (v.hp <= 0 && !v.burning) {
@@ -100,7 +103,7 @@ export function explode(x, z, source) {
   fx.explosion(x, 0.5, z)
   boom()
   for (const n of npcs) {
-    if (n.x === undefined) continue
+    if (n.x === undefined || n.away) continue
     const d = Math.hypot(n.x - x, n.z - z)
     if (d < 9) knockDown(n, n.x - x, n.z - z, 12 - d)
   }

@@ -13,18 +13,26 @@ Rapier physics and Vite.
   Mainland and Carter Bridge. The
   Mainland is low two- and three-storey shophouses with painted signs,
   awnings and power lines; the towers are on Marina and VI.
-- **Banana Island:** a gated estate on its own island off Ikoyi, reached by
-  one causeway. Villas behind walls, palms and a mansion at the end. The
-  guards keep the boom down unless you own the mansion.
-- **Airport:** Murtala Muhammed International Airport off Third Mainland
-  Bridge, with a terminal, control tower and airliners taking off and landing.
+- **Banana Island:** a big gated estate on its own island off Ikoyi, reached
+  by one causeway. It has estate roads, over 30 villas behind walls (pools, gatemen, a
+  G-Wagon in the drive), a clubhouse with a pool and tennis court, a park,
+  the estate mart, a marina with yachts, and the mansion at the end of the
+  boulevard. The boom stays down unless you own the mansion or "settle" the
+  guards (₦3,000). Sneak in and the guards chase you. When one catches you,
+  settle him (₦5,000) or get thrown out at the gate.
+- **Flying:** walk into Murtala Muhammed Airport (Ikeja), go to the EKO AIR
+  desk past check-in, security and the departures board, and buy a ticket
+  (₦2,500). You take off, fly over Lagos and land at **Eko Atlantic**, the
+  new city on reclaimed land past Bar Beach, with its own runway and
+  terminal. Press E on the plane to skip to the landing. Fly back from the
+  Eko Atlantic terminal.
 - **Places:** markets, Lekki Grand Mall, clubs, bus stops, and buildings you
   can enter: Tunde's house, Club Eko, Kwilox, a gym, a church, a bank, the
   General Hospital (you wake up here when wasted) and a police station (you
   walk out of here when busted).
 - **Your room:** change clothes at the wardrobe and decorate from the laptop
   on the desk.
-- **Traffic:** danfos, kekes, sedans and jeeps, with luxury cars on the
+- **Traffic:** danfos, kekes, okadas, sedans and jeeps, with luxury cars on the
   Island; traffic lights, stop signs, horns and engine sounds. Danfos and
   kekes pick up passengers at bus stops. Cars wait for each other at
   junctions and pull over for sirens. Run a red light in front of a LASTMA
@@ -45,6 +53,12 @@ Rapier physics and Vite.
   boards.
 - **Street trouble:** area boys on some corners want you to "settle" them
   (pay ₦500, walk off, or fight). Stay out of the army barracks in Ikeja.
+  People fight back when you hit them, and some carry guns: push the wrong
+  person and they back off and shoot.
+- **Street life:** hawkers with trays of Gala and pure water at the busy
+  junctions, preachers by the bus stops, people gisting on the pavement (walk
+  close to overhear), kids playing football in the parks, and the odd street
+  fight with a crowd gathered round. Barge into someone and you'll hear about it.
 - **Nine story jobs:** pepper delivery, church, a flash drive across the
   bridge, aso-ebi, driving a danfo, a bank robbery, Skido's double cross (an
   ambush, a car chase and a fight), clearing area boys out of the market, and
@@ -58,8 +72,11 @@ Rapier physics and Vite.
 - **Fighting and damage:** punch people and cars, carjack with F; cars smoke,
   burn and explode.
 - **Multiplayer:** see friends, chat, punch, and send emoji, in rooms of 16.
-  When the police chase a friend, you see their police cars, officers and
-  stars too.
+  Everyone sees the same city: the same cars and the same people in the same
+  places. One player's game runs the traffic and crowd for the whole room, and
+  whoever crashes into a car or punches someone takes it over for a while.
+  When the police (or LASTMA) chase a friend, you see their patrol cars,
+  officers and stars too.
   Friends are pink dots on the radar; press **G** to go to them. Your phone
   (**P**) texts, calls or sends your location to anyone online.
 - **Saved games:** add a 4-digit PIN on the title screen and your game saves
@@ -150,8 +167,9 @@ doesn't need restoring. Render's own free database expires after 30 days.
 - `src/game/wardrobe.js`, `src/game/decor.js`: clothes and furniture
 - `src/game/property.js`, `src/game/ShopPanels.jsx`: houses, businesses, the garage and the market
 - `src/game/facades.js`, `src/game/shopfronts.js`: building fronts, shop signs and power lines
-- `src/game/Planes.jsx`: the airliners
-- `src/game/streetlife.js`: area boys and the barracks
+- `src/game/Planes.jsx`, `src/game/flights.js`: the airliners and flights
+- `src/game/streetlife.js`: area boys, the barracks, Banana Island security, street fights and chatter
+- `src/game/worldSync.js`: keeping everyone's city the same online
 - `server/`: multiplayer, saved games (`saves.js`) and the production server (`npm start`)
 
 ## Adding a job

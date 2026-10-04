@@ -420,6 +420,14 @@ export function boom() {
   hiss(t, 1.2, 0.9, 'lowpass', 500)
   tone('sine', 90, t, 0.9, 0.9, master, 30)
 }
+// A pistol shot: a sharp crack and a low thump, quieter the further away.
+export function gunshot(near = 1) {
+  if (!ctx || near <= 0) return
+  const t = ctx.currentTime
+  hiss(t, 0.14, 0.8 * near, 'bandpass', 1700)
+  hiss(t, 0.4, 0.25 * near, 'lowpass', 600)
+  tone('square', 120, t, 0.07, 0.35 * near, master, 40)
+}
 export function honk() {
   if (!horn) return
   setHorn(true)

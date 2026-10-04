@@ -17,6 +17,7 @@ import { useGame, world } from './state'
 import { toonRamp } from './materials'
 import RemoteChase, { CHASE_LIMITS } from './RemoteChase'
 import { vehicles } from './trafficSim'
+import { sharedVehicle } from './worldSync'
 import { npcs } from './crowd'
 
 const hashName = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)
@@ -62,6 +63,8 @@ function RemotePlayer({ id }) {
   const anim = useRef({ phase: 0, t: 0, pose: {}, input: {}, hitCooldown: 0 })
   const [shape, setShape] = useState({ m: r?.s?.m ?? 'f', c: r?.s?.c ?? 'sedan', k: r?.s?.k ?? '#c9ccd1' })
   const [wanted, setWanted] = useState(0)
+  // LASTMA after them for a red light (no stars, but a chase all the same).
+  const [chased, setChased] = useState(false)
   // What they chose in their wardrobe, or (an older game) a look from their name.
   const outfit = useGame((st) => st.remoteLooks[id])
   const look = useMemo(() => {
@@ -92,6 +95,8 @@ function RemotePlayer({ id }) {
     }
     if (s.m !== shape.m || s.c !== shape.c || s.k !== shape.k) setShape({ m: s.m, c: s.c, k: s.k })
     if ((s.w ?? 0) !== wanted) setWanted(s.w ?? 0)
+    const c = (s.pc?.length ?? 0) + (s.pf?.length ?? 0) > 0
+    if (c !== chased) setChased(c)
 
     q.setFromAxisAngle(up, remote.yaw)
     // A big jump (they just appeared, went through a door, or respawned) is a
@@ -141,7 +146,7 @@ function RemotePlayer({ id }) {
   const def = VEHICLES[shape.c] ?? VEHICLES.sedan
   return (
     <>
-      {wanted > 0 && <RemoteChase id={id} />}
+      {(wanted > 0 || chased) && <RemoteChase id={id} />}
       <RigidBody ref={body} key={`${shape.m}${shape.c}`} type="kinematicPosition" colliders={false} position={[r.x, r.y, r.z]}>
         {shape.m === 'c' ? (
           <>
@@ -175,16 +180,19 @@ function RemotePlayer({ id }) {
 }
 
 // Our own police chase, for everyone else to see: the nearest chasing cars
-// and officers on foot, as [x, z, heading] (officers also send their height).
+// (police, or LASTMA after a red light) and officers on foot, as [x, z,
+// heading, kind] (officers send their height instead). Only our own
+// police: a shared car on the chase is in the world snapshot already.
 const round = (v) => Math.round(v * 10) / 10
 function ourChase(game, at) {
-  if (game.wanted <= 0 || game.inside) return { pc: [], pf: [] }
+  if (game.inside) return { pc: [], pf: [] }
   const near = (o) => Math.hypot(o.x - at.x, o.z - at.z)
   const pc = vehicles
-    .filter((v) => v.chasing && !v.wrecked && near(v) < 150)
+    .filter((v) => (v.chasing || v.lastmaOn) && !sharedVehicle(v) && !v.wrecked && near(v) < 260)
     .sort((a, b) => near(a) - near(b))
     .slice(0, CHASE_LIMITS.CARS)
-    .map((v) => [round(v.x + (v.offX ?? 0)), round(v.z + (v.offZ ?? 0)), round(v.yaw)])
+    .map((v) => [round(v.x + (v.offX ?? 0)), round(v.z + (v.offZ ?? 0)), round(v.yaw), v.type === 'lastma' ? 1 : 0])
+  if (game.wanted <= 0) return { pc, pf: [] }
   const pf = npcs
     .filter((n) => n.kind === 'cop' && n.active && near(n) < 80)
     .sort((a, b) => near(a) - near(b))

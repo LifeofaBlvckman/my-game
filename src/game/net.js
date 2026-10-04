@@ -4,6 +4,7 @@ import { useGame, world } from './state'
 import { onRaceMessage } from './racing'
 import { contactLeft, phoneMessage } from './phoneline'
 import { cleanOutfit } from './wardrobe'
+import { applySnapshot } from './worldSync'
 
 // Client side of multiplayer. Connects to the server on the same address the
 // game was loaded from; if there isn't one, the game just stays single player.
@@ -82,6 +83,8 @@ export function connectMultiplayer(name) {
     id: null,
     ws,
     remotes: new Map(),
+    hostId: null, // who runs the room's traffic and crowd (worldSync.js)
+    owners: new Map(), // cars and people someone has claimed: key -> player id
     lastSend: 0,
     send(msg) {
       if (ws.readyState === 1) ws.send(JSON.stringify(msg))
@@ -151,6 +154,8 @@ export function connectMultiplayer(name) {
       retryDelay = 2000
       net.id = msg.id
       world.time = msg.time
+      net.hostId = msg.host ?? msg.id
+      net.owners = new Map(msg.owners ?? [])
       msg.players.forEach((p) => {
         addRemote(net, p.id, p.name, p.s)
         setLook(p.id, p.o)
@@ -174,6 +179,15 @@ export function connectMultiplayer(name) {
       if (!r) return
       r.samples.push({ time: performance.now(), ...msg })
       if (r.samples.length > 5) r.samples.shift()
+    } else if (msg.t === 'w') {
+      applySnapshot(msg.id, msg)
+    } else if (msg.t === 'own') {
+      for (const k of msg.k ?? []) {
+        if (msg.id === null) net.owners.delete(k)
+        else net.owners.set(k, msg.id)
+      }
+    } else if (msg.t === 'host') {
+      net.hostId = msg.id
     } else if (msg.t === 'hit') {
       const from = net.remotes.get(msg.from)
       hurtPlayer(msg.dmg, msg.x, msg.z, msg.dmg >= 15)
