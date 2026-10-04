@@ -9,7 +9,9 @@ Rapier physics and Vite.
 - **You:** pick a boy or a girl and type your name on the title screen; the
   story calls you by it.
 - **Lagos:** Mainland (Ikeja, Yaba, Surulere, Ebute Metta) and Island (Lagos
-  Island, Ikoyi, VI, Lekki), joined by Third Mainland and Carter Bridge.
+  Island, Ikoyi, VI, Lekki), joined by Third Mainland and Carter Bridge. The
+  Mainland is low two- and three-storey shophouses with painted signs,
+  awnings and power lines; the towers are on Marina and VI.
 - **Places:** markets, Lekki Grand Mall, clubs, bus stops, and buildings you
   can enter: Tunde's house, Club Eko, Kwilox, a gym, a church, a bank, the
   General Hospital (you wake up here when wasted) and a police station (you
@@ -18,9 +20,12 @@ Rapier physics and Vite.
   on the desk.
 - **Traffic:** danfos, kekes, sedans and jeeps, with luxury cars on the
   Island; traffic lights, stop signs, horns and engine sounds. Danfos and
-  kekes pick up passengers at bus stops. LASTMA wardens give you a star if
-  they see you run a red light.
+  kekes pick up passengers at bus stops. Cars wait for each other at
+  junctions and pull over for sirens. Run a red light in front of a LASTMA
+  warden and a LASTMA patrol chases you: get caught and you pay a fine.
 - **Police:** wanted stars, chases, and officers who get out to arrest you.
+  The lead car comes at you from behind while the others try to cut you off
+  or box you in.
   Get out of sight (far away or behind buildings) and the stars blink, then
   drop one at a time. Make it home and they're gone.
 - **Food and the market:** buy jollof, suya, amala and more at mama put
@@ -52,9 +57,12 @@ Rapier physics and Vite.
   (**P**) texts, calls or sends your location to anyone online.
 - **Saved games:** add a 4-digit PIN on the title screen and your game saves
   online, so you can carry on from any device.
+- **Map:** the radar shows your house, the hospital, the police station, the
+  barracks and the bank. Tap it (or press N) for the whole city.
 - **Phones:** simple touch controls appear automatically. Drag on the left
   to move and on the right to look. One button does whatever is nearby, and
-  ☰ holds the rest. In a car: ◀ ▶ to steer, GAS and BRAKE.
+  ☰ holds the rest. In a car, drag the left stick the way you want to drive;
+  pull back to brake or reverse.
 - **Look and sound:** two-tone shading, ink outlines, painted sky, birds, clear
   water with fish you can swim in, footbridges over busy roads, flower
   gardens, street dogs, rain after a while, day and
@@ -120,6 +128,7 @@ doesn't need restoring. Render's own free database expires after 30 days.
 | G | Go to a friend (online) | |
 | P | Phone: text, call, send your location | Phone |
 | Y | Chat (online) | Chat |
+| N | Map | Map |
 | M / O / T / H | Music (calm, Afrobeats, off) · outlines · skip an hour · help | |
 
 ## Where things are
