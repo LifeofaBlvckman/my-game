@@ -39,6 +39,29 @@ function checkCaseClashes(dir) {
 }
 const caseCheck = { name: 'case-check', buildStart: () => checkCaseClashes('src') }
 
+// Split the download into pieces that change at different rates, so after a
+// game update the browser only fetches the game code again: the physics
+// engine (big, never changes), three.js and the R3F helpers, the other
+// libraries (React and friends, kept together so they load in order), then
+// the game itself.
+const chunks = {
+  codeSplitting: {
+    // (Don't drag a library's dependencies into its chunk: rapier would take three.js with it.)
+    includeDependenciesRecursively: false,
+    groups: [
+      { name: 'physics', test: /node_modules[\\/](@dimforge|@react-three[\\/]rapier)/, priority: 30 },
+      { name: 'three', test: /node_modules[\\/](three|three-stdlib|@react-three[\\/](fiber|drei)|troika|meshline|maath|camera-controls)/, priority: 20 },
+      { name: 'vendor', test: /node_modules/, priority: 1 },
+    ],
+  },
+}
+
 export default defineConfig({
   plugins: [react(), multiplayer, caseCheck],
+  build: {
+    rolldownOptions: { output: chunks },
+    // The physics engine ships as one WebAssembly blob of about 1.5 MB; it
+    // can't be split further, so don't warn about it.
+    chunkSizeWarningLimit: 2600,
+  },
 })
