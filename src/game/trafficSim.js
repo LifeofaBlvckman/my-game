@@ -633,7 +633,7 @@ export function updateTraffic(dt, ctx) {
 export function summonLastma(focus) {
   let v = vehicles.find((o) => o.type === 'lastma' && o.state !== 'parked' && Math.hypot(o.x - focus.x, o.z - focus.z) < 120)
   if (!v) {
-    const spot = randomLanePosition(focus, 35, 80) ?? randomLanePosition(focus, 20, 140)
+    const spot = randomLanePosition(focus, 25, 55) ?? randomLanePosition(focus, 20, 120)
     if (!spot) return null
     // Borrow the farthest ordinary car for it.
     v = vehicles
