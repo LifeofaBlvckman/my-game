@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { useRapier } from '@react-three/rapier'
 import { useKeyboardControls } from '@react-three/drei'
 import { Quaternion, Vector3 } from 'three'
 import { city, ISLAND, MAINLAND, ROAD, zoneAt } from './cityData'
@@ -1244,6 +1245,7 @@ export default function GameLogic() {
 
   // Debug hooks for automated testing (dev server only).
   const three = useThree()
+  const physics = useRapier()
   useEffect(() => {
     if (!import.meta.env.DEV) return
     window.__game = {
@@ -1258,6 +1260,25 @@ export default function GameLogic() {
       },
       state: () => useGame.getState(),
       // Draw calls and triangles for one whole frame (all passes).
+      // Solid things at chest height on a grid: where a person would be stopped.
+      probe: (x0, x1, z0, z1, step = 2, y = 1.0) => {
+        const { rapier, world: pw } = physics
+        const ball = new rapier.Ball(0.3)
+        const hits = []
+        for (let x = x0; x <= x1; x += step) {
+          for (let z = z0; z <= z1; z += step) {
+            pw.intersectionsWithShape({ x, y, z }, { x: 0, y: 0, z: 0, w: 1 }, ball, (c) => {
+              const body = c.parent()
+              if (body && !body.isFixed()) return true
+              const t = c.translation()
+              const h = c.halfExtents?.() ?? { x: c.radius?.() ?? 0, y: c.halfHeight?.() ?? 0, z: c.radius?.() ?? 0 }
+              hits.push({ x, z, cx: Math.round(t.x * 10) / 10, cz: Math.round(t.z * 10) / 10, cy: Math.round(t.y * 10) / 10, hx: Math.round(h.x * 10) / 10, hy: Math.round(h.y * 10) / 10, hz: Math.round(h.z * 10) / 10, shape: c.shape.type })
+              return false
+            })
+          }
+        }
+        return hits
+      },
       // Where the triangles go: the heaviest meshes in the scene.
       sceneBreakdown: () => {
         const rows = new Map()
