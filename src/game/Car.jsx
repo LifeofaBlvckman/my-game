@@ -125,11 +125,28 @@ export default function Car() {
     let latX = v.x - fwd.x * speed
     let latZ = v.z - fwd.z * speed
 
-    // Touch: the stick gives smooth throttle (push up) and steering; the
-    // pedals press the same keys as W and S.
+    // Touch: drag the stick the way you want to go. Up drives on, up and to
+    // a side turns that way, a long way to the side turns hard; pulling back
+    // brakes, then reverses once you've stopped.
     const stick = driving && !world.raceHold ? world.stick : null
     let throttle = Number(!!keys.forward) - Number(!!keys.back)
-    if (stick && throttle === 0 && Math.abs(stick.y) > 0.3) throttle = Math.max(-1, Math.min(1, (-stick.y - Math.sign(-stick.y) * 0.3) / 0.6))
+    let stickSteer = 0
+    if (stick) {
+      const mag = Math.min(1, Math.hypot(stick.x, stick.y))
+      if (mag > 0.15) {
+        const a = Math.atan2(stick.x, -stick.y) // 0 = up, + to the right
+        const power = (mag - 0.15) / 0.85
+        if (Math.abs(a) < 2.1) {
+          throttle = Math.max(throttle, power * (Math.abs(a) > 1.2 ? 0.75 : 1))
+          stickSteer = -Math.max(-1, Math.min(1, a / 1.1))
+        } else if (speed > 1.5) {
+          throttle = -power // brake
+        } else {
+          throttle = -power * 0.8 // reverse
+          stickSteer = Math.max(-1, Math.min(1, stick.x * 1.4))
+        }
+      }
+    }
     if (throttle !== 0) {
       const braking = Math.abs(speed) > 0.5 && Math.sign(speed) !== Math.sign(throttle)
       const accel = braking ? BRAKE : throttle > 0 ? def.accel : def.accel * 0.8
@@ -168,10 +185,9 @@ export default function Car() {
     // Steering only turns the car while it's rolling, and tightens at low speed.
     let steerInput = Number(!!keys.left) - Number(!!keys.right)
     if (stick) {
-      // A small dead zone, gentle near the middle, and less lock at speed so
-      // a thumb can hold a straight line on the expressway.
-      const x = Math.abs(stick.x) < 0.08 ? 0 : -stick.x
-      steerInput = Math.sign(x) * Math.abs(x) ** 1.5 * (1 - Math.min(0.4, Math.abs(speed) / 70))
+      // Gentle near straight ahead, and a little less lock at speed so a
+      // thumb can hold a straight line on the expressway.
+      steerInput = Math.sign(stickSteer) * Math.abs(stickSteer) ** 1.3 * (1 - Math.min(0.35, Math.abs(speed) / 80))
     }
     steer.current += (steerInput - steer.current) * Math.min(1, dt * (stick ? 10 : 8))
     const rolling = Math.max(-1, Math.min(1, speed / 6))

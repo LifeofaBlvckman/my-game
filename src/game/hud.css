@@ -640,43 +640,23 @@
 .touch-btn.mini .icon {
   font-size: 18px;
 }
-.car-extras {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-.steer-pad {
+/* In a car: a faint ring where the driving stick goes until you touch. */
+.stick-hint {
   position: absolute;
-  left: 18px;
-  bottom: calc(26px + env(safe-area-inset-bottom));
+  left: 34px;
+  bottom: calc(34px + env(safe-area-inset-bottom));
   display: flex;
-  gap: 14px;
-  pointer-events: auto;
-}
-.touch-btn.steer {
-  width: 84px;
-  height: 84px;
-  border-radius: 20px;
-}
-.touch-btn.steer .icon {
-  font-size: 34px;
-}
-/* Pedals: tall rounded rectangles you can rest a thumb on. */
-.touch-btn.pedal {
-  width: 70px;
-  height: 104px;
-  border-radius: 18px;
-}
-.touch-btn.pedal .icon {
-  font-size: 22px;
-}
-.touch-btn.pedal.gas {
-  background: rgba(196, 240, 190, 0.94);
-  height: 128px;
-}
-.touch-btn.pedal.brake {
-  background: rgba(255, 205, 200, 0.94);
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font: bold 11px Arial, Helvetica, sans-serif;
+  text-align: center;
+  pointer-events: none;
 }
 .touch-btn:active {
   transform: translate(2px, 2px);

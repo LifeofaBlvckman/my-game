@@ -11,7 +11,8 @@ import { personalize } from './who'
 //  - one big action button that becomes whatever makes sense right now
 //    (talk, enter, drive, eat, race... or punch), and a small jump button
 //  - square buttons: ☰ for the rest (friends, chat, music, help), 😀 and 📱
-//  - in a car: ◀ ▶ under the left thumb to steer, GAS and BRAKE on the right
+//  - in a car: the same left-thumb stick drives: drag the way you want to go
+//    (up to go, to a side to turn, back to brake and reverse)
 // They press the same keys the keyboard would, so the game doesn't need to know.
 export const isTouch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window)
 
@@ -29,7 +30,7 @@ const tap = (code) => {
 
 const STICK = 52 // px from the center to the edge of the stick's travel
 
-function MoveZone() {
+function MoveZone({ hint }) {
   const [knob, setKnob] = useState(null) // { x, y, cx, cy } in px
   const pointer = useRef(null)
   const update = (e) => {
@@ -60,7 +61,7 @@ function MoveZone() {
     ;['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft'].forEach((c) => key(c, false))
     setKnob(null)
   }
-  // Getting into a car swaps the stick for steering buttons: let go of
+  // Leaving the screen (a dialogue, the end of the game): let go of
   // everything the stick was holding, or the car would set off by itself.
   useEffect(() => () => {
     world.stick = null
@@ -83,6 +84,7 @@ function MoveZone() {
           <div className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
         </div>
       )}
+      {!knob && hint && <div className="stick-hint">{hint}</div>}
     </div>
   )
 }
@@ -200,7 +202,7 @@ function Menu({ onClose }) {
       {item('❓', 'How to play', () => setHelp((h) => !h))}
       {help && (
         <p className="menu-help">
-          Left thumb: move (push far to sprint). Right thumb: look. The big button does whatever is nearby: talk, enter, drive, eat, race. Otherwise it punches. Follow the yellow dot on the radar; pink dots are friends.
+          Left thumb: move (push far to sprint); in a car, drag the way you want to drive, and pull back to brake or reverse. Right thumb: look. The big button does whatever is nearby: talk, enter, drive, eat, race. Otherwise it punches. Follow the yellow dot on the radar; pink dots are friends.
         </p>
       )}
       {item('✕', 'Close', onClose)}
@@ -232,15 +234,7 @@ export default function TouchControls() {
   return (
     <div className="touch">
       <LookZone />
-      {car ? (
-        // Driving: hold ◀ or ▶ to steer (left thumb), pedals on the right.
-        <div className="steer-pad">
-          <HoldButton code="KeyA" icon="◀" className="steer" />
-          <HoldButton code="KeyD" icon="▶" className="steer" />
-        </div>
-      ) : (
-        <MoveZone />
-      )}
+      <MoveZone hint={car ? 'Drag to drive' : null} />
       <div className="touch-side">
         <Square icon="☰" active={panel === 'menu'} onPress={() => setPanel((p) => (p === 'menu' ? null : 'menu'))} />
         <Square icon="😀" active={panel === 'emoji'} onPress={() => setPanel((p) => (p === 'emoji' ? null : 'emoji'))} />
@@ -251,14 +245,11 @@ export default function TouchControls() {
       <div className="touch-actions">
         {caption && <div className="action-caption">{caption}</div>}
         {car ? (
-          // Driving: steer with the left thumb, pedals under the right.
+          // Driving: get out, the horn (or whatever's nearby), and the handbrake.
           <>
-            <div className="car-extras">
-              <HoldButton code="KeyF" icon="🚪" className="mini" />
-              <HoldButton key={main.key + main.icon} code={main.key} icon={main.icon} className={`mini ${action ? 'glow' : ''}`} />
-            </div>
-            <HoldButton code="KeyS" icon="◼" label="BRAKE" className="pedal brake" />
-            <HoldButton code="KeyW" icon="▲" label="GAS" className="pedal gas" />
+            <HoldButton key={main.key + main.icon} code={main.key} icon={main.icon} label={main.label} className={`big ${action ? 'glow' : ''}`} />
+            <HoldButton code="KeyF" icon="🚪" className="small" />
+            <HoldButton code="Space" icon="Ⓗ" className="small" />
           </>
         ) : (
           <>
