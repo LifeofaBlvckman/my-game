@@ -8,10 +8,13 @@ Rapier physics and Vite.
 
 - **You:** pick a boy or a girl and type your name on the title screen; the
   story calls you by it.
-- **Lagos:** Mainland (Ikeja, Yaba, Surulere, Ebute Metta) and Island (Lagos
-  Island, Ikoyi, VI, Lekki), joined by Third Mainland and Carter Bridge. The
+- **Lagos:** Mainland (Ikeja, Yaba, Surulere, Ebute Metta, Oyingbo, Apapa,
+  Ajegunle) and Island (Lagos Island, Ikoyi, VI, Banana Island, Lekki),
+  joined by Third Mainland and Carter Bridge. The
   Mainland is low two- and three-storey shophouses with painted signs,
   awnings and power lines; the towers are on Marina and VI.
+- **Airport:** Murtala Muhammed International Airport off Third Mainland
+  Bridge, with a terminal, control tower and airliners taking off and landing.
 - **Places:** markets, Lekki Grand Mall, clubs, bus stops, and buildings you
   can enter: Tunde's house, Club Eko, Kwilox, a gym, a church, a bank, the
   General Hospital (you wake up here when wasted) and a police station (you
@@ -31,11 +34,12 @@ Rapier physics and Vite.
 - **Food and the market:** buy jollof, suya, amala and more at mama put
   stalls (E) to get health back. Any market trader (E) sells snacks, clothes
   and things for your house.
-- **Property:** spend mission money on a Yaba flat (₦25,000) or a Lekki
-  penthouse (₦150,000), both safe houses with a bed and wardrobe, or a garage
-  (₦40,000) that keeps up to 4 cars. Drive up to the roller door and press E
-  to park; Alhaji Musa pays for the cars he orders. Look for the red "FOR
-  SALE" boards.
+- **Property:** spend mission money on houses (a Surulere bungalow from
+  ₦15,000 up to a Banana Island mansion for ₦500,000), all safe houses with a
+  bed and wardrobe; a garage (₦40,000) that keeps up to 4 cars (Alhaji Musa
+  pays for the cars he orders); or businesses that pay you every 3 minutes
+  you play, from a car wash to an oil company. Look for the red "FOR SALE"
+  boards.
 - **Street trouble:** area boys on some corners want you to "settle" them
   (pay ₦500, walk off, or fight). Stay out of the army barracks in Ikeja.
 - **Nine story jobs:** pepper delivery, church, a flash drive across the
@@ -141,7 +145,9 @@ doesn't need restoring. Render's own free database expires after 30 days.
 - `src/game/vehicleTypes.js`: vehicles and their handling
 - `src/game/audio.js`: music and sounds (`MUSIC_VOLUME` sets the music level)
 - `src/game/wardrobe.js`, `src/game/decor.js`: clothes and furniture
-- `src/game/property.js`, `src/game/ShopPanels.jsx`: houses, the garage and the market
+- `src/game/property.js`, `src/game/ShopPanels.jsx`: houses, businesses, the garage and the market
+- `src/game/facades.js`, `src/game/shopfronts.js`: building fronts, shop signs and power lines
+- `src/game/Planes.jsx`: the airliners
 - `src/game/streetlife.js`: area boys and the barracks
 - `server/`: multiplayer, saved games (`saves.js`) and the production server (`npm start`)
 
