@@ -713,10 +713,13 @@ function addBananaIsland(city) {
     city.trees.push({ x: v.x0 + 2.6, z: v.z0 + 2.6 })
     if (r() < 0.7) city.trees.push({ x: v.x1 - 2.6, z: v.z1 - 2.6 })
     // The car in the drive, and a gateman at about half the gates.
-    const dx = frontX - fx * 5 + (alongX ? -6 : 0)
-    const dz = frontZ - fz * 5 + (alongX ? 0 : -6)
+    // (The gate is the middle of the front wall.)
+    const gateX = alongX ? cxp : frontX
+    const gateZ = alongX ? frontZ : czp
+    const dx = gateX - fx * 5 + (alongX ? -6 : 0)
+    const dz = gateZ - fz * 5 + (alongX ? 0 : -6)
     city.parkedCars.push({ x: dx, z: dz, yaw: alongX ? (fz > 0 ? 0 : Math.PI) : fx > 0 ? Math.PI / 2 : -Math.PI / 2, type: ['gwagon', 'benz', 'sports', 'jeep'][Math.floor(r() * 4)] })
-    if (k % 2 === 0) city.idlers.push({ x: frontX + fx * 1.4 + (alongX ? 3.6 : 0), z: frontZ + fz * 1.4 + (alongX ? 0 : 3.6), y, yaw: Math.atan2(fx, fz), role: 'gateman' })
+    if (k % 2 === 0) city.idlers.push({ x: gateX + fx * 1.4 + (alongX ? 3.6 : 0), z: gateZ + fz * 1.4 + (alongX ? 0 : 3.6), y, yaw: Math.atan2(fx, fz), role: 'gateman' })
   })
   // Residents out for a walk and joggers along the roads.
   city.wanderAreas.push({ x: (B.minX + B.maxX) / 2 + 20, z: cz - 7.5, w: B.maxX - B.minX - 80, d: 1.2, count: 6, y })

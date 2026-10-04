@@ -12,6 +12,9 @@ import Water, { SEABED_Y } from './Water'
 // Outer limits of the playable area: both landmasses plus their beaches.
 export const WORLD = { minX: MAINLAND.minX - BEACH, maxX: ISLAND.maxX + BEACH, minZ: MAINLAND.minZ - BEACH, maxZ: MAINLAND.maxZ + BEACH }
 const QUAY = 0.9 // height of the lagoon wall above the road
+// How far out you can swim: past the beaches, and round the islands that
+// stick out beyond them (Banana Island to the north, Eko Atlantic south).
+const EDGE = { minX: WORLD.minX, maxX: WORLD.maxX, minZ: Math.min(WORLD.minZ, BANANA.minZ - 30), maxZ: Math.max(WORLD.maxZ, EKO.maxZ + 30) }
 
 // Box helper: { x0, x1, z0, z1, y0, y1 }.
 const box = (x0, x1, z0, z1, y0, y1) => ({ x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: (y0 + y1) / 2, w: x1 - x0, d: z1 - z0, h: y1 - y0 })
@@ -318,11 +321,11 @@ export default function City() {
         {city.lamps.map((l, i) => (
           <CylinderCollider key={`l${i}`} args={[3, 0.15]} position={[l.x, 3, l.z]} />
         ))}
-        {/* Invisible walls at the edge of the sea */}
-        <CuboidCollider args={[1, 10, (WORLD.maxZ - WORLD.minZ) / 2]} position={[WORLD.minX, 10, 0]} />
-        <CuboidCollider args={[1, 10, (WORLD.maxZ - WORLD.minZ) / 2]} position={[WORLD.maxX, 10, 0]} />
-        <CuboidCollider args={[(WORLD.maxX - WORLD.minX) / 2, 10, 1]} position={[(WORLD.minX + WORLD.maxX) / 2, 10, WORLD.minZ]} />
-        <CuboidCollider args={[(WORLD.maxX - WORLD.minX) / 2, 10, 1]} position={[(WORLD.minX + WORLD.maxX) / 2, 10, WORLD.maxZ]} />
+        {/* Invisible walls out at sea, round everything (Banana Island and Eko Atlantic included) */}
+        <CuboidCollider args={[1, 10, (EDGE.maxZ - EDGE.minZ) / 2]} position={[EDGE.minX, 10, (EDGE.minZ + EDGE.maxZ) / 2]} />
+        <CuboidCollider args={[1, 10, (EDGE.maxZ - EDGE.minZ) / 2]} position={[EDGE.maxX, 10, (EDGE.minZ + EDGE.maxZ) / 2]} />
+        <CuboidCollider args={[(EDGE.maxX - EDGE.minX) / 2, 10, 1]} position={[(EDGE.minX + EDGE.maxX) / 2, 10, EDGE.minZ]} />
+        <CuboidCollider args={[(EDGE.maxX - EDGE.minX) / 2, 10, 1]} position={[(EDGE.minX + EDGE.maxX) / 2, 10, EDGE.maxZ]} />
       </RigidBody>
     </group>
   )
