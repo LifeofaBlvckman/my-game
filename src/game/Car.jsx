@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import { CoefficientCombineRule, CuboidCollider, RigidBody } from '@react-three/rapier'
-import { BoxGeometry, Quaternion, TorusGeometry, Vector3 } from 'three'
+import { BoxGeometry, Quaternion, TorusGeometry, Vector3, CylinderGeometry } from 'three'
 import { city } from './cityData'
 import { useGame, world } from './state'
 import { partColor, partKind, VEHICLES } from './vehicleTypes'
@@ -38,6 +38,22 @@ function partMaterial(p, color) {
 const wheelRing = new TorusGeometry(0.18, 0.025, 5, 14)
 
 // The vehicle's bodywork, steering wheel, and optionally whoever is inside.
+// A tyre with a silver rim showing on both sides (centred on the hub).
+const tyreGeometry = new CylinderGeometry(1, 1, 0.28, 14).rotateZ(Math.PI / 2)
+export const rimGeometry = new CylinderGeometry(0.62, 0.62, 0.3, 12).rotateZ(Math.PI / 2)
+export function Wheel({ r, ...props }) {
+  return (
+    <group scale={[1, r, r]} {...props}>
+      <mesh geometry={tyreGeometry}>
+        <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
+      </mesh>
+      <mesh geometry={rimGeometry}>
+        <meshToonMaterial gradientMap={toonRamp} color="#c9ccd1" />
+      </mesh>
+    </group>
+  )
+}
+
 export function Body({ type, color, driver, driverFace, riders = [] }) {
   const def = VEHICLES[type]
   const seat = useMemo(() => seatMatrix(def.seat).multiply(steeringWheel), [def])
@@ -222,13 +238,11 @@ export default function Car() {
       {wheels.map(({ w, front, i }) => (
         <group key={`${type}${i}`} position={w} ref={(el) => (wheelSteer.current[i] = front ? el : null)}>
           <mesh ref={(el) => (wheelSpin.current[i] = el)}>
+            <Wheel r={def.wheels.r} />
+            {/* A spoke, so you can see the wheels turn */}
             <mesh rotation-z={Math.PI / 2}>
-              <cylinderGeometry args={[def.wheels.r, def.wheels.r, 0.28, 10]} />
-              <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
-            </mesh>
-            <mesh rotation-z={Math.PI / 2}>
-              <boxGeometry args={[0.29, def.wheels.r * 0.8, 0.12]} />
-              <meshToonMaterial gradientMap={toonRamp} color="#aaaaaa" />
+              <boxGeometry args={[0.31, def.wheels.r * 0.9, 0.1]} />
+              <meshToonMaterial gradientMap={toonRamp} color="#8a8f96" />
             </mesh>
           </mesh>
         </group>

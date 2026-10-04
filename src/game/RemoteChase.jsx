@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import Person from './Person'
-import { Body } from './Car'
+import { Body, Wheel } from './Car'
 import { Blob } from './Shadows'
 import { computePose, COP_LOOK } from './people'
 import { VEHICLES } from './vehicleTypes'
@@ -65,10 +65,7 @@ function CopCar({ index, get }) {
     <group ref={group} visible={false}>
       <Body type="police" color={def.colors[0]} driver={COP_LOOK} />
       {def.wheels.at.map((w, i) => (
-        <mesh key={i} position={w} rotation-z={Math.PI / 2}>
-          <cylinderGeometry args={[def.wheels.r, def.wheels.r, 0.28, 10]} />
-          <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
-        </mesh>
+        <Wheel key={i} r={def.wheels.r} position={w} />
       ))}
       {/* Light bar, bright enough to see from down the road */}
       <mesh ref={left} {...bar(sirenA)} material={red}>

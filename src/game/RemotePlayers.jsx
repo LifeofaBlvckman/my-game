@@ -4,7 +4,7 @@ import { Billboard } from '@react-three/drei'
 import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier'
 import { CanvasTexture, PlaneGeometry, Quaternion, SRGBColorSpace, Vector3 } from 'three'
 import Person from './Person'
-import { Body } from './Car'
+import { Body, Wheel } from './Car'
 import { Blob } from './Shadows'
 import EmoteBubble from './EmoteBubble'
 import { computePose, lookFromSeed } from './people'
@@ -148,11 +148,8 @@ function RemotePlayer({ id }) {
             <CuboidCollider args={def.half} />
             <Body type={shape.c} color={shape.k} driver={look} />
             {def.wheels.at.map((w, i) => (
-              <mesh key={i} position={w} rotation-z={Math.PI / 2}>
-                <cylinderGeometry args={[def.wheels.r, def.wheels.r, 0.28, 10]} />
-                <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
-              </mesh>
-            ))}
+        <Wheel key={i} r={def.wheels.r} position={w} />
+      ))}
             <Blob position-y={-def.half[1] + 0.03} scale={[def.half[0] * 2.6, 1, def.half[2] * 2.4]} />
           </>
         ) : (

@@ -21,6 +21,10 @@ const armGeometry = new BoxGeometry(0.12, 0.12, 1.5).translate(0, 7.3, 0)
 const transformerGeometry = new CylinderGeometry(0.32, 0.32, 0.9, 10).translate(0, 5.9, 0.3)
 const wireGeometry = new BoxGeometry(0.035, 0.035, 1)
 const mastGeometry = new BoxGeometry(0.25, 1, 0.25).translate(0, 0.5, 0)
+// Balcony: slab, a railing along the front and the two ends (1 m wide, scaled).
+const slabGeometry = new BoxGeometry(1, 0.16, 1.1)
+const railGeometry = new BoxGeometry(1, 0.9, 0.06).translate(0, 0.53, 0.52)
+const ledgeGeometry = new BoxGeometry(1, 0.22, 0.32)
 
 const facing = (o, it) => {
   o.position.set(it.x, it.y, it.z)
@@ -78,6 +82,33 @@ export default function StreetFronts() {
         colors={(a) => a.color}
       />
       <Instances items={fronts.acs} geometry={acGeometry} transform={facing} colors={() => '#e6e6e0'} />
+      <Instances
+        items={fronts.balconies}
+        geometry={slabGeometry}
+        transform={(o, b) => {
+          facing(o, b)
+          o.scale.set(b.w, 1, 1)
+        }}
+        colors={() => '#e9e4d6'}
+      />
+      <Instances
+        items={fronts.balconies}
+        geometry={railGeometry}
+        transform={(o, b) => {
+          facing(o, b)
+          o.scale.set(b.w, 1, 1)
+        }}
+        colors={() => '#f4f2ea'}
+      />
+      <Instances
+        items={fronts.ledges}
+        geometry={ledgeGeometry}
+        transform={(o, l) => {
+          facing(o, l)
+          o.scale.set(l.w, 1, 1)
+        }}
+        colors={() => '#f1ece0'}
+      />
       <Instances items={fronts.dishes} geometry={dishPost} transform={(o, d) => o.position.set(d.x, d.y, d.z)} colors={() => '#5a5a5a'} />
       <Instances
         items={fronts.dishes}

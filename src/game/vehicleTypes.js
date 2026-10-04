@@ -51,6 +51,44 @@ function cabin({ x, y, h, front, back, roofY, roofW }) {
   ]
 }
 
+// Finishing touches worked out from a vehicle's main body and windscreen:
+// side mirrors, front and back number plates, door seams and handles.
+function trim(parts, { doors = 2, mirrors = true, plates = true } = {}) {
+  const body = parts.find((p) => p[6] === 'body')
+  const [, by, , bw, bh, bd] = body
+  const hw = bw / 2
+  const hd = bd / 2
+  const glass = parts.filter((p) => p[6] === GLASS && p[5] < 0.1)
+  const front = glass.reduce((a, p) => (!a || p[2] > a[2] ? p : a), null)
+  const rear = glass.reduce((a, p) => (!a || p[2] < a[2] ? p : a), null)
+  const out = []
+  if (mirrors && front) {
+    const my = front[1] - front[4] / 2 + 0.05
+    for (const s of [-1, 1]) {
+      out.push([s * (hw + 0.1), my, front[2] - 0.12, 0.18, 0.11, 0.2, 'body'])
+      out.push([s * (hw + 0.1), my, front[2] - 0.225, 0.14, 0.08, 0.02, GLASS])
+    }
+  }
+  if (plates) {
+    for (const z of [hd + 0.025, -hd - 0.025]) {
+      out.push([0, by - bh * 0.15, z, 0.5, 0.15, 0.03, '#f4f1e6'])
+      out.push([0, by - bh * 0.15 + 0.045, z + Math.sign(z) * 0.012, 0.42, 0.03, 0.01, '#2f6b3a'])
+    }
+  }
+  if (doors && front && rear) {
+    const zs = doors === 4 ? [front[2] - 0.05, (front[2] + rear[2]) / 2 + 0.05] : [front[2] - 0.05]
+    for (const z of zs) {
+      for (const s of [-1, 1]) {
+        out.push([s * (hw + 0.006), by + 0.02, z, 0.02, bh * 0.82, 0.035, '#1e1e22'])
+        out.push([s * (hw + 0.014), by + bh * 0.22, z - 0.32, 0.03, 0.045, 0.17, '#d8dbdf'])
+      }
+    }
+  }
+  return out
+}
+
+const withTrim = (opts, parts) => [...parts, ...trim(parts, opts)]
+
 const sedanParts = [
   [0, 0.05, 0, 1.9, 0.55, 4.3, 'body'],
   ...cabin({ x: 0.8, y: 0.6, h: 0.56, front: 0.78, back: -1.28, roofY: 0.9, roofW: 1.66 }),
@@ -130,7 +168,7 @@ export const VEHICLES = {
   sedan: {
     name: 'Sedan',
     half: [0.95, 0.5, 2.15],
-    parts: sedanParts,
+    parts: [...sedanParts, ...trim(sedanParts, { doors: 4 })],
     wheels: sedanWheels,
     seat: SEDAN_SEAT,
     passengers: SEDAN_PASSENGERS,
@@ -143,12 +181,12 @@ export const VEHICLES = {
   police: {
     name: 'Police Car',
     half: [0.95, 0.5, 2.15],
-    parts: [
+    parts: withTrim({ doors: 4 }, [
       ...sedanParts,
       [0, 0.05, 0.25, 1.93, 0.2, 2.0, '#f2f2f2'],
       [0.3, 0.98, -0.25, 0.5, 0.14, 0.35, 'sirenA', E],
       [-0.3, 0.98, -0.25, 0.5, 0.14, 0.35, 'sirenB', E],
-    ],
+    ]),
     wheels: sedanWheels,
     seat: SEDAN_SEAT,
     passengers: [],
@@ -161,7 +199,7 @@ export const VEHICLES = {
   jeep: {
     name: 'Jeep',
     half: [1.0, 0.8, 2.35],
-    parts: [
+    parts: withTrim({ doors: 4 }, [
       [0, -0.15, 0, 2.0, 0.8, 4.7, 'body'],
       ...cabin({ x: 0.92, y: 0.55, h: 0.6, front: 1.35, back: -1.95, roofY: 0.88, roofW: 1.92 }),
       [0, 0.3, 1.2, 1.8, 0.1, 0.25, '#2a2a2e'],
@@ -174,7 +212,7 @@ export const VEHICLES = {
         [0.45, 0.2, -0.6, 0.86],
         [-0.45, 0.2, -0.6, 0.86],
       ]),
-    ],
+    ]),
     wheels: { r: 0.45, at: [[0.92, -0.35, 1.5], [-0.92, -0.35, 1.5], [0.92, -0.35, -1.5], [-0.92, -0.35, -1.5]] },
     seat: [0.45, 0.2, 0.55, 0.86],
     passengers: [
@@ -193,7 +231,7 @@ export const VEHICLES = {
   lastma: {
     name: 'LASTMA Patrol',
     half: [1.0, 0.8, 2.35],
-    parts: [
+    parts: withTrim({ doors: 2 }, [
       [0, -0.15, 0, 2.0, 0.8, 4.7, 'body'],
       ...cabin({ x: 0.92, y: 0.55, h: 0.6, front: 1.35, back: 0.05, roofY: 0.88, roofW: 1.92 }),
       [0, 0.3, 1.2, 1.8, 0.1, 0.25, '#2a2a2e'],
@@ -211,7 +249,7 @@ export const VEHICLES = {
         [0.45, 0.2, 0.55, 0.86],
         [-0.45, 0.2, 0.55, 0.86],
       ]),
-    ],
+    ]),
     wheels: { r: 0.45, at: [[0.92, -0.35, 1.5], [-0.92, -0.35, 1.5], [0.92, -0.35, -1.5], [-0.92, -0.35, -1.5]] },
     seat: [0.45, 0.2, 0.55, 0.86],
     passengers: [[-0.45, 0.2, 0.55, 0.86]],
@@ -224,7 +262,7 @@ export const VEHICLES = {
   danfo: {
     name: 'Danfo',
     half: [1.0, 1.1, 2.4],
-    parts: [
+    parts: withTrim({ doors: 0 }, [
       [0, -0.35, 0, 2.0, 0.8, 4.8, 'body'],
       [0, 0.85, 0, 2.0, 0.22, 4.8, 'body'],
       [0.97, 0.4, 2.3, 0.07, 0.7, 0.14, 'body'],
@@ -251,7 +289,7 @@ export const VEHICLES = {
         [0.5, 0.06, -0.8, 0.9],
         [-0.5, 0.06, -0.8, 0.9],
       ]),
-    ],
+    ]),
     wheels: { r: 0.38, at: [[0.9, -0.72, 1.6], [-0.9, -0.72, 1.6], [0.9, -0.72, -1.6], [-0.9, -0.72, -1.6]] },
     seat: [0.5, 0.06, 1.75, 0.9],
     passengers: [
@@ -270,7 +308,7 @@ export const VEHICLES = {
   keke: {
     name: 'Keke',
     half: [0.7, 0.85, 1.25],
-    parts: [
+    parts: withTrim({ doors: 0, mirrors: false }, [
       [0, -0.42, 0, 1.3, 0.22, 2.3, 'body'],
       [0, -0.05, 0.95, 0.75, 0.75, 0.45, 'body'],
       [0, 0.5, 0.97, 0.75, 0.4, 0.04, GLASS],
@@ -288,7 +326,7 @@ export const VEHICLES = {
       [0, 0.2, 1.18, 0.25, 0.15, 0.04, '#fff4c8', E],
       [0.5, -0.2, -1.16, 0.2, 0.12, 0.04, '#c3262b', E],
       [-0.5, -0.2, -1.16, 0.2, 0.12, 0.04, '#c3262b', E],
-    ],
+    ]),
     wheels: { r: 0.25, at: [[0, -0.6, 1.0], [0.6, -0.6, -0.8], [-0.6, -0.6, -0.8]] },
     seat: [0, -0.08, 0.42, 0.85],
     passengers: [
@@ -306,7 +344,7 @@ export const VEHICLES = {
   benz: {
     name: 'Luxury Saloon',
     half: [1.0, 0.5, 2.45],
-    parts: luxuryParts,
+    parts: [...luxuryParts, ...trim(luxuryParts, { doors: 4 })],
     wheels: { r: 0.4, at: [[0.9, -0.12, 1.5], [-0.9, -0.12, 1.5], [0.9, -0.12, -1.5], [-0.9, -0.12, -1.5]] },
     seat: LUXURY_SEAT,
     passengers: LUXURY_PASSENGERS,
@@ -319,7 +357,7 @@ export const VEHICLES = {
   gwagon: {
     name: 'Big Boy SUV',
     half: [1.05, 1.0, 2.4],
-    parts: suvParts,
+    parts: [...suvParts, ...trim(suvParts, { doors: 4 })],
     wheels: { r: 0.47, at: [[0.95, -0.55, 1.5], [-0.95, -0.55, 1.5], [0.95, -0.55, -1.5], [-0.95, -0.55, -1.5]] },
     seat: SUV_SEAT,
     passengers: SUV_PASSENGERS,
@@ -334,7 +372,7 @@ export const VEHICLES = {
   truck: {
     name: 'Army Truck',
     half: [1.2, 1.3, 3.3],
-    parts: [
+    parts: withTrim({ doors: 2 }, [
       [0, -0.55, 0, 2.3, 0.35, 6.5, '#2b2b26'], // chassis
       [0, 0.15, 2.25, 2.3, 1.05, 1.9, 'body'], // cab
       ...cabin({ x: 1.05, y: 1.0, h: 0.62, front: 3.0, back: 1.4, roofY: 1.33, roofW: 2.14 }),
@@ -358,7 +396,7 @@ export const VEHICLES = {
         [0.5, 0.56, 2.15, 0.9],
         [-0.5, 0.56, 2.15, 0.9],
       ]),
-    ],
+    ]),
     wheels: { r: 0.55, at: [[1.05, -0.75, 2.2], [-1.05, -0.75, 2.2], [1.05, -0.75, -1.8], [-1.05, -0.75, -1.8]] },
     seat: [0.5, 0.56, 2.15, 0.9],
     passengers: [[-0.5, 0.56, 2.15, 0.9]],
@@ -371,7 +409,7 @@ export const VEHICLES = {
   sports: {
     name: 'Supercar',
     half: [1.05, 0.38, 2.3],
-    parts: sportsParts,
+    parts: [...sportsParts, ...trim(sportsParts, { doors: 2 })],
     wheels: { r: 0.36, at: [[0.95, -0.2, 1.45], [-0.95, -0.2, 1.45], [0.95, -0.2, -1.45], [-0.95, -0.2, -1.45]] },
     seat: SPORTS_SEAT,
     passengers: [[-0.4, -0.02, -0.25, 0.8]],

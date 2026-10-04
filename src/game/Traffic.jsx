@@ -9,6 +9,7 @@ import { carBox, SHAPES } from './shapes'
 import { explode, hurtPlayer, TRAFFIC_HP, vehicleSmoke, wreckVehicle } from './damage'
 import { ENGINE_VOICES, trafficHorn, updateTrafficAudio } from './audio'
 import { toon, toonRamp, unlit } from './materials'
+import { rimGeometry } from './Car'
 import { useGame, world } from './state'
 import { blobGeometry, blobMaterial } from './Shadows'
 import { DRIVER_SLOTS, driverFace, driverParts, seatMatrix, steeringWheel } from './drivers'
@@ -19,7 +20,7 @@ import { FACE_COLS, getFaceAtlas } from './faces'
 // Missions park cars too (Baba Femi's danfo): load them before traffic is set up.
 import './quests'
 
-const wheelGeometry = new CylinderGeometry(1, 1, 0.28, 10).rotateZ(Math.PI / 2)
+const wheelGeometry = new CylinderGeometry(1, 1, 0.28, 14).rotateZ(Math.PI / 2)
 const KINDS = ['lit', 'trim', 'glow', 'glass']
 const SEATS = 1 + MAX_PASSENGERS // driver plus passengers
 const wheelRing = new TorusGeometry(0.18, 0.025, 5, 14)
@@ -94,6 +95,7 @@ export default function Traffic() {
   const people = { sphere: useRef(), rbox: useRef(), capsule: useRef(), cone: useRef() }
   const faces = useRef()
   const wheels = useRef()
+  const rims = useRef()
   const steering = useRef()
   const shadows = useRef()
   const { rapier, world: physics } = useRapier()
@@ -115,7 +117,7 @@ export default function Traffic() {
   }, [])
 
   useLayoutEffect(() => {
-    for (const mesh of [...Object.values(meshes), ...Object.values(people), faces, wheels, steering]) {
+    for (const mesh of [...Object.values(meshes), ...Object.values(people), faces, wheels, rims, steering]) {
       for (let i = 0; i < mesh.current.count; i++) mesh.current.setMatrixAt(i, zero)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,15 +319,17 @@ export default function Traffic() {
         const slot = i * MAX_WHEELS + k
         if (!w) {
           wheels.current.setMatrixAt(slot, zero)
+          rims.current.setMatrixAt(slot, zero)
           continue
         }
         tmp.multiplyMatrices(base, spin.makeTranslation(w[0], w[1], w[2]))
         tmp.multiply(spin.makeRotationX(v.spin))
         tmp.multiply(spin.makeScale(1, def.wheels.r, def.wheels.r))
         wheels.current.setMatrixAt(slot, tmp)
+        rims.current.setMatrixAt(slot, tmp)
       }
     })
-    for (const mesh of [...Object.values(meshes), ...Object.values(people), faces, wheels, steering, shadows]) mesh.current.instanceMatrix.needsUpdate = true
+    for (const mesh of [...Object.values(meshes), ...Object.values(people), faces, wheels, rims, steering, shadows]) mesh.current.instanceMatrix.needsUpdate = true
 
     // Engines: the few closest vehicles with somebody at the wheel.
     heard.length = 0
@@ -356,6 +360,9 @@ export default function Traffic() {
       </instancedMesh>
       <instancedMesh ref={wheels} args={[wheelGeometry, undefined, count * MAX_WHEELS]} frustumCulled={false}>
         <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
+      </instancedMesh>
+      <instancedMesh ref={rims} args={[rimGeometry, undefined, count * MAX_WHEELS]} frustumCulled={false}>
+        <meshToonMaterial gradientMap={toonRamp} color="#c9ccd1" />
       </instancedMesh>
       <instancedMesh ref={shadows} args={[blobGeometry, blobMaterial, count]} frustumCulled={false} renderOrder={-1} />
     </group>

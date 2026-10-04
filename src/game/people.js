@@ -139,6 +139,8 @@ export function personParts(look) {
       P('capsule', `arm${s}`, [0, -0.135, 0], [0.105, 0.29, 0.105], sleeve),
       P('capsule', `fore${s}`, [0, -0.12, 0], [0.088, 0.26, 0.088], forearm),
       P('sphere', `fore${s}`, [0, -0.27, 0.005], [0.085, 0.1, 0.075], look.skin),
+      P('sphere', `arm${s}`, [0, -0.015, 0], [0.13, 0.12, 0.13], sleeve), // rounded shoulder
+      P('sphere', 'head', [s === 'L' ? 0.113 : -0.113, 0.12, 0.0], [0.04, 0.07, 0.05], look.skin), // ear
     )
   }
   parts.push(
@@ -147,8 +149,10 @@ export function personParts(look) {
     P('rbox', 'chest', [0, 0.99, 0], [0.34, 0.1, 0.215], look.top), // hem
     P('capsule', 'chest', [0, 1.44, 0], [0.085, 0.1, 0.085], look.skin), // neck
     P('sphere', 'head', [0, 0.13, 0.005], [0.235, 0.27, 0.25], look.skin),
+    P('sphere', 'head', [0, 0.1, 0.128], [0.04, 0.05, 0.04], look.skin), // nose
     ...hairParts(look),
   )
+  if (!wrapper && !agbada) parts.push(P('rbox', 'root', [0, 0.975, 0], [0.33, 0.035, 0.218], '#2a2622')) // belt
   if (look.hood && !look.robe) parts.push(P('sphere', 'chest', [0, 1.4, -0.105], [0.26, 0.13, 0.12], look.top))
   if (wrapper) parts.push(P('rbox', 'root', [0, 0.7, 0], [0.4, 0.5, 0.28], look.bottom)) // iro wrapper
   if (agbada) parts.push(P('rbox', 'chest', [0, 1.06, 0], [0.62, 0.72, 0.3], look.top)) // flowing agbada

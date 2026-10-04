@@ -36,7 +36,7 @@ export const SHOPS = [
 ]
 const AWNINGS = ['#c8202a', '#1f6f3a', '#2962ff', '#f2c230', '#e8622c', '#8a8f96', '#6a1b9a']
 
-export const fronts = { signs: [], awnings: [], acs: [], dishes: [], poles: [], wires: [], crowns: [], masts: [] }
+export const fronts = { signs: [], awnings: [], acs: [], dishes: [], poles: [], wires: [], crowns: [], masts: [], balconies: [], ledges: [] }
 
 const blockCenter = (v, axis) => {
   const first = axis === 'x' ? roadX(0) : roadZ(0)
@@ -69,6 +69,14 @@ for (const b of city.buildings) {
       const aw = Math.min(f.len - 0.6, sw + 1.5 + rand() * 3)
       fronts.awnings.push({ x: wallX + nx * 0.7 + nz * slide, y: 2.42, z: wallZ + nz * 0.7 - nx * slide, rot: f.rot, w: aw, color: pick(AWNINGS) })
     }
+    // A first-floor balcony with a railing on many storey buildings, and a
+    // coping ledge along the top of the wall.
+    if (b.h > 7 && rand() < 0.45) {
+      const bw = Math.min(f.len - 2, 2.6 + rand() * 3)
+      const along = (rand() - 0.5) * (f.len - bw - 1)
+      fronts.balconies.push({ x: wallX + nx * 0.55 + nz * along, y: 3.2, z: wallZ + nz * 0.55 - nx * along, rot: f.rot, w: bw })
+    }
+    fronts.ledges.push({ x: wallX + nx * 0.12, y: b.h - 0.22, z: wallZ + nz * 0.12, rot: f.rot, w: f.len + 0.3 })
     // AC units and satellite dishes upstairs.
     if (b.h > 6) {
       const n = rand() < 0.5 ? 1 : 2

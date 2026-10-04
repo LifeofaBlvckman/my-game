@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import { Quaternion, Vector3 } from 'three'
-import { Body } from './Car'
+import { Body, Wheel } from './Car'
 import { Blob } from './Shadows'
 import { SKIDO_LOOK } from './crowd'
 import { fugitive } from './pursuit'
@@ -42,10 +42,7 @@ export default function Fugitive() {
       <CuboidCollider args={def.half} />
       <Body type={shown} color={fugitive.color} driver={fugitive.crashed ? null : SKIDO_LOOK} />
       {def.wheels.at.map((w, i) => (
-        <mesh key={i} position={w} rotation-z={Math.PI / 2}>
-          <cylinderGeometry args={[def.wheels.r, def.wheels.r, 0.28, 10]} />
-          <meshToonMaterial gradientMap={toonRamp} color="#1a1a1a" />
-        </mesh>
+        <Wheel key={i} r={def.wheels.r} position={w} />
       ))}
       <Blob position-y={-def.half[1] + 0.03} scale={[def.half[0] * 2.6, 1, def.half[2] * 2.4]} />
     </RigidBody>
