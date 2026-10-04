@@ -114,7 +114,7 @@ function laneDashes() {
 // Landmarks (your house, the church, the hospital...) keep the plain look;
 // everything else by area: Mainland shophouses, Island apartments and towers.
 const BUILDING_GROUPS = { civic: [], low: [], mid: [], tower: [] }
-for (const b of city.buildings) BUILDING_GROUPS[b.landmark ? 'civic' : (b.style ?? (b.x > ISLAND.minX - 10 ? 'mid' : 'low'))].push(b)
+for (const b of city.buildings) BUILDING_GROUPS[b.facade ?? (b.landmark ? 'civic' : (b.style ?? (b.x > ISLAND.minX - 10 ? 'mid' : 'low')))].push(b)
 
 export default function City() {
   const buildingMaterial = useMemo(createBuildingMaterial, [])

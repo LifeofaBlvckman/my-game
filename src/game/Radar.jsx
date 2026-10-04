@@ -24,6 +24,7 @@ export function mapPlaces(game) {
     { at: door('police'), glyph: '★', bg: '#1b2a52', label: 'Police station' },
     city.barracks && { at: { x: city.barracks.gateX, z: city.barracks.gateZ }, glyph: '▲', bg: '#4b5536', label: 'Army barracks' },
     { at: door('bank'), glyph: '₦', bg: '#d4af37', fg: '#1b1b24', label: 'Bank' },
+    city.airport && { at: city.airport.terminal, glyph: '✈', bg: '#0d3b6e', label: 'Airport' },
   ]
   for (const p of city.properties) {
     if (game.properties.includes(p.id)) list.push({ at: p, glyph: p.kind === 'garage' ? 'G' : '⌂', bg: '#2ad15a', fg: '#0e3b1a', label: p.kind === 'garage' ? 'Your garage' : 'Your place' })
@@ -73,6 +74,17 @@ export function drawMap() {
   })
   ctx.fillStyle = '#5f8a3c'
   city.parks.forEach((p) => ctx.fillRect(p.x - p.w / 2, p.z - p.d / 2, p.w, p.d))
+  // The airfield: grass with the runway across it.
+  const ap = city.airport
+  if (ap) {
+    const b = city.blocks.find((k) => k.color === '#8fae63')
+    if (b) {
+      ctx.fillStyle = '#7f9e57'
+      ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d)
+    }
+    ctx.fillStyle = '#3a3b3f'
+    ctx.fillRect(ap.runway.x0, ap.runway.z - 8, ap.runway.x1 - ap.runway.x0, 16)
+  }
   ctx.fillStyle = '#a5a79c'
   city.buildings.forEach((b) => ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d))
   city.solids.filter((s) => s.collider && !s.hidden).forEach((s) => ctx.fillRect(s.x - s.w / 2, s.z - s.d / 2, s.w, s.d))

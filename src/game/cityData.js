@@ -1,12 +1,13 @@
 // Procedural Lagos-style city. Pure data, no Three.js, so the 3D scene, the
 // traffic system, the pedestrians and the radar all read the same map.
 
-// The map is a grid of blocks with roads between them: five columns of
-// Mainland, then the Lagos Lagoon, then five columns of Island. Two long
+// The map is a grid of blocks with roads between them: eight columns of
+// Mainland, then the Lagos Lagoon, then seven columns of Island. Two long
 // bridges carry roads across the water.
 export const LAGOON = 6 // columns of water between Mainland and Island
-export const GX = 10 + LAGOON // block columns (x)
-export const GZ = 8 // block rows (z)
+const ISLAND_COLUMNS = 7
+export const GX = 8 + LAGOON + ISLAND_COLUMNS // block columns (x)
+export const GZ = 10 // block rows (z)
 export const BLOCK = 36 // width of a city block (buildings + sidewalk)
 export const ROAD = 12 // width of a road
 export const LANE = 3 // lane center offset from the road center (we drive on the right)
@@ -14,7 +15,7 @@ export const CELL = BLOCK + ROAD
 export const HALF_X = (GX * CELL) / 2
 export const HALF_Z = (GZ * CELL) / 2
 export const SIDEWALK_Y = 0.12
-export const MAINLAND_LAST = 4 // last mainland column
+export const MAINLAND_LAST = 7 // last mainland column
 export const ISLAND_FIRST = MAINLAND_LAST + 1 + LAGOON // first island column
 const isl = (k) => ISLAND_FIRST + k // the k-th island column
 export const BRIDGES = [
@@ -84,6 +85,10 @@ const BUS_STOPS = [
   ['CMS', 'x', 1, 1, isl(2)],
   ['AHMADU BELLO WAY', 'z', isl(2), 1, 4],
   ['LEKKI PHASE 1', 'x', 7, 1, isl(2)],
+  ['MMA AIRPORT', 'x', 2, -1, 6],
+  ['APAPA', 'z', 6, 1, 7],
+  ['AJEGUNLE', 'x', 9, 1, 2],
+  ['AJAH', 'x', 8, 1, isl(5)],
 ]
 
 export const roadX = (i) => -HALF_X + i * CELL
@@ -114,6 +119,9 @@ export const halfFor = (axis) => (axis === 'x' ? HALF_X : HALF_Z)
 // only the bridges do.
 export function segmentValid(axis, line, a) {
   if (a < 0 || a >= nodeCount(axis) || line < 0 || line > lineCount(axis)) return false
+  // Nothing crosses the airport (its edges are ordinary roads).
+  if (axis === 'x' && line > AIRPORT.j0 && line <= AIRPORT.j1 && a >= AIRPORT.i0 && a <= AIRPORT.i1) return false
+  if (axis === 'z' && line > AIRPORT.i0 && line <= AIRPORT.i1 && a >= AIRPORT.j0 && a <= AIRPORT.j1) return false
   if (axis === 'x') return isLandColumn(a) || !!bridgeAt(line)
   return isLandColumn(line - 1) || isLandColumn(line)
 }
@@ -127,8 +135,19 @@ export function lanePoint(axis, line, dir, p) {
   return axis === 'x' ? { x: p, z: roadZ(line) + dir * LANE } : { x: roadX(line) - dir * LANE, z: p }
 }
 
+// Murtala Muhammed International Airport: a 3 x 2 block site in the north
+// east of the Mainland, by the road off Third Mainland Bridge. No roads run
+// through it (columns i0..i1, rows j0..j1 inclusive).
+export const AIRPORT = { i0: 5, i1: 7, j0: 0, j1: 1 }
+const insideAirport = (i, j) => i >= AIRPORT.i0 && i <= AIRPORT.i1 && j >= AIRPORT.j0 && j <= AIRPORT.j1
+
 export const ZONES = {
   ikeja: 'IKEJA',
+  airport: 'MURTALA MUHAMMED AIRPORT',
+  oyingbo: 'OYINGBO',
+  apapa: 'APAPA',
+  ajegunle: 'AJEGUNLE',
+  banana: 'BANANA ISLAND',
   yaba: 'YABA',
   surulere: 'SURULERE',
   ebute: 'EBUTE METTA',
@@ -151,9 +170,12 @@ export function zoneAt(x, z) {
   const j = Math.floor((z + HALF_Z) / CELL)
   if (x <= MAINLAND.maxX) {
     // (the shore road past the last Mainland column still counts as Mainland)
+    if (i >= AIRPORT.i0) return insideAirport(Math.min(i, AIRPORT.i1), j) ? ZONES.airport : j < 6 ? ZONES.oyingbo : ZONES.apapa
+    if (j >= 8) return ZONES.ajegunle
     if (j < 4) return i <= 2 ? ZONES.ikeja : ZONES.yaba
     return i <= 2 ? ZONES.surulere : ZONES.ebute
   }
+  if (i >= isl(5)) return j < 4 ? ZONES.banana : ZONES.lekki
   if (j < 3) return i >= isl(3) ? ZONES.ikoyi : ZONES.island
   if (j < 6) return i >= isl(3) ? ZONES.ikoyi : ZONES.vi
   return ZONES.lekki
@@ -268,6 +290,70 @@ function addCivicBuildings(city) {
     }
     city.doors.push({ id: c.id, name, x, z: front - 3 + 1.3, ...(c.sale && { sale: c.sale }) })
     if (c.sale) city.properties.push({ id: c.id, name, price: c.sale, kind: c.kind, x, z: front - 3 + 1.3 })
+  }
+}
+
+// The airport: a runway along the north, a taxiway down to the apron where
+// the airliners park, the terminal facing the road off Third Mainland
+// Bridge, a control tower, a car park and a fence. Planes.jsx flies them.
+function addAirport(city) {
+  const x0 = roadX(AIRPORT.i0) + ROAD / 2
+  const x1 = roadX(AIRPORT.i1 + 1) - ROAD / 2
+  const z0 = roadZ(AIRPORT.j0) + ROAD / 2
+  const z1 = roadZ(AIRPORT.j1 + 1) - ROAD / 2
+  const cx = (x0 + x1) / 2
+  const y = SIDEWALK_Y
+  const flat = (o) => city.solids.push({ h: 0.03, y, ...o })
+  city.blocks.push({ x: cx, z: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0, color: '#8fae63' }) // grass
+  // Runway with its centre line and threshold bars.
+  const rz = z0 + 20
+  const rw = x1 - x0 - 8
+  flat({ x: cx, z: rz, w: rw, d: 16, color: '#3a3b3f' })
+  for (let x = cx - rw / 2 + 14; x < cx + rw / 2 - 14; x += 9) flat({ x, z: rz, w: 4.5, d: 0.45, color: '#f2f2ee', y: y + 0.01 })
+  for (const end of [-1, 1]) {
+    for (let k = -3; k <= 3; k++) flat({ x: cx + end * (rw / 2 - 5), z: rz + k * 2, w: 6, d: 0.9, color: '#f2f2ee', y: y + 0.01 })
+    flat({ x: cx + end * (rw / 2 - 0.6), z: rz, w: 0.6, d: 16, color: '#e8c547', y: y + 0.01 })
+  }
+  // Taxiway and apron.
+  flat({ x: cx - 34, z: (rz + z0 + 52) / 2, w: 9, d: z0 + 52 - rz, color: '#4a4b4f' })
+  flat({ x: cx - 34, z: (rz + z0 + 52) / 2, w: 0.35, d: z0 + 52 - rz, color: '#e8c547', y: y + 0.01 })
+  flat({ x: cx + 4, z: z0 + 60, w: 104, d: 18, color: '#b8b8b2' })
+  // Terminal: glass front to the road and to the planes, canopy, signs.
+  const tz = z1 - 9
+  const tx = cx + 10
+  city.buildings.push({ x: tx, z: tz, w: 72, d: 14, h: 11, color: '#dfe6ea', landmark: true, facade: 'tower' })
+  city.solids.push({ x: tx, z: tz + 7 + 2.5, w: 64, d: 5, h: 0.35, color: '#e9edf0', y: 4.6 }) // drop-off canopy
+  for (let k = -3; k <= 3; k++) city.solids.push({ x: tx + k * 10, z: tz + 7 + 4.6, w: 0.35, d: 0.35, h: 4.6, color: '#c9cdd2', collider: true })
+  city.signs.push({ text: 'MURTALA MUHAMMED INTERNATIONAL AIRPORT', x: tx, y: 8.6, z: tz + 7.08, rot: 0, w: 40, h: 2.2, bg: '#0d3b6e', fg: '#ffffff', glow: '#9fd6ff' })
+  city.signs.push({ text: 'DEPARTURES', x: tx - 18, y: 3.4, z: tz + 7.08, rot: 0, w: 7, h: 0.9, bg: '#1b1b24', fg: '#ffd23a' })
+  city.signs.push({ text: 'ARRIVALS', x: tx + 18, y: 3.4, z: tz + 7.08, rot: 0, w: 7, h: 0.9, bg: '#1b1b24', fg: '#ffd23a' })
+  for (const k of [-18, 18]) city.solids.push({ x: tx + k, z: tz + 7.05, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true }) // doors
+  // Control tower.
+  const ox = x0 + 10
+  const oz = z1 - 16
+  city.solids.push({ x: ox, z: oz, w: 3.2, d: 3.2, h: 22, color: '#e9edf0', collider: true })
+  city.solids.push({ x: ox, z: oz, w: 7, d: 7, h: 0.5, color: '#c9cdd2', y: 22 })
+  city.solids.push({ x: ox, z: oz, w: 6.4, d: 6.4, h: 3.2, color: '#5fc8e8', y: 22.5, emissive: true })
+  city.solids.push({ x: ox, z: oz, w: 7.4, d: 7.4, h: 0.5, color: '#2f3640', y: 25.7 })
+  city.solids.push({ x: ox, z: oz, w: 0.2, d: 0.2, h: 4, color: '#d8d8d8', y: 26.2 })
+  // Car park in front, west of the terminal.
+  for (let k = 0; k < 7; k++) {
+    city.parkingLines.push({ x: x0 + 18 + k * 4, z: z1 - 5 })
+    if (k < 6 && (k * 7) % 3 !== 1) city.parkedCars.push({ x: x0 + 20 + k * 4, z: z1 - 5, yaw: Math.PI, type: k % 2 ? 'sedan' : 'jeep' })
+  }
+  // Fence round the airfield (the road side stays open).
+  const fence = (o) => city.solids.push({ collider: true, h: 2.2, color: '#9aa0a6', ...o })
+  fence({ x: cx, z: z0 + 0.6, w: x1 - x0, d: 0.12 })
+  fence({ x: x0 + 0.6, z: (z0 + z1 - 20) / 2, w: 0.12, d: z1 - z0 - 20 })
+  fence({ x: x1 - 0.6, z: (z0 + z1 - 20) / 2, w: 0.12, d: z1 - z0 - 20 })
+  // Travellers milling about out front.
+  city.wanderAreas.push({ x: tx, z: tz + 8.6, w: 58, d: 2.2, count: 10, y })
+  city.airport = {
+    runway: { x0: cx - rw / 2, x1: cx + rw / 2, z: rz },
+    // Parked airliners on the apron, noses to the terminal.
+    stands: [-38, -2, 34].map((dx) => ({ x: cx + dx, z: z0 + 58, yaw: 0 })),
+    terminal: { x: tx, z: tz + 8 },
+    tower: { x: ox, z: oz },
   }
 }
 
@@ -532,6 +618,7 @@ function addStreetDetails(city, rand) {
   }
 
   addCivicBuildings(city)
+  addAirport(city)
   addBarracks(city)
   addFootbridges(city)
 
@@ -626,6 +713,7 @@ export function generateCity(seed = 2026) {
   for (let i = 0; i < GX; i++) {
     if (!isLandColumn(i)) continue
     for (let j = 0; j < GZ; j++) {
+      if (insideAirport(i, j)) continue // laid out separately (addAirport)
       const x = blockX(i)
       const z = blockZ(j)
       const island = i >= ISLAND_FIRST

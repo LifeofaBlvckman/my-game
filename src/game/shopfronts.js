@@ -1,4 +1,4 @@
-import { BLOCK, CELL, city, GX, GZ, MAINLAND, mulberry32, ROAD, roadX, roadZ, SIDEWALK_Y } from './cityData'
+import { AIRPORT, BLOCK, CELL, city, GX, GZ, HALF_X, HALF_Z, MAINLAND, mulberry32, ROAD, roadX, roadZ, segmentValid, SIDEWALK_Y } from './cityData'
 
 // The little things that make a Lagos street: painted shop signs and zinc
 // awnings over the shops, AC units and satellite dishes, and wooden electric
@@ -92,6 +92,8 @@ const clearOf = (x, z) =>
   city.footbridges.every((f) => Math.abs(f.x - x) > 14 || Math.abs(f.z - z) > ROAD / 2 + 3) &&
   city.idlers.every((p) => Math.hypot(p.x - x, p.z - z) > 1.2) &&
   (city.stopSigns ?? []).every((s) => Math.hypot(s.x - x, s.z - z) > 1.2)
+// Inside the airport fence (its edge roads keep their poles on the town side).
+const onAirfield = (x, z) => x > roadX(AIRPORT.i0) && x < roadX(AIRPORT.i1 + 1) && z > roadZ(AIRPORT.j0) && z < roadZ(AIRPORT.j1 + 1)
 const nearJunction = (v, lines) => lines.some((r) => Math.abs(v - r) < ROAD / 2 + 2.5)
 const xs = Array.from({ length: GX + 1 }, (_, i) => roadX(i))
 const zs = Array.from({ length: GZ + 1 }, (_, j) => roadZ(j))
@@ -123,14 +125,19 @@ for (let j = 0; j <= GZ; j++) {
   const z = roadZ(j) + ROAD / 2 + 0.9
   if (z > MAINLAND.maxZ - 2) continue
   const pts = []
-  for (let x = MAINLAND.minX + 8; x < MAINLAND.maxX - 8; x += SPACING) if (!nearJunction(x, xs)) pts.push({ x, z, y: SIDEWALK_Y, alongX: true })
+  for (let x = MAINLAND.minX + 8; x < MAINLAND.maxX - 8; x += SPACING) {
+    // Only along road that's really there (none across the airfield).
+    if (!nearJunction(x, xs) && !onAirfield(x, z) && segmentValid('x', j, Math.floor((x + HALF_X) / CELL))) pts.push({ x, z, y: SIDEWALK_Y, alongX: true })
+  }
   runOfPoles(pts)
 }
 for (let i = 0; i <= GX; i++) {
   const x = roadX(i) + ROAD / 2 + 0.9
   if (x > MAINLAND.maxX - 4) break
   const pts = []
-  for (let z = MAINLAND.minZ + 8; z < MAINLAND.maxZ - 8; z += SPACING) if (!nearJunction(z, zs)) pts.push({ x, z, y: SIDEWALK_Y, alongX: false })
+  for (let z = MAINLAND.minZ + 8; z < MAINLAND.maxZ - 8; z += SPACING) {
+    if (!nearJunction(z, zs) && !onAirfield(x, z) && segmentValid('z', i, Math.floor((z + HALF_Z) / CELL))) pts.push({ x, z, y: SIDEWALK_Y, alongX: false })
+  }
   runOfPoles(pts)
 }
 
