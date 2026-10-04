@@ -1258,6 +1258,22 @@ export default function GameLogic() {
       },
       state: () => useGame.getState(),
       // Draw calls and triangles for one whole frame (all passes).
+      // Where the triangles go: the heaviest meshes in the scene.
+      sceneBreakdown: () => {
+        const rows = new Map()
+        three.scene.traverseVisible((o) => {
+          if (!o.isMesh) return
+          const g = o.geometry
+          const tris = (g.index ? g.index.count : (g.attributes.position?.count ?? 0)) / 3
+          const n = o.isInstancedMesh ? o.count : 1
+          const key = `${g.type}:${tris}${o.isInstancedMesh ? ':inst' : ''}:${o.material?.type}`
+          const r = rows.get(key) ?? { key, meshes: 0, tris: 0 }
+          r.meshes++
+          r.tris += tris * n
+          rows.set(key, r)
+        })
+        return [...rows.values()].sort((a, b) => b.tris - a.tris).slice(0, 25)
+      },
       frameStats: () =>
         new Promise((done) => {
           const info = three.gl.info
@@ -1298,7 +1314,6 @@ export default function GameLogic() {
       gangs: () => gangs.map((g) => ({ id: g.id, x: g.x, z: g.z, state: g.state, members: g.members.map((n) => ({ x: n.x, z: n.z, down: n.down, fight: n.fight, hp: n.hp })) })),
       trespass: () => !!world.trespass,
       gateOpen: () => !!world.gateOpen,
-      punch: () => punch(),
       brawl: () => startStreetFight(world.focus),
       brawlers2: () => npcs.filter((n) => n.brawlWith || n.watching).map((n) => ({ i: n.index, x: n.x, z: n.z, b: !!n.brawlWith, w: !!n.watching })),
       armed: () => npcs.filter((n) => n.armed && n.kind === 'walk' && n.x !== undefined).map((n) => ({ i: n.index, x: n.x, z: n.z })),

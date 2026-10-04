@@ -16,6 +16,9 @@ const DRAW_DISTANCE = 120 // people further away are only a few pixels tall
 const SHAPE_NAMES = ['sphere', 'rbox', 'capsule', 'cone']
 const OUTLINE_DISTANCE = 35 // people closer than this get the bold ink outline
 const LOD_DISTANCE = 60 // beyond this, people update every third frame
+const FAR_DISTANCE = 42 // beyond this, people drop their small details and cast no shadow
+// Ears, noses and the like: too small to see from far away.
+const tiny = (p) => p.size[0] * p.size[1] * p.size[2] < 0.0012
 
 function createFaceMaterial() {
   const material = toon({ map: getFaceAtlas(), transparent: true, alphaTest: 0.05, depthWrite: false })
@@ -47,6 +50,7 @@ const color = new Color()
 export default function Pedestrians() {
   const meshes = { sphere: useRef(), rbox: useRef(), capsule: useRef(), cone: useRef() }
   const lines = { sphere: useRef(), rbox: useRef(), capsule: useRef(), cone: useRef() }
+  const fars = { sphere: useRef(), rbox: useRef(), capsule: useRef(), cone: useRef() }
   const faces = useRef()
   const shadows = useRef()
   const faceMaterial = useMemo(createFaceMaterial, [])
@@ -71,6 +75,12 @@ export default function Pedestrians() {
       capsule: new Int32Array(npcs.length * SLOTS.capsule).fill(-1),
       cone: new Int32Array(npcs.length * SLOTS.cone).fill(-1),
       face: new Int32Array(npcs.length).fill(-1),
+      far: {
+        sphere: new Int32Array(npcs.length * SLOTS.sphere).fill(-1),
+        rbox: new Int32Array(npcs.length * SLOTS.rbox).fill(-1),
+        capsule: new Int32Array(npcs.length * SLOTS.capsule).fill(-1),
+        cone: new Int32Array(npcs.length * SLOTS.cone).fill(-1),
+      },
     }),
     [],
   )
@@ -93,6 +103,8 @@ export default function Pedestrians() {
     const time = clock.elapsedTime
     const cursor = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
     const lineCursor = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+    const farCursor = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+    let farRecolored = false
     let faceCursor = 0
     let recolored = false
     const faceAttr = faceGeometry.getAttribute('aFace')
@@ -247,7 +259,22 @@ export default function Pedestrians() {
       }
 
       const outlined = d2 < OUTLINE_DISTANCE * OUTLINE_DISTANCE
+      const far = d2 > FAR_DISTANCE * FAR_DISTANCE
       for (let k = 0; k < rig.parts.length; k++) {
+        const p = rig.parts[k]
+        if (!far) break
+        if (tiny(p)) continue
+        const slot = farCursor[p.shape]++
+        const mesh = fars[p.shape].current
+        mesh.setMatrixAt(slot, p.world)
+        const id = i * 32 + k
+        if (owners.far[p.shape][slot] !== id) {
+          owners.far[p.shape][slot] = id
+          mesh.setColorAt(slot, color.set(p.color))
+          farRecolored = true
+        }
+      }
+      for (let k = 0; k < rig.parts.length && !far; k++) {
         const p = rig.parts[k]
         const slot = cursor[p.shape]++
         const mesh = meshes[p.shape].current
@@ -271,6 +298,10 @@ export default function Pedestrians() {
     })
 
     SHAPE_NAMES.forEach((name) => {
+      const farMesh = fars[name].current
+      farMesh.count = farCursor[name]
+      farMesh.instanceMatrix.needsUpdate = true
+      if (farRecolored && farMesh.instanceColor) farMesh.instanceColor.needsUpdate = true
       const mesh = meshes[name].current
       mesh.count = cursor[name]
       mesh.instanceMatrix.needsUpdate = true
@@ -288,6 +319,12 @@ export default function Pedestrians() {
     <group>
       {SHAPE_NAMES.map((name) => (
         <instancedMesh key={name} ref={meshes[name]} args={[SHAPES[name], undefined, npcs.length * SLOTS[name]]} frustumCulled={false}>
+          <meshToonMaterial gradientMap={toonRamp} />
+        </instancedMesh>
+      ))}
+      {/* Far away: the same people with fewer parts, and no shadow */}
+      {SHAPE_NAMES.map((name) => (
+        <instancedMesh key={`${name}-far`} ref={fars[name]} args={[SHAPES[name], undefined, npcs.length * SLOTS[name]]} frustumCulled={false} userData={{ noShadow: true }}>
           <meshToonMaterial gradientMap={toonRamp} />
         </instancedMesh>
       ))}

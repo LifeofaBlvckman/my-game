@@ -72,6 +72,14 @@ if (!vehicles.length) initTraffic(city.spawn)
 const lookRand = mulberry32(5150)
 vehicles.forEach((v) => (v.civilian = randomLook(lookRand, { robe: false })))
 
+// People in cars within this distance of the camera are drawn.
+const OCCUPANTS_NEAR = 90
+// A number for each look, so a seat slot knows when someone else sits in it.
+const lookIds = new WeakMap()
+let nextLook = 1
+const lookId = (look) => lookIds.get(look) ?? (lookIds.set(look, nextLook++), nextLook - 1)
+const seatOwners = Object.fromEntries([...Object.entries(DRIVER_SLOTS).map(([shape, n]) => [shape, new Int32Array(vehicles.length * SEATS * n).fill(-1)]), ['face', new Int32Array(vehicles.length * SEATS).fill(-1)]])
+
 const driverLook = (v) => (v.police ? COP_LOOK : v.type === 'lastma' ? WARDEN_LOOK : v.civilian)
 // Somebody is at the wheel unless the car is parked, wrecked, burning, or its
 // driver just got out (a cop chasing you on foot, or a driver you dragged out).
@@ -148,11 +156,6 @@ export default function Traffic() {
     v.hidden = true
     v.body?.setNextKinematicTranslation({ x: v.x, y: -60, z: v.z })
     for (const kind of KINDS) for (let k = 0; k < MAX_PARTS[kind]; k++) meshes[kind].current.setMatrixAt(i * MAX_PARTS[kind] + k, zero)
-    for (let seat = 0; seat < SEATS; seat++) {
-      const slotBase = i * SEATS + seat
-      faces.current.setMatrixAt(slotBase, zero)
-      for (const shape of Object.keys(DRIVER_SLOTS)) for (let k = 0; k < DRIVER_SLOTS[shape]; k++) people[shape].current.setMatrixAt(slotBase * DRIVER_SLOTS[shape] + k, zero)
-    }
     steering.current.setMatrixAt(i, zero)
     shadows.current.setMatrixAt(i, zero)
     for (let k = 0; k < MAX_WHEELS; k++) {
@@ -197,6 +200,9 @@ export default function Traffic() {
     const flip = Math.floor(performance.now() / 160) % 2 === 0
     const onFoot = game.mode === 'foot' && game.phase === 'playing' && !world.playerDown
     const faceAttr = faceGeometry.getAttribute('aFace')
+    const seatCursor = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
+    let faceCursor = 0
+    let peopleRecolor = false
     vehicles.forEach((v, i) => {
       const def = VEHICLES[v.type]
       const rig = rigs[v.type]
@@ -211,7 +217,6 @@ export default function Traffic() {
       if (v.hidden) {
         v.hidden = false
         v.dirty = true
-        v.driverRecolor = true
       }
 
       // Damage: smoke, then fire, then a bang.
@@ -293,56 +298,54 @@ export default function Traffic() {
       }
 
       // Who's on board: the driver (if any) and the riders, each in a seat.
+      // Only cars near the camera get people drawn in them; they're packed
+      // into the first instance slots, and a slot is only recoloured when
+      // someone different takes it over.
       const look = driverLook(v)
       if (v.driverRigFor !== look) {
         v.driverRigFor = look
         v.driverRig = driverParts(look)
-        v.driverRecolor = true
       }
-      const occupants = [hasDriver(v) ? { rig: v.driverRig, look } : null]
-      v.riderRigs ??= new Map()
-      for (const r of v.riders.slice(0, def.passengers.length)) {
-        if (!v.riderRigs.has(r)) v.riderRigs.set(r, driverParts(r.look, false))
-        occupants.push({ rig: v.riderRigs.get(r), look: r.look })
-      }
-      const occupantKey = occupants.map((o) => o?.look.face ?? '-').join(',') + v.riders.length
-      if (occupantKey !== v.occupantKey) {
-        v.occupantKey = occupantKey
-        v.driverRecolor = true
-      }
-      for (let seat = 0; seat < SEATS; seat++) {
-        const occ = occupants[seat]
-        const used = { sphere: 0, rbox: 0, capsule: 0, cone: 0 }
-        const slotBase = i * SEATS + seat
-        if (occ && rig.seats[seat]) {
+      const seen = Math.hypot(x - listener.x, z - listener.z) < OCCUPANTS_NEAR
+      if (seen) {
+        const occupants = [hasDriver(v) ? { rig: v.driverRig, look } : null]
+        v.riderRigs ??= new Map()
+        for (const r of v.riders.slice(0, def.passengers.length)) {
+          if (!v.riderRigs.has(r)) v.riderRigs.set(r, driverParts(r.look, false))
+          occupants.push({ rig: v.riderRigs.get(r), look: r.look })
+        }
+        for (let seat = 0; seat < occupants.length; seat++) {
+          const occ = occupants[seat]
+          if (!occ || !rig.seats[seat]) continue
           seatBase.multiplyMatrices(base, rig.seats[seat])
-          for (const p of occ.rig) {
-            const slot = slotBase * DRIVER_SLOTS[p.shape] + used[p.shape]++
+          const who = lookId(occ.look) * 64
+          occ.rig.forEach((p, k) => {
+            const slot = seatCursor[p.shape]++
             const mesh = people[p.shape].current
             mesh.setMatrixAt(slot, tmp.multiplyMatrices(seatBase, p.m))
-            if (v.driverRecolor) mesh.setColorAt(slot, c.set(p.color))
-          }
-          faces.current.setMatrixAt(slotBase, tmp.multiplyMatrices(seatBase, driverFace))
-          if (v.driverRecolor) {
-            faceAttr.setX(slotBase, occ.look.face)
+            if (seatOwners[p.shape][slot] !== who + k) {
+              seatOwners[p.shape][slot] = who + k
+              mesh.setColorAt(slot, c.set(p.color))
+              peopleRecolor = true
+            }
+          })
+          const fslot = faceCursor++
+          faces.current.setMatrixAt(fslot, tmp.multiplyMatrices(seatBase, driverFace))
+          if (seatOwners.face[fslot] !== who) {
+            seatOwners.face[fslot] = who
+            faceAttr.setX(fslot, occ.look.face)
             faceAttr.needsUpdate = true
           }
-        } else {
-          faces.current.setMatrixAt(slotBase, zero)
-        }
-        for (const shape of Object.keys(DRIVER_SLOTS)) {
-          for (let k = used[shape]; k < DRIVER_SLOTS[shape]; k++) people[shape].current.setMatrixAt(slotBase * DRIVER_SLOTS[shape] + k, zero)
         }
       }
       seatBase.multiplyMatrices(base, rig.seats[0])
       steering.current.setMatrixAt(i, tmp.multiplyMatrices(seatBase, steeringWheel))
 
-      if (recolor || v.driverRecolor) {
+      if (recolor) {
         v.dirty = false
-        v.driverRecolor = false
         v.colored = true
         v.sirenWasOn = flashing
-        for (const mesh of [...Object.values(meshes), ...Object.values(people)]) {
+        for (const mesh of Object.values(meshes)) {
           if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true
         }
       }
@@ -365,6 +368,12 @@ export default function Traffic() {
         rims.current.setMatrixAt(slot, tmp)
       }
     })
+    for (const shape of Object.keys(DRIVER_SLOTS)) {
+      const mesh = people[shape].current
+      mesh.count = seatCursor[shape]
+      if (peopleRecolor && mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    }
+    faces.current.count = faceCursor
     for (const mesh of [...Object.values(meshes), ...Object.values(people), faces, wheels, rims, steering, shadows]) mesh.current.instanceMatrix.needsUpdate = true
 
     // Engines: the few closest vehicles with somebody at the wheel.
