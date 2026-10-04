@@ -188,6 +188,39 @@ export const VEHICLES = {
     steer: 2.0,
     cruise: 14,
   },
+  // LASTMA patrol pickup: Lagos traffic management yellow with a maroon
+  // band and an amber light bar. They chase people who run red lights.
+  lastma: {
+    name: 'LASTMA Patrol',
+    half: [1.0, 0.8, 2.35],
+    parts: [
+      [0, -0.15, 0, 2.0, 0.8, 4.7, 'body'],
+      ...cabin({ x: 0.92, y: 0.55, h: 0.6, front: 1.35, back: 0.05, roofY: 0.88, roofW: 1.92 }),
+      [0, 0.3, 1.2, 1.8, 0.1, 0.25, '#2a2a2e'],
+      [0, -0.45, 2.37, 2.0, 0.25, 0.1, '#202020'],
+      [0.97, 0.12, -1.1, 0.06, 0.3, 2.3, 'body'], // load bed sides
+      [-0.97, 0.12, -1.1, 0.06, 0.3, 2.3, 'body'],
+      [0, 0.12, -2.33, 2.0, 0.3, 0.06, 'body'],
+      [1.01, -0.18, 0, 0.02, 0.22, 4.6, '#6b1f2e'], // maroon band
+      [-1.01, -0.18, 0, 0.02, 0.22, 4.6, '#6b1f2e'],
+      [0, 0.97, 0.7, 1.4, 0.12, 0.3, '#2a2a2e'], // light bar
+      [0.35, 1.06, 0.7, 0.5, 0.12, 0.28, 'amberA', E],
+      [-0.35, 1.06, 0.7, 0.5, 0.12, 0.28, 'amberB', E],
+      ...lights(2.36, 0.0, 0.66),
+      ...seats([
+        [0.45, 0.2, 0.55, 0.86],
+        [-0.45, 0.2, 0.55, 0.86],
+      ]),
+    ],
+    wheels: { r: 0.45, at: [[0.92, -0.35, 1.5], [-0.92, -0.35, 1.5], [0.92, -0.35, -1.5], [-0.92, -0.35, -1.5]] },
+    seat: [0.45, 0.2, 0.55, 0.86],
+    passengers: [[-0.45, 0.2, 0.55, 0.86]],
+    colors: ['#f2dc3a'],
+    maxSpeed: 40,
+    accel: 9,
+    steer: 2.0,
+    cruise: 12,
+  },
   danfo: {
     name: 'Danfo',
     half: [1.0, 1.1, 2.4],
@@ -370,5 +403,7 @@ export function partColor(part, vehicleColor, sirenOn = false, sirenFlip = false
   if (c === 'glass') return GLASS_COLOR
   if (c === 'sirenA') return sirenOn ? (sirenFlip ? '#ff2a2a' : '#401010') : '#5a1a1a'
   if (c === 'sirenB') return sirenOn ? (sirenFlip ? '#102040' : '#2a6bff') : '#1a2a5a'
+  if (c === 'amberA') return sirenOn ? (sirenFlip ? '#ffb31a' : '#4a3008') : '#6a4a10'
+  if (c === 'amberB') return sirenOn ? (sirenFlip ? '#4a3008' : '#ffb31a') : '#6a4a10'
   return c
 }

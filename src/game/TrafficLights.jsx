@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BoxGeometry, Color } from 'three'
+import { BoxGeometry, CircleGeometry, Color } from 'three'
 import { CylinderCollider, RigidBody } from '@react-three/rapier'
 import { ROAD } from './cityData'
 import { approaches, lightFor, signals } from './signals'
@@ -8,7 +8,11 @@ import { Instances, groundQuad, unitBox } from './Instances'
 import { unlit } from './materials'
 
 const poleGeometry = new BoxGeometry(0.18, 4.8, 0.18).translate(0, 2.4, 0)
+// Lamps are one-sided discs facing their own drivers, each under a little
+// hood, so from the side or behind you can't see what another road has.
+const lampGeometry = new CircleGeometry(0.15, 16)
 const lampMaterial = unlit()
+const visorGeometry = new BoxGeometry(0.38, 0.035, 0.24)
 const COLORS = { red: '#ff2a1a', yellow: '#ffc21a', green: '#2aff5a', off: '#1c1c1c' }
 const ORDER = ['red', 'yellow', 'green']
 const c = new Color()
@@ -70,14 +74,23 @@ export default function TrafficLights() {
       <Instances
         ref={lamps}
         items={lampItems}
-        geometry={unitBox}
+        geometry={lampGeometry}
         material={lampMaterial}
+        castShadow={false}
         transform={(o, l) => {
-          o.position.set(l.a.x - l.a.ux * 0.22, l.y, l.a.z - l.a.uz * 0.22)
-          o.rotation.y = Math.atan2(l.a.ux, l.a.uz)
-          o.scale.set(0.3, 0.3, 0.06)
+          o.position.set(l.a.x - l.a.ux * 0.205, l.y, l.a.z - l.a.uz * 0.205)
+          o.rotation.y = Math.atan2(-l.a.ux, -l.a.uz)
         }}
         colors={() => COLORS.off}
+      />
+      <Instances
+        items={lampItems}
+        geometry={visorGeometry}
+        transform={(o, l) => {
+          o.position.set(l.a.x - l.a.ux * 0.32, l.y + 0.17, l.a.z - l.a.uz * 0.32)
+          o.rotation.y = Math.atan2(l.a.ux, l.a.uz)
+        }}
+        colors={() => '#111311'}
       />
       <RigidBody type="fixed" colliders={false}>
         {approaches.map((a, i) => (

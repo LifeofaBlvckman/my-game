@@ -365,6 +365,7 @@ export default function Hud() {
             </div>
             <div className="money">₦{String(game.money).padStart(8, '0')}</div>
             <Stars wanted={game.wanted} evading={game.evading} />
+            {game.lastma && <div className="lastma-chip">LASTMA ON YOUR TAIL</div>}
             <SaveBadge />
           </div>
 

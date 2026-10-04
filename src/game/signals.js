@@ -1,9 +1,10 @@
 import { GX, GZ, hasLight, ROAD, roadX, roadZ } from './cityData'
 
 // All junctions share one cycle: roads along x get green, then roads along z.
-const GREEN = 9
-const YELLOW = 2.5
-const ALL_RED = 1
+// Between the two, every light is red for a moment so the junction clears.
+const GREEN = 10
+const YELLOW = 3
+const ALL_RED = 2.5
 export const CYCLE = 2 * (GREEN + YELLOW + ALL_RED)
 
 export const signals = { t: 0 }

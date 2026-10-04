@@ -248,14 +248,14 @@ function addCivicBuildings(city) {
       // A big red cross on the roof edge, lit at night.
       city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 2.6, d: 0.15, h: 0.8, color: '#e8202a', y: c.h - 3, emissive: true })
       city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 0.8, d: 0.15, h: 2.6, color: '#e8202a', y: c.h - 3.9, emissive: true })
-      city.parkedCars.push({ x: x - 8, z: front + 1.5, yaw: Math.PI / 2, type: 'danfo' })
+      city.parkedCars.push({ x: x - 8, z: front + 1.05, yaw: Math.PI / 2, type: 'danfo' })
     } else if (c.sale) {
       // A doorman's lamp and a planter either side of the door.
       for (const k of [-1, 1]) city.solids.push({ x: x + k * 2.6, z: front - 2.4, w: 1, d: 1, h: 0.7, color: '#8a5e3c', y: 0.12 })
     } else {
       // Patrol cars out front and an officer at the door.
-      city.parkedCars.push({ x: x - 8, z: front + 1.5, yaw: Math.PI / 2, type: 'police' })
-      city.parkedCars.push({ x: x + 9, z: front + 1.5, yaw: -Math.PI / 2, type: 'police' })
+      city.parkedCars.push({ x: x - 8, z: front + 1.05, yaw: Math.PI / 2, type: 'police' })
+      city.parkedCars.push({ x: x + 9, z: front + 1.05, yaw: -Math.PI / 2, type: 'police' })
       city.idlers.push({ x: x + 2.2, z: front - 1.6, y: SIDEWALK_Y, yaw: 0, role: 'cop-guard' })
     }
     city.doors.push({ id: c.id, name, x, z: front - 3 + 1.3, ...(c.sale && { sale: c.sale }) })

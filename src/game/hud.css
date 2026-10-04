@@ -1389,3 +1389,17 @@
   background: #fff8e0;
   font-size: 13px;
 }
+
+/* A LASTMA patrol is after you (no stars, just a fine if they catch you) */
+.lastma-chip {
+  margin-top: 4px;
+  padding: 3px 8px;
+  border: 2px solid #1b1b24;
+  border-radius: 6px;
+  background: #f2dc3a;
+  color: #6b1f2e;
+  font: bold 12px Arial, Helvetica, sans-serif;
+  letter-spacing: 1px;
+  text-shadow: none;
+  animation: flash 0.8s steps(2) infinite;
+}

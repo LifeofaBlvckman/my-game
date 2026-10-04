@@ -27,6 +27,7 @@ import { updateWeather, weather } from './weather'
 import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks } from './streetlife'
 import { DEFAULT_CAR, garageSpot, owns, propertyNear, storeCar, takeCar } from './property'
 import { deliverOrder } from './chopshop'
+import { lastma, startLastma, updateLastma } from './lastma'
 
 const ENTER_DISTANCE = 4.5
 const TALK_DISTANCE = 2.6
@@ -56,7 +57,8 @@ function addWanted(n) {
   world.seenFor = 1.5
 }
 
-// LASTMA wardens book anyone they see driving through a red light.
+// LASTMA wardens see anyone driving through a red light, and send a patrol
+// after them (lastma.js).
 function checkRedLights(game) {
   const inBox = new Set()
   // (Not during a street race: the city turns a blind eye.)
@@ -71,11 +73,7 @@ function checkRedLights(game) {
       // Just drove into the junction: which way, and was that way red?
       const h = world.carHeading ?? 0
       const axis = Math.abs(Math.sin(h)) > Math.abs(Math.cos(h)) ? 'x' : 'z'
-      if (lightFor(axis) === 'red' && Math.hypot(c.x - w.x, c.z - w.z) < 40) {
-        addWanted(1)
-        message('LASTMA SAW YOU RUN THE RED LIGHT!', '#ff6b6b', 3000)
-        whistle()
-      }
+      if (lightFor(axis) === 'red' && Math.hypot(c.x - w.x, c.z - w.z) < 40) startLastma(world.focus)
     }
   }
   world.redBox = inBox
@@ -951,6 +949,7 @@ export default function GameLogic() {
     }
     updateEscape(game, dt, copsAim)
     checkRedLights(game)
+    updateLastma(dt, game, world.focus)
     // Area boys on the corners, and soldiers guarding the barracks.
     updateAreaBoys(dt, game, world.focus)
     updateBarracks(dt, game, world.focus, addWanted)
@@ -1226,6 +1225,8 @@ export default function GameLogic() {
       gangs: () => gangs.map((g) => ({ id: g.id, x: g.x, z: g.z, state: g.state, members: g.members.map((n) => ({ x: n.x, z: n.z, down: n.down, fight: n.fight, hp: n.hp })) })),
       trespass: () => !!world.trespass,
       online: () => !!world.net,
+      runRed: () => startLastma(world.focus),
+      lastma: () => (lastma.v ? { x: lastma.v.x, z: lastma.v.z, state: lastma.v.state, near: lastma.near, far: lastma.far, t: lastma.t } : null),
       remoteChases: () => [...(world.net?.remotes.values() ?? [])].map((r) => ({ name: r.name, w: r.s?.w, pc: r.s?.pc, pf: r.s?.pf })),
       fugitive: () => ({ active: fugitive.active, x: fugitive.x, z: fugitive.z, running: fugitive.running, close: fugitive.close, crashed: fugitive.crashed, leg: fugitive.leg }),
       brawlers: () => npcs.filter((n) => n.brawler).map((n) => ({ active: n.active, x: n.x, z: n.z, down: n.down, beaten: n.beaten, fight: n.fight, hp: n.hp })),
@@ -1246,7 +1247,7 @@ export default function GameLogic() {
       setShadows: (on) => useGame.setState({ shadows: on }),
       // Point the camera (yaw 0 looks from +z) and hold it there for a while.
       setCamera: (yaw, pitch = 0.3, distance) => Object.assign(world, { cameraYaw: yaw, cameraPitch: pitch, debugCamDistance: distance, lastMouseMove: performance.now() + 60000 }),
-      vehicles: () => vehicles.map((v) => ({ type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut, yaw: v.yaw, blockedBy: v.blockedBy, riders: v.riders?.length ?? 0, dwell: v.dwell, stopWait: v.stopWait })),
+      vehicles: () => vehicles.map((v) => ({ id: v.id, waitFor: v.waitFor, turnT: v.turn?.t, side: v.side, lastmaOn: v.lastmaOn, type: v.type, state: v.state, x: v.x, z: v.z, speed: v.speed, chasing: v.chasing, officerOut: !!v.officerOut, yaw: v.yaw, blockedBy: v.blockedBy, riders: v.riders?.length ?? 0, dwell: v.dwell, stopWait: v.stopWait })),
       waiting: () => waitingCounts(),
       // Put an NPC danfo on the road just before a bus stop.
       busToStop: (name) => {

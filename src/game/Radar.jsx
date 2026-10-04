@@ -109,6 +109,8 @@ export default function Radar() {
         const flash = Math.floor(performance.now() / 250) % 2 === 0
         vehicles.forEach((v) => v.chasing && blip(v.x, v.z, rot, flash ? '#ff3030' : '#3060ff', 3.5))
       }
+      // A LASTMA patrol after you: flashing amber.
+      for (const v of vehicles) if (v.lastmaOn) blip(v.x, v.z, rot, Math.floor(performance.now() / 300) % 2 ? '#ffb31a' : '#6b1f2e', 3.5)
       if (objective) blip(objective.x, objective.z, rot, '#ffd23a', 5.5)
       // Houses and the garage you own: green squares.
       for (const p of city.properties) if (game.properties.includes(p.id)) blip(p.x, p.z, rot, '#2ad15a', 4.5, true)

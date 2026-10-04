@@ -14,7 +14,7 @@ import { blobGeometry, blobMaterial } from './Shadows'
 import { DRIVER_SLOTS, driverFace, driverParts, seatMatrix, steeringWheel } from './drivers'
 import { alightRiders, callBoarders, waitingCounts } from './crowd'
 import { city as cityMap } from './cityData'
-import { COP_LOOK, randomLook } from './people'
+import { COP_LOOK, randomLook, WARDEN_LOOK } from './people'
 import { FACE_COLS, getFaceAtlas } from './faces'
 // Missions park cars too (Baba Femi's danfo): load them before traffic is set up.
 import './quests'
@@ -70,7 +70,7 @@ if (!vehicles.length) initTraffic(city.spawn)
 const lookRand = mulberry32(5150)
 vehicles.forEach((v) => (v.civilian = randomLook(lookRand, { robe: false })))
 
-const driverLook = (v) => (v.police ? COP_LOOK : v.civilian)
+const driverLook = (v) => (v.police ? COP_LOOK : v.type === 'lastma' ? WARDEN_LOOK : v.civilian)
 // Somebody is at the wheel unless the car is parked, wrecked, burning, or its
 // driver just got out (a cop chasing you on foot, or a driver you dragged out).
 const hasDriver = (v) => v.state !== 'parked' && !v.wrecked && !(v.burning > 0) && !v.officerOut
@@ -153,6 +153,8 @@ export default function Traffic() {
       chase: world.lastSeen,
       hidden: game.evading,
       playerCar: carPos ? { x: carPos.x, z: carPos.z } : null,
+      // Which way you're heading, so the police can try to cut you off.
+      playerVel: game.inside ? null : (driving ? world.car : world.player)?.linvel(),
       pedestrian: game.mode === 'foot' ? { x: world.focus.x, z: world.focus.z } : null,
     })
 
@@ -221,7 +223,8 @@ export default function Traffic() {
       }
       base.compose(v3.set(x, def.half[1], z), q, one)
 
-      const recolor = v.dirty || v.colored === undefined || (v.police && (v.chasing || v.sirenWasOn))
+      const flashing = v.chasing || v.lastmaOn
+      const recolor = v.dirty || v.colored === undefined || ((v.police || v.type === 'lastma') && (flashing || v.sirenWasOn))
       for (const kind of KINDS) {
         const mesh = meshes[kind].current
         const list = rig.byKind[kind]
@@ -233,7 +236,7 @@ export default function Traffic() {
             continue
           }
           mesh.setMatrixAt(slot, tmp.multiplyMatrices(base, part.m))
-          if (recolor) mesh.setColorAt(slot, c.set(partColor(part.p, v.color, v.chasing, flip)))
+          if (recolor) mesh.setColorAt(slot, c.set(partColor(part.p, v.color, flashing, flip)))
         }
       }
 
@@ -300,7 +303,7 @@ export default function Traffic() {
         v.dirty = false
         v.driverRecolor = false
         v.colored = true
-        v.sirenWasOn = v.chasing
+        v.sirenWasOn = flashing
         for (const mesh of [...Object.values(meshes), ...Object.values(people)]) {
           if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true
         }

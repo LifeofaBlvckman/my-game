@@ -16,6 +16,7 @@ export const useGame = create((set) => ({
   speed: 0, // km/h, refreshed a few times a second
   prompt: null, // context hint, e.g. "Press F to enter the Danfo"
   wanted: 0, // 0-5 stars
+  lastma: false, // a LASTMA patrol is after you for running a red light
   evading: false, // wanted, but out of the police's sight (stars blink)
   money: 2000,
   zone: '',
