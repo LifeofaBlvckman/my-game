@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Radar from './Radar'
+import Radar, { BigMap } from './Radar'
 import { INTRO_LENGTH } from './CameraRig'
 import { activeTarget, INTRO_CALL } from './quests'
 import { blip, setMusic, startAudio } from './audio'
@@ -323,7 +323,13 @@ export default function Hud() {
   const [showHelp, setShowHelp] = useState(true)
 
   useEffect(() => {
-    const onKey = (e) => e.code === 'KeyH' && !(e.target instanceof HTMLInputElement) && setShowHelp((s) => !s)
+    const onKey = (e) => {
+      if (e.target instanceof HTMLInputElement) return
+      if (e.code === 'KeyH') setShowHelp((s) => !s)
+      // N: the full map (BigMap closes itself on N or Escape).
+      const g = useGame.getState()
+      if (e.code === 'KeyN' && !g.mapOpen && g.phase === 'playing' && !g.inside && !g.panel) useGame.setState({ mapOpen: true })
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
@@ -441,6 +447,7 @@ export default function Hud() {
       {game.panel === 'market' && <Market />}
       {game.panel === 'property' && <PropertySheet />}
       {game.panel === 'garage' && <Garage />}
+      {game.mapOpen && <BigMap />}
       {game.phase === 'playing' && <PhoneAlerts />}
       {game.phase === 'playing' && !isTouch && !game.panel && (
         <button className="phone-btn" onClick={() => phone.open()}>

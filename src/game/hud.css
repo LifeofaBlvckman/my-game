@@ -1383,3 +1383,65 @@
   text-shadow: none;
   animation: flash 0.8s steps(2) infinite;
 }
+
+/* Tap the radar for the full map */
+.radar {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bigmap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: rgba(20, 22, 30, 0.55);
+  pointer-events: auto;
+  z-index: 30;
+}
+.bigmap-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(980px, 100%);
+  height: min(680px, 100%);
+  padding: 12px;
+  border: 2px solid #3d4a5c;
+  border-radius: 14px;
+  background: #f6f6f2;
+  box-shadow: 6px 6px 0 #3d4a5c;
+  color: #3d4a5c;
+  text-shadow: none;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.bigmap-canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-radius: 10px;
+  border: 2px solid #3d4a5c;
+}
+.bigmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.bigmap-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.bigmap-legend i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #111;
+  border-radius: 50%;
+  font-style: normal;
+  font-size: 13px;
+}

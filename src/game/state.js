@@ -50,6 +50,7 @@ export const useGame = create((set) => ({
   properties: [], // houses and the garage bought (property.js)
   garage: [], // cars kept in the garage: [{ type, color }]
   chopIndex: 0, // how many of Alhaji Musa's car orders you've filled (chopshop.js)
+  mapOpen: false, // the full city map (tap the radar or press N)
   offer: null, // id of the property whose "for sale" sheet is open
   panel: null, // 'wardrobe' | 'decor' | 'phone' | 'market' | 'property' | 'garage' while a full-screen menu is open
   // Saved games
