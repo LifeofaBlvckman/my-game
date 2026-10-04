@@ -27,7 +27,9 @@ export function mapPlaces(game) {
     city.airport && { at: city.airport.terminal, glyph: '✈', bg: '#0d3b6e', label: 'Airport' },
   ]
   for (const p of city.properties) {
-    if (game.properties.includes(p.id)) list.push({ at: p, glyph: p.kind === 'garage' ? 'G' : '⌂', bg: '#2ad15a', fg: '#0e3b1a', label: p.kind === 'garage' ? 'Your garage' : 'Your place' })
+    if (!game.properties.includes(p.id)) continue
+    const kind = { garage: ['G', 'Your garage'], business: ['₦', 'Your business'] }[p.kind] ?? ['⌂', 'Your place']
+    list.push({ at: p, glyph: kind[0], bg: '#2ad15a', fg: '#0e3b1a', label: kind[1] })
   }
   return list.filter((p) => p && p.at)
 }
@@ -305,7 +307,8 @@ export function BigMap() {
       window.removeEventListener('keydown', onKey)
     }
   }, [])
-  const legend = mapPlaces(useGame.getState())
+  // One legend entry per kind of icon (you may own several houses).
+  const legend = [...new Map(mapPlaces(useGame.getState()).map((p) => [p.label, p])).values()]
   return (
     <div className="bigmap" onPointerDown={(e) => e.target === e.currentTarget && useGame.setState({ mapOpen: false })}>
       <div className="bigmap-sheet">

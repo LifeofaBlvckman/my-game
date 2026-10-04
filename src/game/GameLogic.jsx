@@ -25,7 +25,7 @@ import { phone } from './phoneline'
 import { dogs, punchDogs } from './strays'
 import { updateWeather, weather } from './weather'
 import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks } from './streetlife'
-import { DEFAULT_CAR, garageSpot, owns, propertyNear, storeCar, takeCar } from './property'
+import { DEFAULT_CAR, garageSpot, owns, propertyNear, storeCar, takeCar, updateBusinesses } from './property'
 import { deliverOrder } from './chopshop'
 import { lastma, startLastma, updateLastma } from './lastma'
 
@@ -94,7 +94,7 @@ function copCanSee(x, z, focus, far) {
 }
 
 // Your own houses: the police can't follow you in.
-const SAFE_HOUSES = new Set(['home', 'flat', 'penthouse'])
+const SAFE_HOUSES = new Set(['home', 'flat', 'penthouse', 'bungalow', 'duplex', 'mansion'])
 function updateEscape(game, dt, focus) {
   // Made it home with the police after you: they can't touch you there.
   if (game.wanted > 0 && SAFE_HOUSES.has(game.inside) && !game.fade) {
@@ -407,7 +407,7 @@ function nearUsable() {
     if (near(...home.laptop, 1.3)) return 'laptop'
     if (near(5.4, 3, 2.2)) return 'bed'
   }
-  if (id === 'flat' || id === 'penthouse') {
+  if (INTERIORS[id]?.bedSpot) {
     const room = INTERIORS[id]
     const near = (lx, lz, r) => {
       const [x, , z] = roomPoint(room, lx, lz)
@@ -606,6 +606,7 @@ function interact() {
   const prop = !game.inside && propertyNear(world.focus)
   if (prop && !owns(prop.id)) return useGame.setState({ panel: 'property', offer: prop.id })
   if (prop?.kind === 'garage') return useGame.setState({ panel: 'garage' })
+  if (prop?.kind === 'business') return useGame.setState({ panel: 'property', offer: prop.id })
   const door = !game.inside && nearDoor(world.focus)
   if (door) return goThrough(() => placeInRoom(door.id))
   const near = nearestNamedNpc(world.focus)
@@ -950,6 +951,7 @@ export default function GameLogic() {
     updateEscape(game, dt, copsAim)
     checkRedLights(game)
     updateLastma(dt, game, world.focus)
+    updateBusinesses(dt)
     // Area boys on the corners, and soldiers guarding the barracks.
     updateAreaBoys(dt, game, world.focus)
     updateBarracks(dt, game, world.focus, addWanted)
@@ -1147,6 +1149,7 @@ export default function GameLogic() {
       else if (!game.inside && gangAsking()) (prompt = `Press E to settle the area boys (${naira(SETTLE)})`), act('KeyE', '💸', 'Settle')
       else if (prop && !owns(prop.id)) (prompt = `${prop.name}: FOR SALE ${naira(prop.price)}. Press E to look`), act('KeyE', '🏷️', 'For sale')
       else if (prop?.kind === 'garage') (prompt = 'Press E to open your garage'), act('KeyE', '🔑', 'Garage')
+      else if (prop?.kind === 'business') (prompt = `Your business: ${prop.name}. Press E for the accounts`), act('KeyE', '📈', 'Accounts')
       else if (door) (prompt = `Press E to enter ${door.name}`), act('KeyE', '🚪', 'Enter')
       else if (npc) (prompt = `Press E to talk to ${npc.n.name}`), act('KeyE', '💬', 'Talk')
       else if (car?.wrecked) prompt = 'This car is wrecked. Find another one.'

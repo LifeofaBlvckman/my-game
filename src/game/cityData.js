@@ -217,6 +217,17 @@ const CIVIC = [
   { id: 'flat', name: 'YABA FLATS', sale: 25000, kind: 'house', blocks: [[3, 1], [4, 6], [3, 6]], w: 16, d: 12, h: 10.8, color: '#e8d2b0', sign: '#7a5444', filler: true },
   { id: 'penthouse', name: 'LEKKI PEARL TOWERS', sale: 150000, kind: 'house', blocks: [[isl(2), 6], [isl(4), 6], [isl(0), 6]], w: 18, d: 14, h: 34, color: '#a9c4d4', sign: '#0d2a4a', filler: true },
   { id: 'garage', name: 'EBUTE METTA GARAGE', sale: 40000, kind: 'garage', blocks: [[3, 5], [4, 5], [3, 4]], w: 18, d: 12, h: 6, color: '#bdb6a8', sign: '#e0a020', filler: true },
+  // More houses, from a starter bungalow to a Banana Island mansion.
+  { id: 'bungalow', name: 'SURULERE BUNGALOW', sale: 15000, kind: 'house', blocks: [[1, 8], [2, 8], [0, 8], [1, 9]], w: 14, d: 11, h: 4.4, color: '#f2e2b8', sign: '#7a5444', filler: true, roof: '#b5452f' },
+  { id: 'duplex', name: 'IKEJA GRA DUPLEX', sale: 80000, kind: 'house', blocks: [[2, 0], [1, 2], [2, 2], [3, 0]], w: 18, d: 13, h: 7.6, color: '#f4f1e8', sign: '#2f4f8a', filler: true, roof: '#3d4a5c' },
+  { id: 'mansion', name: 'BANANA ISLAND MANSION', sale: 500000, kind: 'house', blocks: [[isl(5), 1], [isl(6), 2], [isl(5), 2], [isl(6), 1]], w: 24, d: 16, h: 10.8, color: '#fbfaf6', sign: '#d4af37', filler: true },
+  // Businesses: buy one and it pays you every few minutes (property.js).
+  { id: 'carwash', name: 'EKO SPARKLE CAR WASH', sale: 20000, kind: 'business', blocks: [[5, 4], [6, 4], [5, 5], [6, 3]], w: 16, d: 9, h: 4.6, color: '#7fc4e8', sign: '#1565c0', filler: true },
+  { id: 'buka', name: 'MAMA PUT RESTAURANT', sale: 30000, kind: 'business', blocks: [[3, 8], [4, 8], [3, 9], [4, 9]], w: 14, d: 10, h: 4.4, color: '#f6d79b', sign: '#e8622c', filler: true, roof: '#8a3b1f' },
+  { id: 'transport', name: 'EKO DANFO TRANSPORT CO.', sale: 60000, kind: 'business', blocks: [[6, 6], [7, 6], [6, 7], [7, 7]], w: 18, d: 10, h: 6, color: '#f2c230', sign: '#1b1b24', filler: true },
+  { id: 'techhub', name: 'YABA TECH HUB', sale: 120000, kind: 'business', blocks: [[4, 3], [4, 2], [3, 3], [5, 2]], w: 18, d: 12, h: 10.8, color: '#cfe0ec', sign: '#6a1b9a', filler: true },
+  { id: 'lounge', name: 'LEKKI SKY LOUNGE', sale: 200000, kind: 'business', blocks: [[isl(4), 8], [isl(5), 7], [isl(3), 8], [isl(6), 8]], w: 18, d: 12, h: 9, color: '#1d1b22', sign: '#ff2fb4', filler: true },
+  { id: 'oilco', name: 'EKO PETROLEUM HQ', sale: 400000, kind: 'business', blocks: [[isl(1), 2], [isl(2), 1], [isl(1), 0], [isl(0), 3]], w: 20, d: 16, h: 46, color: '#5a8aa8', sign: '#0d2a4a', filler: true, facade: 'tower' },
 ]
 export const PROPERTY_IDS = CIVIC.filter((c) => c.sale).map((c) => c.id)
 
@@ -252,7 +263,7 @@ function addCivicBuildings(city) {
     city.idlers = city.idlers.filter((o) => o.role !== 'seller' || off(o))
     city.signs = city.signs.filter((g) => !g.posts || off(g))
     const name = c.sale ? c.name : c.id === 'police' ? `${zoneAt(x, z)} ${c.name}` : `LAGOS ${c.name}`
-    city.buildings.push({ x, z: bz, w: c.w, d: c.d, h: c.h, color: c.color, landmark: true })
+    city.buildings.push({ x, z: bz, w: c.w, d: c.d, h: c.h, color: c.color, landmark: true, facade: c.facade, roof: c.roof ? { h: Math.min(c.w, c.d) * 0.36, color: c.roof } : undefined })
     if (c.filler) {
       // Neighbours on the back half of the block, so it isn't a bare lot.
       const r = mulberry32(c.id.length * 97 + x)
@@ -272,13 +283,21 @@ function addCivicBuildings(city) {
       continue
     }
     city.solids.push({ x, z: front - 3 + 0.05, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true }) // doors
-    city.solids.push({ x, z: front - 3 + 1.2, w: 6, d: 2.4, h: 0.15, color: '#9a9a9a', y: 3.2 }) // canopy
-    city.signs.push({ text: name, x, y: Math.min(c.h - 1.5, 6.5), z: front - 3 + 0.12, rot: 0, w: Math.min(c.w - 4, 16), h: 1.8, bg: c.sign, fg: '#ffffff', glow: '#ffffff' })
+    city.solids.push({ x, z: front - 3 + 1.2, w: 6, d: 2.4, h: 0.15, color: '#9a9a9a', y: c.h < 6 ? 2.88 : 3.2 }) // canopy
+    // (A single-storey building gets a smaller board, above the door.)
+    const small = c.h < 6
+    city.signs.push({ text: name, x, y: small ? Math.min(c.h - 0.5, 3.6) : Math.min(c.h - 1.5, 6.5), z: front - 3 + 0.12, rot: 0, w: Math.min(c.w - 4, 16), h: small ? 0.85 : 1.8, bg: c.sign, fg: '#ffffff', glow: '#ffffff' })
     if (c.id === 'hospital') {
       // A big red cross on the roof edge, lit at night.
       city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 2.6, d: 0.15, h: 0.8, color: '#e8202a', y: c.h - 3, emissive: true })
       city.solids.push({ x: x + c.w / 2 - 3, z: front - 3 + 0.1, w: 0.8, d: 0.15, h: 2.6, color: '#e8202a', y: c.h - 3.9, emissive: true })
       city.parkedCars.push({ x: x - 8, z: front + 1.05, yaw: Math.PI / 2, type: 'danfo' })
+    } else if (c.id === 'transport') {
+      // The fleet, parked out front.
+      for (const k of [-1, 1]) city.parkedCars.push({ x: x + k * 6, z: front + 1.05, yaw: Math.PI / 2, type: 'danfo' })
+    } else if (c.id === 'carwash') {
+      city.parkedCars.push({ x: x + 7, z: front + 1.05, yaw: -Math.PI / 2, type: 'sedan' })
+      city.solids.push({ x, z: front - 1.4, w: 10, d: 3, h: 0.03, color: '#9fc9e0', y: 0.13 }) // wet apron
     } else if (c.sale) {
       // A doorman's lamp and a planter either side of the door.
       for (const k of [-1, 1]) city.solids.push({ x: x + k * 2.6, z: front - 2.4, w: 1, d: 1, h: 0.7, color: '#8a5e3c', y: 0.12 })
@@ -288,7 +307,8 @@ function addCivicBuildings(city) {
       city.parkedCars.push({ x: x + 9, z: front + 1.05, yaw: -Math.PI / 2, type: 'police' })
       city.idlers.push({ x: x + 2.2, z: front - 1.6, y: SIDEWALK_Y, yaw: 0, role: 'cop-guard' })
     }
-    city.doors.push({ id: c.id, name, x, z: front - 3 + 1.3, ...(c.sale && { sale: c.sale }) })
+    // (Businesses aren't somewhere you go inside; houses and civic buildings are.)
+    if (c.kind !== 'business') city.doors.push({ id: c.id, name, x, z: front - 3 + 1.3, ...(c.sale && { sale: c.sale }) })
     if (c.sale) city.properties.push({ id: c.id, name, price: c.sale, kind: c.kind, x, z: front - 3 + 1.3 })
   }
 }

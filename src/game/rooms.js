@@ -377,6 +377,26 @@ export const INTERIORS = {
   },
 }
 
+// The other houses for sale share a layout with the flat or the penthouse,
+// in their own colours (the mansion gets gold trim and more plants).
+INTERIORS.bungalow = { ...INTERIORS.flat, name: 'YOUR SURULERE BUNGALOW', floor: '#c9a27a', wall: '#f7ecd8', light: '#ffe9c4' }
+INTERIORS.duplex = { ...INTERIORS.penthouse, name: 'YOUR IKEJA DUPLEX', floor: '#d8d0c4', wall: '#f2eee6' }
+INTERIORS.mansion = {
+  ...INTERIORS.penthouse,
+  name: 'YOUR BANANA ISLAND MANSION',
+  floor: '#f6f4ef',
+  wall: '#fbfaf6',
+  light: '#fff3d6',
+  props: [
+    ...INTERIORS.penthouse.props,
+    [0, 3.92, 0, 19.6, 0.12, 0.25, '#d4af37'], // gold cornice
+    [-2.5, 0.35, 6.2, 0.7, 0.7, 0.7, '#f2f2f2', S],
+    [-2.5, 1.2, 6.2, 1.0, 1.2, 1.0, '#3f8a3a', { shape: 'sphere' }],
+    [2.6, 1.6, -6.8, 0.06, 2.4, 0.06, '#d4af37'], // a tall gold lamp by the window
+    [2.6, 2.9, -6.8, 0.5, 0.5, 0.5, '#fff1c8', { glow: true, shape: 'sphere' }],
+  ],
+}
+
 // Give each room a spot in the world (in a row, far below the city) and link
 // it to its door outside.
 Object.entries(INTERIORS).forEach(([id, room], k) => {

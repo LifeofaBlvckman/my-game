@@ -9,6 +9,7 @@ import { VEHICLES } from './vehicleTypes'
 // Musa's chop-shop orders are delivered there.
 
 export const GARAGE_SLOTS = 4
+export const PAYOUT_EVERY = 180 // seconds of play between business payouts
 export const DEFAULT_CAR = { type: 'sedan', color: '#c9ccd1' }
 
 export const PROPERTIES = {
@@ -24,6 +25,43 @@ export const PROPERTIES = {
     blurb: 'A lock-up garage in Ebute Metta with a roller door.',
     perks: [`Keep up to ${GARAGE_SLOTS} cars, safe from thieves`, 'Take any of them out whenever you like', 'Alhaji Musa pays for cars delivered here'],
   },
+  bungalow: {
+    blurb: 'A neat two-bedroom bungalow in Surulere with a zinc roof. A good start.',
+    perks: ['Safe house: the police lose you inside', 'Bed: sleep until morning, full health', 'Wardrobe for your clothes'],
+  },
+  duplex: {
+    blurb: 'A white duplex on a quiet, tree-lined street in Ikeja GRA.',
+    perks: ['Safe house: the police lose you inside', 'Big bed, wardrobe, bar and a fish tank', 'Close to the airport'],
+  },
+  mansion: {
+    blurb: 'Banana Island. Waterfront, marble floors, the address everybody wants.',
+    perks: ['Safe house: the police lose you inside', 'The finest bedroom in Lagos', 'People will know you have arrived'],
+  },
+  carwash: { income: 1000, blurb: 'Buckets, soap and three boys who never stop. Every danfo driver in Oyingbo comes here.', perks: [] },
+  buka: { income: 1500, blurb: 'Amala, ewedu and the best stew in Ajegunle. The queue starts at noon.', perks: [] },
+  transport: { income: 3500, blurb: 'Five danfos on the Apapa to CMS route, and the drivers pay you every day.', perks: [] },
+  techhub: { income: 7000, blurb: 'Co-working desks full of young developers. The internet almost never goes off.', perks: [] },
+  lounge: { income: 12000, blurb: 'Rooftop lounge in Lekki: DJs, shisha and big spenders every weekend.', perks: [] },
+  oilco: { income: 25000, blurb: 'A whole tower on VI. Do not ask how the money is made.', perks: [] },
+}
+// Businesses say what they pay.
+for (const info of Object.values(PROPERTIES)) {
+  if (info.income) info.perks = [`Pays you ${naira(info.income)} every ${PAYOUT_EVERY / 60} minutes you play`, 'The money goes straight into your pocket', 'Buy more to earn more']
+}
+
+// Profits from everything you own, paid every PAYOUT_EVERY seconds of play.
+let payoutClock = 0
+export function updateBusinesses(dt) {
+  const g = useGame.getState()
+  const earning = g.properties.filter((id) => PROPERTIES[id]?.income)
+  if (!earning.length || g.phase !== 'playing') return
+  payoutClock += dt
+  if (payoutClock < PAYOUT_EVERY) return
+  payoutClock = 0
+  const total = earning.reduce((sum, id) => sum + PROPERTIES[id].income, 0)
+  useGame.setState({ money: g.money + total })
+  jingle()
+  message(`BUSINESS PROFITS\n+${naira(total)}`, '#7ee07e', 3000)
 }
 
 export const owns = (id) => useGame.getState().properties.includes(id)
@@ -45,7 +83,7 @@ export function buyProperty(id) {
   }
   useGame.setState({ money: g.money - p.price, properties: [...g.properties, id], panel: null })
   jingle()
-  message(`${p.kind === 'garage' ? 'GARAGE' : 'NEW HOUSE'} BOUGHT!\n${p.name}`, '#7ee07e', 3500)
+  message(`${p.kind === 'garage' ? 'GARAGE' : p.kind === 'business' ? 'BUSINESS' : 'NEW HOUSE'} BOUGHT!\n${p.name}`, '#7ee07e', 3500)
   return true
 }
 
