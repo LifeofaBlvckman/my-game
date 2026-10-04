@@ -24,7 +24,7 @@ import { lineOfSight } from './sight'
 import { phone } from './phoneline'
 import { dogs, punchDogs } from './strays'
 import { updateWeather, weather } from './weather'
-import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks } from './streetlife'
+import { gangAsking, gangs, settleGang, SETTLE, updateAreaBoys, updateBarracks, updateEstateGate } from './streetlife'
 import { DEFAULT_CAR, garageSpot, owns, propertyNear, storeCar, takeCar, updateBusinesses } from './property'
 import { deliverOrder } from './chopshop'
 import { lastma, startLastma, updateLastma } from './lastma'
@@ -955,6 +955,7 @@ export default function GameLogic() {
     // Area boys on the corners, and soldiers guarding the barracks.
     updateAreaBoys(dt, game, world.focus)
     updateBarracks(dt, game, world.focus, addWanted)
+    updateEstateGate(game, world.focus)
 
     // Passengers: stop your danfo or keke at a bus stop to let riders off
     // (they pay) and take on whoever is waiting.
@@ -1227,6 +1228,7 @@ export default function GameLogic() {
       setWanted: (n) => useGame.setState({ wanted: n }),
       gangs: () => gangs.map((g) => ({ id: g.id, x: g.x, z: g.z, state: g.state, members: g.members.map((n) => ({ x: n.x, z: n.z, down: n.down, fight: n.fight, hp: n.hp })) })),
       trespass: () => !!world.trespass,
+      gateOpen: () => !!world.gateOpen,
       online: () => !!world.net,
       runRed: () => startLastma(world.focus),
       lastma: () => (lastma.v ? { x: lastma.v.x, z: lastma.v.z, state: lastma.v.state, near: lastma.near, far: lastma.far, t: lastma.t } : null),

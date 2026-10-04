@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { mapSpot } from './rooms'
 import { RACES } from './racing'
-import { city, ISLAND, MAINLAND, zoneAt } from './cityData'
+import { BANANA, city, ISLAND, MAINLAND, zoneAt } from './cityData'
 import { WORLD } from './City'
 import { vehicles } from './trafficSim'
 import { useGame, world } from './state'
@@ -70,8 +70,13 @@ export function drawMap() {
   rect(ISLAND, '#2e2f33')
   ctx.fillStyle = '#2e2f33'
   city.bridges.forEach((b) => ctx.fillRect(b.x0, b.z - 7, b.x1 - b.x0, 14))
+  // Banana Island: a ring of sand, the estate lawns, the causeway to Ikoyi.
+  rect({ minX: BANANA.minX - 3, maxX: BANANA.maxX + 3, minZ: BANANA.minZ - 3, maxZ: BANANA.maxZ + 3 }, '#e2cf98')
+  rect(BANANA, '#2e2f33')
+  ctx.fillStyle = '#2e2f33'
+  ctx.fillRect(BANANA.causeway.x0, BANANA.causeway.z - 7, BANANA.causeway.x1 - BANANA.causeway.x0, 14)
   city.blocks.forEach((b) => {
-    ctx.fillStyle = b.color === '#a8784c' ? '#9a6d45' : '#7d7f73'
+    ctx.fillStyle = b.color === '#a8784c' ? '#9a6d45' : b.color === '#a9c27c' ? '#6f9a4a' : '#7d7f73'
     ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d)
   })
   ctx.fillStyle = '#5f8a3c'

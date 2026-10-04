@@ -145,3 +145,30 @@ export function updateBarracks(dt, game, focus, addWanted) {
   if (alerted && game.mode === 'foot') for (const n of npcs) if (n.role === 'soldier' && !n.lookout && n.fight > 0 && n.fight < 4) n.fight = 8
   world.trespass = alerted
 }
+
+// --- Banana Island gate ---
+// The estate is residents only. The boom stays down and the guards turn you
+// back unless you own the mansion; then it lifts as you come up to it.
+
+const GATE_NEAR = 16
+let gateGreeted = false
+
+export function updateEstateGate(game, focus) {
+  const g = city.bananaIsland?.gate
+  if (!g) return
+  const resident = game.properties.includes('mansion')
+  const near = !game.inside && Math.abs(focus.z - g.z) < 12 && Math.abs(focus.x - g.x) < GATE_NEAR
+  world.gateOpen = resident && near
+  if (!near) {
+    if (Math.abs(focus.x - g.x) > GATE_NEAR + 10 || Math.abs(focus.z - g.z) > 30) gateGreeted = false
+    return
+  }
+  if (gateGreeted) return
+  gateGreeted = true
+  if (resident) say('Estate guard', 'Welcome home, {oga|madam}! Opening the gate.', 2800)
+  else if (focus.x > g.x) {
+    whistle()
+    say('Estate guard', 'Oga, this is a private estate. Residents only, no entry!', 3500)
+    message('BANANA ISLAND\nRESIDENTS ONLY', '#e0c35a', 2500)
+  }
+}

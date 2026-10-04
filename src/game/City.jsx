@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { BoxGeometry, Color, CylinderGeometry } from 'three'
 import { gableRoof, puff } from './shapes'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
-import { BEACH, city, GX, GZ, ISLAND, MAINLAND, nodeCount, ROAD, roadX, roadZ, segmentValid } from './cityData'
+import { BANANA, BEACH, city, GX, GZ, ISLAND, MAINLAND, nodeCount, ROAD, roadX, roadZ, segmentValid } from './cityData'
 import { createBuildingMaterial, nightUniform, unlit } from './materials'
 import { Instances, groundQuad } from './Instances'
 import Water, { SEABED_Y } from './Water'
@@ -19,17 +19,23 @@ const box = (x0, x1, z0, z1, y0, y1) => ({ x: (x0 + x1) / 2, z: (z0 + z1) / 2, y
 // Land, beaches, bridge decks and walls, as plain boxes for both the meshes and the colliders.
 const beachMainland = box(WORLD.minX, MAINLAND.maxX, WORLD.minZ, WORLD.maxZ, SEABED_Y, -0.02)
 const beachIsland = box(ISLAND.minX, WORLD.maxX, WORLD.minZ, WORLD.maxZ, SEABED_Y, -0.02)
-const lands = [box(MAINLAND.minX, MAINLAND.maxX, MAINLAND.minZ, MAINLAND.maxZ, -2, 0), box(ISLAND.minX, ISLAND.maxX, ISLAND.minZ, ISLAND.maxZ, -2, 0)]
-const decks = city.bridges.map((b) => box(b.x0 - 1, b.x1 + 1, b.z - ROAD / 2 - 1.2, b.z + ROAD / 2 + 1.2, -1, 0))
-const barriers = city.bridges.flatMap((b) => [-1, 1].map((s) => box(b.x0, b.x1, b.z + s * (ROAD / 2 + 0.8) - 0.25, b.z + s * (ROAD / 2 + 0.8) + 0.25, 0, 0.9)))
+const lands = [
+  box(MAINLAND.minX, MAINLAND.maxX, MAINLAND.minZ, MAINLAND.maxZ, -2, 0),
+  box(ISLAND.minX, ISLAND.maxX, ISLAND.minZ, ISLAND.maxZ, -2, 0),
+  box(BANANA.minX, BANANA.maxX, BANANA.minZ, BANANA.maxZ, -2, 0),
+]
+// The bridges, plus the causeway out to Banana Island.
+const spans = [...city.bridges, { x0: BANANA.causeway.x0, x1: BANANA.causeway.x1, z: BANANA.causeway.z }]
+const decks = spans.map((b) => box(b.x0 - 1, b.x1 + 1, b.z - ROAD / 2 - 1.2, b.z + ROAD / 2 + 1.2, -1, 0))
+const barriers = spans.flatMap((b) => [-1, 1].map((s) => box(b.x0, b.x1, b.z + s * (ROAD / 2 + 0.8) - 0.25, b.z + s * (ROAD / 2 + 0.8) + 0.25, 0, 0.9)))
 const pillars = city.bridges.flatMap((b) => {
   const list = []
   for (let x = b.x0 + 14; x < b.x1 - 8; x += 22) list.push(box(x - 1.2, x + 1.2, b.z - ROAD / 2, b.z + ROAD / 2, SEABED_Y, -1))
   return list
 })
 // Quay walls along both lagoon shores, with gaps where the bridges land.
-function quay(x) {
-  const gaps = city.bridges.map((b) => [b.z - ROAD / 2 - 1.2, b.z + ROAD / 2 + 1.2]).sort((a, b) => a[0] - b[0])
+function quay(x, causeway = false) {
+  const gaps = [...city.bridges, ...(causeway ? [BANANA.causeway] : [])].map((b) => [b.z - ROAD / 2 - 1.2, b.z + ROAD / 2 + 1.2]).sort((a, b) => a[0] - b[0])
   const walls = []
   let z = WORLD.minZ
   for (const [g0, g1] of gaps) {
@@ -39,7 +45,20 @@ function quay(x) {
   walls.push(box(x - 0.3, x + 0.3, z, WORLD.maxZ, SEABED_Y, QUAY))
   return walls
 }
-const quays = [...quay(MAINLAND.maxX + 0.3), ...quay(ISLAND.minX - 0.3)]
+// Banana Island's sea wall all round, open only where the causeway lands.
+const bananaWalls = (() => {
+  const B = BANANA
+  const c = B.causeway.z
+  const g = ROAD / 2 + 1.2
+  return [
+    box(B.minX - 0.3, B.maxX + 0.3, B.minZ - 0.3, B.minZ + 0.3, SEABED_Y, QUAY),
+    box(B.minX - 0.3, B.maxX + 0.3, B.maxZ - 0.3, B.maxZ + 0.3, SEABED_Y, QUAY),
+    box(B.minX - 0.3, B.minX + 0.3, B.minZ, B.maxZ, SEABED_Y, QUAY),
+    box(B.maxX - 0.3, B.maxX + 0.3, B.minZ, c - g, SEABED_Y, QUAY),
+    box(B.maxX - 0.3, B.maxX + 0.3, c + g, B.maxZ, SEABED_Y, QUAY),
+  ]
+})()
+const quays = [...quay(MAINLAND.maxX + 0.3), ...quay(ISLAND.minX - 0.3, true), ...bananaWalls]
 // Where the beach meets the sea, the sand slopes away under the clear water
 // down to the seabed. Each shelf: a sloped slab along one outer edge.
 const SHELF = 30

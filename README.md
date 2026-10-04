@@ -9,10 +9,13 @@ Rapier physics and Vite.
 - **You:** pick a boy or a girl and type your name on the title screen; the
   story calls you by it.
 - **Lagos:** Mainland (Ikeja, Yaba, Surulere, Ebute Metta, Oyingbo, Apapa,
-  Ajegunle) and Island (Lagos Island, Ikoyi, VI, Banana Island, Lekki),
-  joined by Third Mainland and Carter Bridge. The
+  Ajegunle) and Island (Lagos Island, Ikoyi, VI, Lekki), joined by Third
+  Mainland and Carter Bridge. The
   Mainland is low two- and three-storey shophouses with painted signs,
   awnings and power lines; the towers are on Marina and VI.
+- **Banana Island:** a gated estate on its own island off Ikoyi, reached by
+  one causeway. Villas behind walls, palms and a mansion at the end. The
+  guards keep the boom down unless you own the mansion.
 - **Airport:** Murtala Muhammed International Airport off Third Mainland
   Bridge, with a terminal, control tower and airliners taking off and landing.
 - **Places:** markets, Lekki Grand Mall, clubs, bus stops, and buildings you

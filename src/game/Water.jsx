@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, Color, ConeGeometry, DoubleSide, IcosahedronGeometry, Matrix4, Quaternion, ShaderMaterial, SphereGeometry, UniformsLib, UniformsUtils, Vector3 } from 'three'
-import { ISLAND, MAINLAND, mulberry32 } from './cityData'
+import { ISLAND, MAINLAND, mulberry32, onBanana } from './cityData'
 import { nightUniform, toon } from './materials'
 import { world } from './state'
 
@@ -20,6 +20,7 @@ export function setWaterBounds(bounds) {
 const SHELF = 30 // how far the beach slopes out under the water
 export function isWater(x, z, margin = 0) {
   if (!WORLD) return false
+  if (onBanana(x, z, 2 + margin)) return false
   if (x > MAINLAND.maxX + 2 + margin && x < ISLAND.minX - 2 - margin && z > WORLD.minZ - 200 && z < WORLD.maxZ + 200) return true
   return x < WORLD.minX - SHELF - margin || x > WORLD.maxX + SHELF + margin || z < WORLD.minZ - SHELF - margin || z > WORLD.maxZ + SHELF + margin
 }

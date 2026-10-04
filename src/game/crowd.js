@@ -1,4 +1,4 @@
-import { BEACH, BLOCK, city, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
+import { BANANA, BEACH, BLOCK, city, ISLAND, MAINLAND, mulberry32, ROAD, SIDEWALK_Y } from './cityData'
 import { COP_LOOK, lookFromSeed, randomLook, SOLDIER_LOOK, thugLook, WARDEN_LOOK } from './people'
 import { weather } from './weather'
 
@@ -68,6 +68,8 @@ city.idlers.forEach((spot, k) => {
             ? { ...COP_LOOK }
             : spot.role === 'soldier'
               ? { ...SOLDIER_LOOK, face: [3, 0, 5, 1, 6][k % 5], height: 1.0 + (k % 3) * 0.03 }
+              : spot.role === 'guard'
+                ? { ...COP_LOOK, face: [2, 6][k % 2], top: '#23232b', bottom: '#23232b', hairColor: '#7a1f2e', height: 1.05 }
               : spot.role === 'thug'
                 ? thugLook(rand)
                 : randomLook(rand)
@@ -377,6 +379,9 @@ export function driverGetsOut(x, z, yaw, focus, mood) {
 const LAND = [
   { minX: MAINLAND.minX - BEACH, maxX: MAINLAND.maxX, minZ: MAINLAND.minZ - BEACH, maxZ: MAINLAND.maxZ + BEACH },
   { minX: ISLAND.minX, maxX: ISLAND.maxX + BEACH, minZ: ISLAND.minZ - BEACH, maxZ: ISLAND.maxZ + BEACH },
+  BANANA,
+  // the causeway out to Banana Island
+  { minX: BANANA.maxX - 1, maxX: ISLAND.minX + 1, minZ: BANANA.causeway.z - ROAD / 2, maxZ: BANANA.causeway.z + ROAD / 2 },
 ]
 export function walkable(x, z) {
   if (x > 1500) return true
