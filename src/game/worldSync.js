@@ -250,7 +250,13 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a))
 // stale copy standing about.
 export function drivePuppet(v, dt, now) {
   const s = v.net
-  v.away = !s || now - s.at > STALE
+  // (A parked car nobody has touched is where it always was, on every screen.)
+  const untouched = v.state === 'parked' && v.decor && !v.touched
+  v.away = untouched ? false : !s || now - s.at > STALE
+  if (untouched) {
+    v.speed = 0
+    return
+  }
   if (v.away) {
     v.speed = 0
     return
