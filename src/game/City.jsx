@@ -1,3 +1,4 @@
+import { createFacadeMaterial } from './facades'
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BoxGeometry, Color, CylinderGeometry } from 'three'
@@ -110,8 +111,14 @@ function laneDashes() {
   return dashes
 }
 
+// Landmarks (your house, the church, the hospital...) keep the plain look;
+// everything else by area: Mainland shophouses, Island apartments and towers.
+const BUILDING_GROUPS = { civic: [], low: [], mid: [], tower: [] }
+for (const b of city.buildings) BUILDING_GROUPS[b.landmark ? 'civic' : (b.style ?? (b.x > ISLAND.minX - 10 ? 'mid' : 'low'))].push(b)
+
 export default function City() {
   const buildingMaterial = useMemo(createBuildingMaterial, [])
+  const facades = useMemo(() => ({ low: createFacadeMaterial('low'), mid: createFacadeMaterial('mid'), tower: createFacadeMaterial('tower') }), [])
   const dashes = useMemo(laneDashes, [])
 
   useFrame(() => lampGlow.color.lerpColors(dayLamp, nightLamp, nightUniform.value))
@@ -168,16 +175,19 @@ export default function City() {
         colors={() => '#e8c547'}
       />
 
-      {/* Buildings and rooftop water tanks */}
-      <Instances
-        items={city.buildings}
-        material={buildingMaterial}
-        transform={(o, b) => {
-          o.position.set(b.x, 0, b.z)
-          o.scale.set(b.w, b.h, b.d)
-        }}
-        colors={(b) => b.color}
-      />
+      {/* Buildings (each kind with its own facade) and rooftop water tanks */}
+      {Object.entries(BUILDING_GROUPS).map(([style, items]) => (
+        <Instances
+          key={style}
+          items={items}
+          material={facades[style] ?? buildingMaterial}
+          transform={(o, b) => {
+            o.position.set(b.x, 0, b.z)
+            o.scale.set(b.w, b.h, b.d)
+          }}
+          colors={(b) => b.color}
+        />
+      ))}
       <Instances items={city.tanks} geometry={tankGeometry} transform={(o, t) => o.position.set(t.x, t.y, t.z)} colors={() => '#1c1c1c'} />
 
       <Instances

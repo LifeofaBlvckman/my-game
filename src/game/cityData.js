@@ -22,6 +22,10 @@ export const BRIDGES = [
   { row: 6, name: 'CARTER BRIDGE' },
 ]
 
+// Mainland floors are 3.2 m, with a parapet on top.
+export const FLOOR = 3.2
+const storeys = (n) => n * FLOOR + 1.2
+
 // Faded stucco and paint for mainland low-rise; glass and concrete for Island towers.
 const LOWRISE_COLORS = ['#f6d79b', '#f4b6a6', '#a8d8c8', '#b9cfe8', '#f7e7c4', '#e9a875', '#c8e09a', '#f3c0d4', '#9fc9e0']
 const TOWER_COLORS = ['#8fb3c9', '#a9c4d4', '#b8c9d9', '#d8dde2', '#9bb8c4']
@@ -188,7 +192,7 @@ const CIVIC = [
   { id: 'police', name: 'POLICE STATION', blocks: [[2, 3], [3, 4], [4, 4], [1, 3]], w: 22, d: 14, h: 10, color: '#cfd8e6', sign: '#1b2a52' },
   // Property you can buy once you've made some money: a safe house on each
   // side of the lagoon, and a garage to keep your cars in.
-  { id: 'flat', name: 'YABA FLATS', sale: 25000, kind: 'house', blocks: [[3, 1], [4, 6], [3, 6]], w: 16, d: 12, h: 13, color: '#e8d2b0', sign: '#7a5444', filler: true },
+  { id: 'flat', name: 'YABA FLATS', sale: 25000, kind: 'house', blocks: [[3, 1], [4, 6], [3, 6]], w: 16, d: 12, h: 10.8, color: '#e8d2b0', sign: '#7a5444', filler: true },
   { id: 'penthouse', name: 'LEKKI PEARL TOWERS', sale: 150000, kind: 'house', blocks: [[isl(2), 6], [isl(4), 6], [isl(0), 6]], w: 18, d: 14, h: 34, color: '#a9c4d4', sign: '#0d2a4a', filler: true },
   { id: 'garage', name: 'EBUTE METTA GARAGE', sale: 40000, kind: 'garage', blocks: [[3, 5], [4, 5], [3, 4]], w: 18, d: 12, h: 6, color: '#bdb6a8', sign: '#e0a020', filler: true },
 ]
@@ -230,7 +234,11 @@ function addCivicBuildings(city) {
     if (c.filler) {
       // Neighbours on the back half of the block, so it isn't a bare lot.
       const r = mulberry32(c.id.length * 97 + x)
-      for (const side of [-1, 1]) city.buildings.push({ x: x + side * 7.5, z: z - 9, w: 13, d: 11, h: 8 + Math.floor(r() * 12), color: ['#e9b8a0', '#cfe0d0', '#f0e2b6', '#c9d4e8'][Math.floor(r() * 4)] })
+      const island = x > ISLAND.minX
+      for (const side of [-1, 1]) {
+        const tall = r()
+        city.buildings.push({ x: x + side * 7.5, z: z - 9, w: 13, d: 11, h: island ? 14 + Math.floor(tall * 20) : storeys(tall < 0.6 ? 2 : 3), color: ['#e9b8a0', '#cfe0d0', '#f0e2b6', '#c9d4e8'][Math.floor(r() * 4)], style: island ? 'mid' : 'low' })
+      }
     }
     if (c.kind === 'garage') {
       // A wide roller door and a concrete apron to drive onto.
@@ -572,7 +580,10 @@ export function generateCity(seed = 2026) {
     // Small houses get a pitched roof; picked from the count so the random
     // sequence (and so the rest of the layout) stays the same.
     const n = city.buildings.length
-    if (b.h < 13 && (n * 7919) % 10 < 7) {
+    // Bungalows mostly have pitched zinc roofs; storey buildings mostly a flat
+    // roof behind a parapet.
+    const pitched = b.h < 6 ? 8 : b.h < 9 ? 5 : b.h < 13 ? 3 : 0
+    if ((n * 7919) % 10 < pitched) {
       b.roof = { h: Math.min(b.w, b.d) * 0.38, color: ROOF_COLORS[(n * 31) % ROOF_COLORS.length] }
     }
     city.buildings.push(b)
@@ -592,8 +603,12 @@ export function generateCity(seed = 2026) {
       for (let b = 0; b < lots; b++) {
         if (rows && !rows(b, lots)) continue
         if (rand() < 0.1) continue // empty lot
-        const h = isTower ? 26 + rand() * 40 : style === 'mid' ? 10 + rand() * 16 : 5 + rand() * (rand() < 0.2 ? 18 : 9)
+        const raw = isTower ? 26 + rand() * 40 : style === 'mid' ? 10 + rand() * 16 : 5 + rand() * (rand() < 0.2 ? 18 : 9)
+        // The Mainland is low: bungalows and two-storey "storey buildings",
+        // some three-storey, hardly any taller. Marina and VI are the towers.
+        const h = isTower ? 34 + (raw - 26) * 1.35 : style === 'mid' ? raw + 2 : storeys(raw < 7 ? 1 : raw < 12.5 ? 2 : raw < 20 ? 3 : 4)
         addBuilding({
+          style,
           x: x - (BLOCK - 6) / 2 + lotSize * (a + 0.5),
           z: z - (BLOCK - 6) / 2 + lotSize * (b + 0.5),
           w: lotSize - 1.5 - rand() * 2,

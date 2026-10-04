@@ -5,6 +5,7 @@ import { Physics } from '@react-three/rapier'
 import City from './game/City'
 import Landmarks from './game/Landmarks'
 import PropertySigns from './game/PropertySigns'
+import StreetFronts from './game/StreetFronts'
 import TrafficLights from './game/TrafficLights'
 import StreetDetails from './game/StreetDetails'
 import Traffic from './game/Traffic'
@@ -84,6 +85,7 @@ export default function App() {
             <City />
             <Landmarks />
             <PropertySigns />
+            <StreetFronts />
             <TrafficLights />
             <StreetDetails />
             <Traffic />
