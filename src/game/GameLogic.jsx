@@ -1315,6 +1315,7 @@ export default function GameLogic() {
       trespass: () => !!world.trespass,
       gateOpen: () => !!world.gateOpen,
       brawl: () => startStreetFight(world.focus),
+      flightInfo: () => world.flight && { t: world.flight.t, duration: world.flight.path.duration, pose: world.flight.pose },
       boarders: () => npcs.filter((n) => n.kind === 'boarding').map((n) => [Math.round(n.x * 10) / 10, Math.round(n.z * 10) / 10, n.moving]),
       brawlers2: () => npcs.filter((n) => n.brawlWith || n.watching).map((n) => ({ i: n.index, x: n.x, z: n.z, b: !!n.brawlWith, w: !!n.watching })),
       armed: () => npcs.filter((n) => n.armed && n.kind === 'walk' && n.x !== undefined).map((n) => ({ i: n.index, x: n.x, z: n.z })),

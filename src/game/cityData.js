@@ -370,7 +370,8 @@ function addAirport(city) {
   const tx = cx + 10
   city.buildings.push({ x: tx, z: tz, w: 72, d: 14, h: 11, color: '#dfe6ea', landmark: true, facade: 'tower' })
   city.solids.push({ x: tx, z: tz + 7 + 2.5, w: 64, d: 5, h: 0.35, color: '#e9edf0', y: 4.6 }) // drop-off canopy
-  for (let k = -3; k <= 3; k++) city.solids.push({ x: tx + k * 10, z: tz + 7 + 4.6, w: 0.35, d: 0.35, h: 4.6, color: '#c9cdd2', collider: true })
+  // (Pillars clear of the departures and arrivals doors at ±18.)
+  for (const dx of [-30, -24, -12, -6, 6, 12, 24, 30]) city.solids.push({ x: tx + dx, z: tz + 7 + 4.6, w: 0.35, d: 0.35, h: 4.6, color: '#c9cdd2', collider: true })
   city.signs.push({ text: 'MURTALA MUHAMMED INTERNATIONAL AIRPORT', x: tx, y: 8.6, z: tz + 7.08, rot: 0, w: 40, h: 2.2, bg: '#0d3b6e', fg: '#ffffff', glow: '#9fd6ff' })
   city.signs.push({ text: 'DEPARTURES', x: tx - 18, y: 3.4, z: tz + 7.08, rot: 0, w: 7, h: 0.9, bg: '#1b1b24', fg: '#ffd23a' })
   city.signs.push({ text: 'ARRIVALS', x: tx + 18, y: 3.4, z: tz + 7.08, rot: 0, w: 7, h: 0.9, bg: '#1b1b24', fg: '#ffd23a' })
@@ -439,7 +440,8 @@ function addEkoAtlantic(city) {
   const tz = bz + 18
   city.buildings.push({ x: tx, z: tz, w: 58, d: 14, h: 10, color: '#e6ecef', landmark: true, facade: 'tower' })
   city.solids.push({ x: tx, z: tz - 7 - 2.5, w: 50, d: 5, h: 0.35, color: '#e9edf0', y: 4.4 }) // canopy
-  for (let k = -2; k <= 2; k++) city.solids.push({ x: tx + k * 12, z: tz - 7 - 4.6, w: 0.35, d: 0.35, h: 4.4, color: '#c9cdd2', collider: true })
+  // Canopy pillars either side of the two doors, never in front of them.
+  for (const dx of [-24, -18, -6, 6, 18, 24]) city.solids.push({ x: tx + dx, z: tz - 7 - 4.6, w: 0.35, d: 0.35, h: 4.4, color: '#c9cdd2', collider: true })
   city.signs.push({ text: 'EKO ATLANTIC AIRPORT', x: tx, y: 8.2, z: tz - 7.08, rot: Math.PI, w: 26, h: 2, bg: '#0d3b6e', fg: '#ffffff', glow: '#9fd6ff' })
   city.signs.push({ text: 'DEPARTURES', x: tx - 12, y: 3.4, z: tz - 7.08, rot: Math.PI, w: 7, h: 0.9, bg: '#1b1b24', fg: '#ffd23a' })
   city.solids.push({ x: tx - 12, z: tz - 7.05, w: 3, d: 0.12, h: 2.8, color: '#ffd9a0', emissive: true })
